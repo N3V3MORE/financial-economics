@@ -53,13 +53,19 @@ uv run --frozen --group animation manim -qh --fps 30 --media_dir outputs/animati
 ```
 
 The 1080p video is `outputs/animation/videos/phase1_results/1080p30/PhaseOneResults.mp4`.
-It shows the eight-fund allocation, growth of $1,000, risk comparisons, and CAPM interpretation.
+It follows two portfolios through the same dates, then zooms into the 2020 decline
+with both rebased to $100 at the February 19 close. The existing monthly portfolio
+continues unchanged; rebasing the display does not add a rebalance.
+The 2020 example is illustrative, not evidence of protection in every downturn.
+Its losses from the common starting date differ from full-sample maximum drawdowns.
+The film ends with full-period growth and volatility; CAPM stays in the written report.
 Every estimate comes from the local analysis outputs; inconsistent return statistics stop the render.
 The film is silent, with on-screen captions, and needs no LaTeX installation. It uses Segoe UI
 on Windows; Manim's text renderer substitutes an available font on other systems.
 For a faster draft, replace `-qh --fps 30` with `-ql --fps 15`.
 Set `FECON_RESULTS_DIR` to show another analysis of the same eight-fund SPY universe.
-CAPM estimates are read from the saved table rather than re-estimated by the film.
+Growth curves and their markers advance under one shared time cursor. Full-period
+paths use weekly points; the 2020 detail and numerical statistics use daily data.
 No provider data is downloaded during rendering. Generated videos and rendering caches
 stay inside ignored `outputs/`.
 

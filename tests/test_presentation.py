@@ -7,7 +7,7 @@ import pandas as pd
 import pytest
 
 from financial_economics.analysis import performance_summary
-from financial_economics.presentation import load_presentation
+from financial_economics.presentation import load_presentation, rebased_window, time_prefix
 
 
 @pytest.fixture
@@ -48,3 +48,23 @@ def test_presentation_rejects_results_from_different_runs(saved_results, filenam
     table.to_csv(saved_results / filename)
     with pytest.raises(ValueError, match="inconsistent"):
         load_presentation(saved_results)
+
+
+def test_window_rebases_existing_wealth_at_the_same_closing_date(saved_results):
+    result = load_presentation(saved_results)
+    window = rebased_window(result, "2020-01-02", "2020-01-06")
+    np.testing.assert_allclose(window.iloc[0], [100, 100])
+    np.testing.assert_allclose(window.iloc[-1], [84, 91.8])
+    with pytest.raises(ValueError, match="observed"):
+        rebased_window(result, "2020-01-01", "2020-01-06")
+
+
+def test_line_reveal_uses_one_time_for_both_series_and_never_shows_future_points():
+    times = np.array([0, 2, 5])
+    values = np.array([[100, 100], [90, 110], [150, 80]])
+    x, y = time_prefix(times, values, 3)
+    np.testing.assert_allclose(x, [0, 2, 3])
+    np.testing.assert_allclose(y, [[100, 100], [90, 110], [110, 100]])
+    x, y = time_prefix(times, values, 2)
+    np.testing.assert_allclose(x, [0, 2])
+    np.testing.assert_allclose(y, values[:2])

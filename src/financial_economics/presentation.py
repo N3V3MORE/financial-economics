@@ -61,3 +61,22 @@ def load_presentation(folder: str | Path) -> PresentationData:
         1000 * (1 + returns).cumprod(),
     ], ignore_index=True)
     return PresentationData(returns.index, wealth, performance, capm, metadata, benchmark)
+
+
+def rebased_window(data: PresentationData, start: str, end: str) -> pd.DataFrame:
+    """Rebase existing holdings at a shared close, without an extra rebalance."""
+    start, end = pd.Timestamp(start), pd.Timestamp(end)
+    if start not in data.dates or end not in data.dates or start >= end:
+        raise ValueError("Choose two observed closing dates in increasing order.")
+    wealth = data.wealth.iloc[1:].copy()
+    wealth.index = data.dates
+    window = wealth.loc[start:end]
+    return 100 * window / window.iloc[0]
+
+
+def time_prefix(times: np.ndarray, values: np.ndarray, position: float):
+    """Reveal every series through the same time, interpolating its endpoint."""
+    position = float(np.clip(position, times[0], times[-1]))
+    stop = np.searchsorted(times, position, side="left")
+    endpoint = [np.interp(position, times, column) for column in values.T]
+    return np.r_[times[:stop], position], np.vstack([values[:stop], endpoint])
