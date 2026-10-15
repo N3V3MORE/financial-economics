@@ -1,272 +1,252 @@
-"""A silent, captioned film of the saved ETF baseline. No network calls or LaTeX."""
+"""A continuous, captioned comparison drawn from the saved daily results."""
 
+import json
 import os
 from pathlib import Path
 
 import numpy as np
 from manim import (
-    AnimationGroup, Create, Dot, FadeIn, FadeOut, Group, GrowFromEdge, LEFT, Line,
-    Rectangle, RoundedRectangle, Scene, Text, UP, VGroup, VMobject, linear,
+    Dot, FadeIn, FadeOut, FadeTransform, Group, LEFT, Line, Scene, Text, Transform,
+    UP, ValueTracker, VGroup, VMobject, linear,
 )
 
-from financial_economics.presentation import load_presentation
+from financial_economics.presentation import load_presentation, rebased_window, time_prefix
 
 
 ROOT = Path(__file__).resolve().parents[1]
-BACKGROUND = "#0C1424"
-TEXT = "#F1F5FA"
-MUTED = "#A6B4C8"
-GRID = "#27354B"
-SPY = "#91B8FF"
-PORTFOLIO = "#64E0C4"
-ACCENT = "#EACB88"
-FONT = "Segoe UI"
+PAPER = "#F5F1E9"
+INK = "#252925"
+MUTED = "#62665F"
+GRID = "#D8D3C9"
+COLORS = ["#B45232", "#285E89"]
+NAMES = ["SPY", "8-fund mix"]
+ASSETS = ["SPY", "Equal weight"]
 
 
-def label(text, size=26, color=TEXT):
-    return Text(text, font=FONT, font_size=size, color=color, disable_ligatures=True)
+def text(words, size=30, color=INK, headline=False):
+    return Text(words, font="Georgia" if headline else "Segoe UI",
+                font_size=size, color=color, disable_ligatures=True)
 
 
-def at_left(mobject, x, y):
+def left_at(mobject, x, y):
     return mobject.move_to([x + mobject.width / 2, y, 0])
 
 
+class TimelinePlot(VGroup):
+    """Two paths and one shared time cursor; all movement follows the x-axis."""
+
+    left, right, bottom, top = -5.45, 4.55, -1.65, 1.55
+
+    def __init__(self, times, values, ylim, xticks, yticks):
+        super().__init__()
+        self.times, self.values, self.ylim = times, values, ylim
+        self.axes = self.make_axes(xticks, yticks)
+        self.curves = VGroup(*(VMobject(stroke_color=c, stroke_width=3.5) for c in COLORS))
+        self.dots = VGroup(*(Dot(radius=0.055, color=c) for c in COLORS))
+        self.cursor = Line([0, self.bottom, 0], [0, self.top, 0],
+                           stroke_color=MUTED, stroke_width=1, stroke_opacity=0.5)
+        self.add(self.axes, self.cursor, self.curves, self.dots)
+        self.seek(times[0])
+
+    def point(self, when, value):
+        x = self.left + (self.right - self.left) * (when - self.times[0]) / np.ptp(self.times)
+        y = self.bottom + (self.top - self.bottom) * (value - self.ylim[0]) / np.ptp(self.ylim)
+        return np.array([x, y, 0.0])
+
+    def make_axes(self, xticks, yticks):
+        axes = VGroup()
+        for value, word in yticks:
+            baseline = value == 100 and self.ylim[1] < 200
+            axes.add(Line(self.point(self.times[0], value), self.point(self.times[-1], value),
+                          stroke_color=MUTED if baseline else GRID,
+                          stroke_width=1.4 if baseline else 0.8))
+            tick = text(word, 23, MUTED)
+            tick.move_to([self.left - 0.55, self.point(self.times[0], value)[1], 0])
+            axes.add(tick)
+        for when, word in xticks:
+            axes.add(text(word, 23, MUTED).move_to([self.point(when, 0)[0], self.bottom - 0.37, 0]))
+        return axes
+
+    def seek(self, when):
+        dates, values = time_prefix(self.times, self.values, when)
+        for i, (curve, dot) in enumerate(zip(self.curves, self.dots)):
+            points = np.array([self.point(day, value) for day, value in zip(dates, values[:, i])])
+            if len(points) == 1:
+                points = np.repeat(points, 2, axis=0)
+            curve.set_points_as_corners(points)
+            dot.move_to(points[-1])
+        x = self.point(dates[-1], values[-1, 0])[0]
+        self.cursor.put_start_and_end_on([x, self.bottom, 0], [x, self.top, 0])
+        return self
+
+
 class PhaseOneResults(Scene):
-    """Four chapters, with every displayed estimate read from the saved outputs."""
+    """Full-period growth, a common-date 2020 example, and the research next step."""
 
     def construct(self):
-        self.camera.background_color = BACKGROUND
-        folder = Path(os.environ.get("FECON_RESULTS_DIR", ROOT / "outputs" / "phase1"))
-        self.results = load_presentation(folder)
-        if (set(self.results.metadata["study"]["assets"])
+        self.camera.background_color = PAPER
+        self.data = load_presentation(Path(os.environ.get("FECON_RESULTS_DIR", ROOT / "outputs/phase1")))
+        if (set(self.data.metadata["study"]["assets"])
                 != {"SPY", "QQQ", "VNQ", "GLD", "XLE", "XLY", "VIG", "TLT"}
-                or self.results.benchmark != "SPY"):
-            raise ValueError("This film supports the eight-fund SPY baseline in study.toml.")
+                or self.data.benchmark != "SPY"):
+            raise ValueError("This film supports the eight-fund SPY universe in study.toml.")
         self.chapter_times = []
-        self.introduction()
-        self.growth()
-        self.risk()
-        self.interpretation()
-        # This also catches accidental cropping during the low-resolution draft.
-        folder = ROOT / "outputs" / "animation"
-        folder.mkdir(parents=True, exist_ok=True)
-        import json
-        (folder / "chapters.json").write_text(
-            json.dumps(self.chapter_times, indent=2), encoding="utf-8"
-        )
+        self.title = left_at(text("What did the mix change?", 49, headline=True), -6.15, 3.05)
+        self.subtitle = left_at(text("SPY versus eight equally weighted funds", 29, MUTED), -6.15, 2.35)
+        self.caption = text("Reset to equal weights every month.", 29, MUTED).move_to([0, -2.95, 0])
+        self.legend = VGroup()
+        for i, (name, color) in enumerate(zip(NAMES, COLORS)):
+            x = -5.3 + 3.6 * i
+            swatch = Line([x, 1.95, 0], [x + 0.36, 1.95, 0], stroke_color=color, stroke_width=4)
+            self.legend.add(swatch, left_at(text(name, 27, color), x + 0.55, 1.95))
+        self.play(FadeIn(self.title, shift=UP * 0.12), FadeIn(self.subtitle), run_time=1)
+        self.play(FadeIn(self.legend), FadeIn(self.caption), run_time=0.7)
+        self.wait(2)
+
+        self.chapter("Full-period growth")
+        times, values, xticks = self.full_period()
+        ymax = np.ceil(values.max() / 2000) * 2000
+        self.full_spec = (times, values, (0, ymax), xticks,
+                          [(v, "$0" if v == 0 else f"${v / 1000:g}k")
+                           for v in np.linspace(0, ymax, 5)])
+        self.plot = TimelinePlot(*self.full_spec)
+        self.change_words("Start with $1,000.", "2010–2025 · dividends included",
+                          "Follow both portfolios through the same dates.")
+        self.play(FadeIn(self.plot), run_time=0.8)
+        self.advance(times[0], times[-1], 8)
+        self.ends = self.endpoint_labels()
+        self.play(FadeIn(self.ends), run_time=0.6)
+        lower_growth = values[-1, 1] < values[-1, 0]
+        self.change_caption("The mix finished lower." if lower_growth else "The mix finished higher.")
+        self.wait(2.8)
+
+        self.chapter("A common-date 2020 example")
+        window = rebased_window(self.data, "2020-02-19", "2020-08-31")[ASSETS]
+        days = (window.index - window.index[0]).days.to_numpy(dtype=float)
+        ticks = [(0, "19 Feb"), (33, "23 Mar"), (103, "1 Jun"), (194, "31 Aug")]
+        self.change_plot((days, window.to_numpy(), (60, 120), ticks,
+                          [(v, f"${v}") for v in [60, 80, 100, 120]]),
+                         "Watch the 2020 fall.", "19 Feb–31 Aug · both start at $100",
+                         "Same starting date. Same monthly portfolio rule.")
+        trough_date = window["SPY"].idxmin()
+        trough = float((trough_date - window.index[0]).days)
+        self.advance(0, trough, 4)
+        self.ends = self.endpoint_labels(position=trough, loss=True)
+        date_label = text(trough_date.strftime("%d %B %Y").lstrip("0"), 27, MUTED).move_to([0, -2.48, 0])
+        self.play(FadeIn(self.ends), FadeIn(date_label), run_time=0.6)
+        self.change_caption("The mix lost less from the shared starting date.")
+        self.wait(4.5)
+        self.play(FadeOut(self.ends), FadeOut(date_label), run_time=0.4)
+        self.ends = VGroup()
+        self.advance(trough, days[-1], 5)
+        self.change_caption("By 31 August, both were back above $100.")
+        self.wait(3)
+
+        self.chapter("What the full sample shows")
+        vol = self.data.performance.loc[ASSETS, "annualized_volatility"]
+        growth_word = "Less" if lower_growth else "More"
+        risk_word = "Less" if vol.iloc[1] < vol.iloc[0] else "More"
+        self.change_plot(self.full_spec, f"{growth_word} growth. {risk_word} fluctuation.",
+                         "2010–2025 · the full sample", "Same dates. Same starting amount.", complete=True)
+        self.ends = self.endpoint_labels()
+        self.play(FadeIn(self.ends), FadeOut(self.caption), run_time=0.5)
+        comparison = text(f"Annual volatility:  SPY {vol.iloc[0]:.1%}  ·  mix {vol.iloc[1]:.1%}", 29)
+        comparison.move_to([0, -2.7, 0])
+        next_step = text("Next: compare the mix across several downturns.", 28, MUTED)
+        next_step.move_to([0, -3.3, 0])
+        qualification = text("Selected funds · Historical returns · Trading costs and taxes excluded", 19, MUTED)
+        qualification.move_to([0, -3.75, 0])
+        self.play(FadeIn(comparison), run_time=0.6)
+        self.wait(2.5)
+        self.play(FadeIn(next_step), FadeIn(qualification), run_time=0.6)
+        self.wait(3.5)
+        self.check_bounds(Group(*self.mobjects))
+        out = ROOT / "outputs/animation"
+        out.mkdir(parents=True, exist_ok=True)
+        (out / "chapters.json").write_text(json.dumps(self.chapter_times, indent=2), encoding="utf-8")
+        evidence = {
+            "episode": "2020-02-19 close through 2020-08-31 close",
+            "initial_value": 100,
+            "trough_date": str(trough_date.date()),
+            "trough_values": window.loc[trough_date].to_dict(),
+            "end_values": window.iloc[-1].to_dict(),
+            "qualification": "Illustrative common-date losses, not full-sample maximum drawdowns.",
+            "sources": ["daily_returns.csv", "performance.csv", "run.json"],
+        }
+        (out / "episode.json").write_text(json.dumps(evidence, indent=2), encoding="utf-8")
+
+    def chapter(self, title):
+        self.chapter_times.append({"chapter": title, "start_seconds": round(self.time, 2)})
+
+    def full_period(self):
+        dates = self.data.dates
+        weekly = np.flatnonzero(~dates.to_period("W").duplicated(keep="last")) + 1
+        positions = np.r_[0, weekly]
+        values = self.data.wealth[ASSETS].iloc[positions].to_numpy()
+        tick_years = [dates[0].year, 2015, 2020, dates[-1].year]
+        xticks = [(int(np.flatnonzero(dates.year == year)[0]) + 1, str(year))
+                  for year in sorted(set(tick_years)) if year in dates.year]
+        return positions.astype(float), values, xticks
+
+    def advance(self, start, end, seconds):
+        tracker = ValueTracker(start)
+        self.plot.add_updater(lambda plot: plot.seek(tracker.get_value()))
+        self.play(tracker.animate.set_value(end), run_time=seconds, rate_func=linear)
+        self.plot.clear_updaters()
+        self.plot.seek(end)
+        self.remove(tracker)
+
+    def change_words(self, title, subtitle, caption):
+        replacements = [left_at(text(title, 49, headline=True), -6.15, 3.05),
+                        left_at(text(subtitle, 29, MUTED), -6.15, 2.35),
+                        text(caption, 29, MUTED).move_to([0, -3.05, 0])]
+        self.check_bounds(Group(*replacements))
+        self.play(*(FadeTransform(old, new) for old, new in zip(
+            [self.title, self.subtitle, self.caption], replacements)), run_time=0.8)
+        self.title, self.subtitle, self.caption = replacements
+
+    def change_caption(self, words):
+        replacement = text(words, 29, MUTED).move_to([0, -3.05, 0])
+        self.check_bounds(Group(replacement))
+        self.play(FadeTransform(self.caption, replacement), run_time=0.5)
+        self.caption = replacement
+
+    def change_plot(self, spec, title, subtitle, caption, complete=False):
+        target = TimelinePlot(*spec)
+        position = spec[0][-1] if complete else spec[0][0]
+        target.seek(position)
+        self.play(FadeOut(self.ends), run_time=0.35)
+        self.change_words(title, subtitle, caption)
+        self.play(Transform(self.plot.axes, target.axes), Transform(self.plot.curves, target.curves),
+                  Transform(self.plot.dots, target.dots), Transform(self.plot.cursor, target.cursor),
+                  run_time=1.1)
+        self.plot.times, self.plot.values, self.plot.ylim = spec[:3]
+        self.plot.seek(position)
+        self.ends = VGroup()
+
+    def endpoint_labels(self, position=None, loss=False):
+        position = self.plot.times[-1] if position is None else position
+        values = [np.interp(position, self.plot.times, col) for col in self.plot.values.T]
+        anchors = [self.plot.point(position, value) for value in values]
+        labels = VGroup()
+        for i, (name, color, value, anchor) in enumerate(zip(NAMES, COLORS, values, anchors)):
+            if loss:
+                y = -0.35 if i == 1 else -1.25
+                words = f"{name}: ${value:.0f}  ({value / 100 - 1:.1%})"
+                tag = left_at(text(words, 27, color), anchor[0] + 0.5, y)
+                connector = Line(anchor, tag.get_left() + LEFT * 0.12,
+                                 stroke_color=color, stroke_width=1.2)
+                labels.add(connector, tag)
+            else:
+                tag = VGroup(text(name, 26, color), text(f"${value:,.0f}", 31))
+                tag.arrange(np.array([0, -1, 0]), buff=0.11, aligned_edge=LEFT)
+                left_at(tag, 4.8, anchor[1])
+                labels.add(tag)
+        self.check_bounds(labels)
+        return labels
 
     def check_bounds(self, group):
         for obj in group:
-            if (obj.get_left()[0] < -6.85 or obj.get_right()[0] > 6.85
-                    or obj.get_top()[1] > 3.90 or obj.get_bottom()[1] < -3.90):
+            if (obj.get_left()[0] < -6.9 or obj.get_right()[0] > 6.9
+                    or obj.get_top()[1] > 3.9 or obj.get_bottom()[1] < -3.9):
                 raise ValueError(f"Presentation object is outside the safe frame: {obj}")
-
-    def header(self, chapter, title, footer):
-        self.chapter_times.append({"chapter": title, "start_seconds": round(self.time, 2)})
-        brand = at_left(label("FINANCIAL ECONOMICS  /  PHASE 1", 17, MUTED), -6.3, 3.45)
-        page = label(f"0{chapter} / 04", 17, MUTED).move_to([5.95, 3.45, 0])
-        rule = Line([-6.3, 3.1, 0], [6.3, 3.1, 0], stroke_color=GRID, stroke_width=1)
-        foot = label(footer, 15, MUTED).move_to([0, -3.65, 0])
-        group = VGroup(brand, page, rule, foot)
-        self.check_bounds(group)
-        self.play(FadeIn(group), run_time=0.7)
-        return group
-
-    def clear_chapter(self):
-        self.play(FadeOut(Group(*self.mobjects)), run_time=0.7)
-
-    def introduction(self):
-        data = self.results
-        n = len(data.metadata["study"]["assets"])
-        years = f"{data.dates[0].year}–{data.dates[-1].year}"
-        self.header(1, "The question", "Retrospectively selected funds • Historical comparison")
-        title = label("What did diversification change?", 46)
-        at_left(title, -6.3, 2.45)
-        subtitle = at_left(label(f"{n} funds · {years} · {len(data.dates):,} daily observations", 25, MUTED), -6.3, 1.7)
-        self.play(FadeIn(title, shift=UP * 0.15), FadeIn(subtitle), run_time=1.0)
-
-        tiles = VGroup()
-        for i, (ticker, name) in enumerate(data.metadata["study"]["assets"].items()):
-            x = -4.8 + (i % 4) * 3.2
-            y = 0.65 - (i // 4) * 1.25
-            tile = RoundedRectangle(width=2.9, height=1.05, corner_radius=0.13,
-                                    stroke_width=1, stroke_color=GRID)
-            tile.move_to([x, y, 0])
-            ticker_text = label(ticker, 29, SPY if ticker == data.benchmark else TEXT)
-            ticker_text.move_to([x, y + 0.18, 0])
-            # Use short, readable categories; full instrument names stay in study.toml.
-            category = {"SPY": "S&P 500", "QQQ": "Nasdaq-100", "VNQ": "Real estate",
-                        "GLD": "Gold", "XLE": "Energy", "XLY": "Consumer stocks",
-                        "VIG": "Dividend growth", "TLT": "Long Treasuries"}.get(ticker, name)
-            name_text = label(category, 18, MUTED)
-            if name_text.width > 2.6:
-                name_text.scale_to_fit_width(2.6)
-            name_text.move_to([x, y - 0.25, 0])
-            tiles.add(VGroup(tile, ticker_text, name_text))
-        self.check_bounds(tiles)
-        self.play(AnimationGroup(*(FadeIn(tile, shift=UP * 0.12) for tile in tiles),
-                                 lag_ratio=0.13), run_time=2.2)
-        allocation = label(f"{100 / n:g}% in each fund. Reset every month.", 32, PORTFOLIO)
-        allocation.move_to([0, -1.8, 0])
-        benchmark = label(f"Compare the mix with {data.benchmark}, the S&P 500 fund.", 25, MUTED)
-        benchmark.move_to([0, -2.55, 0])
-        self.check_bounds(VGroup(title, subtitle, allocation, benchmark))
-        self.play(FadeIn(allocation), run_time=0.8)
-        self.wait(2.8)
-        self.play(FadeIn(benchmark), run_time=0.8)
-        self.wait(3.8)
-        self.clear_chapter()
-
-    def growth(self):
-        data = self.results
-        self.header(2, "Growth", "Yahoo Finance adjusted prices • Weekly chart points • Daily statistics")
-        title = at_left(label("How $1,000 grew", 43), -6.3, 2.45)
-        subtitle = at_left(label("Same starting amount. Same dates. Dividends included.", 24, MUTED), -6.3, 1.82)
-        self.play(FadeIn(title), FadeIn(subtitle), run_time=0.9)
-        left, right, bottom, top = -5.65, 4.5, -1.8, 1.3
-        selected = [data.benchmark, "Equal weight"]
-        ceiling = np.ceil(data.wealth[selected].to_numpy().max() / 2000) * 2000
-
-        def point(day, value):
-            return np.array([left + (right - left) * day / len(data.dates),
-                             bottom + (top - bottom) * value / ceiling, 0])
-
-        axes = VGroup()
-        for value in np.linspace(0, ceiling, 5):
-            line = Line(point(0, value), point(len(data.dates), value),
-                        stroke_color=GRID, stroke_width=1)
-            tick = label(f"${value / 1000:g}k" if value else "$0", 18, MUTED)
-            tick.move_to([left - 0.47, point(0, value)[1], 0])
-            axes.add(line, tick)
-        tick_years = list(range(data.dates[0].year, data.dates[-1].year, 4))
-        tick_years.append(data.dates[-1].year)
-        for year in tick_years:
-            index = int(np.flatnonzero(data.dates.year == year)[0]) + 1
-            axes.add(label(str(year), 19, MUTED).move_to([point(index, 0)[0], bottom - 0.3, 0]))
-        self.play(FadeIn(axes), run_time=0.8)
-
-        weekly_positions = (np.flatnonzero(~data.dates.to_period("W").duplicated(keep="last")) + 1)
-        positions = np.r_[0, weekly_positions]
-        curves = VGroup()
-        for asset, color in zip(selected, [SPY, PORTFOLIO]):
-            curve = VMobject(stroke_color=color, stroke_width=3)
-            curve.set_points_as_corners([point(i, data.wealth.iloc[i][asset]) for i in positions])
-            curves.add(curve)
-        self.play(*(Create(curve) for curve in curves), run_time=8, rate_func=linear)
-
-        endpoints = VGroup()
-        for asset, name, color in zip(selected, [data.benchmark, "Eight funds"], [SPY, PORTFOLIO]):
-            final = data.wealth.iloc[-1][asset]
-            end = point(len(data.dates), final)
-            tag = VGroup(label(name, 20, color), label(f"${final:,.0f}", 27, TEXT))
-            tag.arrange(direction=np.array([0, -1, 0]), buff=0.13, aligned_edge=LEFT)
-            at_left(tag, 4.73, end[1])
-            endpoints.add(Dot(end, radius=0.045, color=color), tag)
-        annual = label(
-            f"Annual growth   {data.benchmark}: {data.performance.loc[data.benchmark, 'cagr']:.2%}"
-            f"    /    Eight funds: {data.performance.loc['Equal weight', 'cagr']:.2%}", 25)
-        annual.move_to([0, -2.6, 0])
-        winner = (data.benchmark if data.wealth.iloc[-1][data.benchmark]
-                  > data.wealth.iloc[-1]["Equal weight"] else "The fund mix")
-        caption = label(f"{winner} grew more over this period.", 26, MUTED)
-        caption.move_to([0, -3.15, 0])
-        self.check_bounds(VGroup(title, subtitle, axes, endpoints, annual, caption))
-        self.play(FadeIn(endpoints), FadeIn(annual), run_time=1.0)
-        self.wait(3)
-        self.play(FadeIn(caption), run_time=0.7)
-        self.wait(4.2)
-        self.clear_chapter()
-
-    def risk(self):
-        data = self.results
-        self.header(3, "Risk", "Worst falls are each portfolio's own extreme; they need not occur together")
-        smoother = (data.performance.loc["Equal weight", "annualized_volatility"]
-                    < data.performance.loc[data.benchmark, "annualized_volatility"])
-        smaller_fall = (data.performance.loc["Equal weight", "max_drawdown"]
-                        > data.performance.loc[data.benchmark, "max_drawdown"])
-        heading = "The mix had a smoother ride" if smoother else "How the risks compared"
-        title = at_left(label(heading, 43), -6.3, 2.45)
-        legend = VGroup(label(data.benchmark, 23, SPY), label("Eight funds", 23, PORTFOLIO))
-        legend.arrange(buff=0.65).move_to([3.95, 1.68, 0])
-        self.play(FadeIn(title), FadeIn(legend), run_time=0.9)
-        panels = [(-6.3, "Return fluctuation", "Annualized volatility", "annualized_volatility"),
-                  (0.5, "Worst fall from a peak", "Maximum drawdown", "max_drawdown")]
-        all_bars, descriptions = VGroup(), VGroup()
-        for x, heading, detail, field in panels:
-            heading_text = at_left(label(heading, 29), x, 0.96)
-            detail_text = at_left(label(detail, 20, MUTED), x, 0.45)
-            descriptions.add(heading_text, detail_text)
-            # Identical zero-based scales within each paired comparison.
-            values = [abs(data.performance.loc[asset, field]) for asset in [data.benchmark, "Equal weight"]]
-            maximum = np.ceil(max(values) * 100 / 5) * 5 / 100
-            for row, (value, color) in enumerate(zip(values, [SPY, PORTFOLIO])):
-                y = -0.27 - row * 0.95
-                track = Rectangle(width=3.6, height=0.28, stroke_width=0,
-                                  fill_color=GRID, fill_opacity=1)
-                at_left(track, x, y)
-                bar = Rectangle(width=3.6 * value / maximum, height=0.28,
-                                stroke_width=0, fill_color=color, fill_opacity=1)
-                at_left(bar, x, y)
-                number = at_left(label(f"{value:.2%}", 30, color), x + 3.8, y)
-                self.add(track)
-                all_bars.add(VGroup(bar, number))
-        self.check_bounds(VGroup(title, legend, descriptions, all_bars))
-        self.play(FadeIn(descriptions), run_time=0.8)
-        for bars in [all_bars[:2], all_bars[2:]]:
-            self.play(*(GrowFromEdge(pair[0], LEFT) for pair in bars),
-                      *(FadeIn(pair[1]) for pair in bars), run_time=1.6)
-            self.wait(2.3)
-        conclusion = ("Less fluctuation, with a smaller worst decline."
-                      if smoother and smaller_fall else "Risk depends on the allocation and the period.")
-        caption = label(conclusion, 29, PORTFOLIO)
-        caption.move_to([0, -2.35, 0])
-        explanation = label("Substantial losses still occurred in this historical sample.", 23, MUTED)
-        explanation.move_to([0, -3.0, 0])
-        self.check_bounds(VGroup(caption, explanation))
-        self.play(FadeIn(caption), run_time=0.8)
-        self.wait(3)
-        self.play(FadeIn(explanation), run_time=0.7)
-        self.wait(4.0)
-        self.clear_chapter()
-
-    def interpretation(self):
-        data = self.results
-        self.header(4, "Interpretation", "French U.S. market factor • HAC inference • Zero trading costs and taxes")
-        title = at_left(label("What the market model says", 43), -6.3, 2.45)
-        beta = float(data.capm.loc["Equal weight", "beta"])
-        pvalue = float(data.capm.loc["Equal weight", "alpha_pvalue"])
-        self.play(FadeIn(title), run_time=0.8)
-        beta_number = at_left(label(f"{beta:.2f}", 73, PORTFOLIO), -6.3, 0.85)
-        beta_label = at_left(label("Portfolio beta", 26, MUTED), -6.3, -0.05)
-        definition = VGroup(label("A 1 percentage point move in", 27),
-                            label("market excess return was associated", 27),
-                            label(f"with about {beta:.2f} percentage points", 27),
-                            label("in portfolio excess return, on average.", 27))
-        definition.arrange(direction=np.array([0, -1, 0]), aligned_edge=LEFT, buff=0.2)
-        at_left(definition, -2.7, 0.65)
-        self.check_bounds(VGroup(title, beta_number, beta_label, definition))
-        self.play(FadeIn(beta_number), FadeIn(beta_label), FadeIn(definition), run_time=1.0)
-        self.wait(5.2)
-
-        alpha_text = "No clear evidence of CAPM alpha." if pvalue >= 0.05 else "Evidence of CAPM alpha at the 5% level."
-        alpha = at_left(label(alpha_text, 31, ACCENT), -6.3, -1.3)
-        alpha_detail = at_left(label(f"Alpha p-value: {pvalue:.3f}  ·  5% significance threshold", 23, MUTED), -6.3, -1.9)
-        self.check_bounds(VGroup(alpha, alpha_detail))
-        self.play(FadeIn(alpha), FadeIn(alpha_detail), run_time=0.9)
-        self.wait(4.5)
-        self.play(FadeOut(VGroup(beta_number, beta_label, definition, alpha, alpha_detail)), run_time=0.6)
-
-        lower_vol = (data.performance.loc["Equal weight", "annualized_volatility"]
-                     < data.performance.loc[data.benchmark, "annualized_volatility"])
-        lower_growth = (data.performance.loc["Equal weight", "cagr"]
-                        < data.performance.loc[data.benchmark, "cagr"])
-        takeaway = VGroup(label("Less fluctuation." if lower_vol else "More fluctuation.", 44, PORTFOLIO),
-                          label("Less growth." if lower_growth else "More growth.", 44, SPY),
-                          label("A trade-off worth studying.", 37))
-        takeaway.arrange(direction=np.array([0, -1, 0]), aligned_edge=LEFT, buff=0.28)
-        at_left(takeaway, -6.3, 0.3)
-        limit = at_left(label("Historical results. Future performance remains an open question.", 23, MUTED), -6.3, -2.0)
-        self.check_bounds(VGroup(takeaway, limit))
-        self.play(FadeIn(takeaway, shift=UP * 0.15), run_time=0.9)
-        self.play(FadeIn(limit), run_time=0.6)
-        self.wait(5.0)
