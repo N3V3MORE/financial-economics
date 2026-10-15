@@ -101,11 +101,13 @@ def test_contributions_match_dollar_holdings_on_a_simple_example():
     assert table.contribution["B"] == pytest.approx(-.05)
 
 
-@pytest.mark.parametrize("window", [("bad", "2020-02-03", "2020-01-02"),
-                                    ("bad", "2020-01-02", "2020-01-04")])
+@pytest.mark.parametrize("window", [("reversed", "2020-02-03", "2020-01-02"),
+                                    ("weekend end", "2020-01-02", "2020-01-04"),
+                                    ("weekend start", "2020-01-04", "2020-01-10"),
+                                    ("before history", "2019-11-29", "2020-01-10")])
 def test_contributions_reject_unobserved_or_reversed_windows(window):
     returns, _ = _returns()
-    with pytest.raises(ValueError, match="observed end close"):
+    with pytest.raises(ValueError, match="observed start and end closes"):
         fund_contributions(returns, monthly_equal_weight_holdings(returns), [window])
 
 
