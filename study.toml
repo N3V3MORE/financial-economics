@@ -1,0 +1,17 @@
+[study]
+name = "phase1-etfs"
+start = "2010-01-01"
+end = "2025-12-31"
+benchmark = "SPY"
+trading_days = 252
+hac_lags = 5
+
+[assets]
+SPY = "S&P 500 equities"
+QQQ = "Nasdaq-100 equities"
+VNQ = "U.S. real estate equities"
+GLD = "Gold"
+XLE = "Energy equities"
+XLY = "Consumer discretionary equities"
+VIG = "Dividend-growth equities"
+TLT = "Long-duration U.S. Treasuries"

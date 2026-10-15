@@ -11,8 +11,9 @@ Accept your collaborator invitation before cloning the repository or pushing cha
    git switch -c your-task-name
    ```
 
-3. Keep the change focused. Include enough detail for someone else to reproduce calculations and understand the results.
-4. Check your work, commit it, and push your branch:
+3. Install the locked environment with `uv sync --frozen`. Keep the change focused, and explain the economic meaning of any calculation change.
+4. Run `uv run pytest -q`. Add a small synthetic regression test for changed calculation or data-validation behavior. Tests must not call live finance providers.
+5. Commit your work and push your branch:
 
    ```sh
    git add path/to/your-changed-file
@@ -20,6 +21,8 @@ Accept your collaborator invitation before cloning the repository or pushing cha
    git push -u origin your-task-name
    ```
 
-5. Open a pull request on GitHub. Explain what changed, why, and how you checked it. Ask another contributor to review it before merging.
+6. Open a pull request on GitHub. Explain what changed, why, and how you checked it. Ask another contributor to review it before merging.
+
+Change the study universe or sample explicitly in `study.toml`, and document the reason. Fetch a new snapshot for changed settings instead of editing retained data. Keep provider data and generated outputs out of Git; share the commands and interpretation needed to reproduce them.
 
 Do not commit passwords, API keys, or data you do not have permission to share with the collaborators.
