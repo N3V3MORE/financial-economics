@@ -19,3 +19,10 @@ __pycache__/
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# Downloaded provider snapshots and reproducible local outputs
+data/
+outputs/
+*.egg-info/
+dist/
+build/

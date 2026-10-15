@@ -1,0 +1,26 @@
+[project]
+name = "financial-economics"
+version = "0.1.0"
+description = "Reproducible ETF risk, return, and market-exposure analysis"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "matplotlib>=3.9,<4",
+    # Keep pandas 2.x on NumPy 2.3; newer timedelta deprecations fail strict checks.
+    "numpy>=2.3,<2.4",
+    "pandas>=2.2,<3",
+    "statsmodels>=0.14.4,<0.16",
+    "yfinance>=0.2.66,<2",
+]
+
+[project.scripts]
+fecon = "financial_economics.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8,<10"]
+
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

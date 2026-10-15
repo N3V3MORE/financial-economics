@@ -1,25 +1,65 @@
 # Financial Economics
 
-A shared project for studying financial economics through questions, models, and data analysis.
+An ETF study connecting portfolio theory to actual returns. Phase 1 establishes a reproducible baseline: return and risk comparisons, co-movement, a monthly equal-weight portfolio, and CAPM estimates with uncertainty.
 
-This repository starts fresh. The first analysis and software setup have not been chosen yet.
+The longer-term question is whether apparently different ETF exposures provide useful diversification, including during market declines. Phase 1 supplies the data and calculations; it does not yet answer the stress-period or out-of-sample questions.
 
-## Join the project
+## Current study
 
-This is a private repository. Ask the owner, [@N3V3MORE](https://github.com/N3V3MORE), to invite your GitHub username, then accept the invitation on GitHub.
+Eight unleveraged instruments: SPY, QQQ, VNQ, GLD, XLE, XLY, VIG, and TLT. The requested return sample is 2010-01-01 through 2025-12-31. Exact choices live in [study.toml](study.toml).
 
-Once you have access, you can browse the files online or download a working copy:
+Prices come from Yahoo Finance through yfinance; daily risk-free and broad-market excess returns come from Kenneth French. Downloaded data stays local. A manifest records its origin, settings, retrieval time, and hashes so the same snapshot can be analyzed again offline.
+
+## Run it
+
+Install [uv](https://docs.astral.sh/uv/getting-started/installation/), then:
 
 ```sh
 git clone https://github.com/N3V3MORE/financial-economics.git
 cd financial-economics
+uv sync --frozen
+uv run fecon download
+uv run fecon analyze
 ```
 
-## Working together
+Open `outputs/phase1/summary.md`. It links four figures and summarizes the saved CSV results. Only `download` contacts the finance data providers. `analyze` uses the retained, hash-checked snapshot.
 
-- Open an issue to propose a question or discuss a task.
-- Make changes on a separate branch and open a pull request for review.
-- For each analysis, state the question, data source, sample period, units, and assumptions.
-- Explain what the results mean and record how the calculations were checked.
+A snapshot is never silently replaced. To refresh data, choose a new directory:
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the contribution steps.
+```sh
+uv run fecon download --data-dir data/new-snapshot
+uv run fecon analyze --data-dir data/new-snapshot --output-dir outputs/new-run
+```
+
+Changing the assets or dates in `study.toml` requires a matching new snapshot. If a provider is unavailable or returns incomplete data, downloading fails visibly; there is no synthetic-data fallback.
+
+## What the results mean
+
+- CAGR measures compounded historical growth; volatility measures total return variability.
+- Sharpe uses daily excess returns. Beta measures exposure to French's market factor, not total risk.
+- The equal-weight portfolio resets monthly, with weights drifting between resets. Trading costs and taxes are zero.
+- SPY is the portfolio benchmark. TLT is a risky bond fund, not the risk-free asset.
+- A whole-period correlation matrix does not establish protection in a market decline. Historical alpha is not proof of skill or mispricing.
+
+See [the Phase 1 plan](docs/phase-1.md) and [methodology](docs/methodology.md) for scope, formulas, assumptions, and sources.
+
+## Develop and collaborate
+
+```sh
+uv run pytest -q
+```
+
+Tests use small synthetic examples and require no live finance service. GitHub Actions runs the locked environment and tests on Windows and Linux.
+
+This repository is private. Ask [@N3V3MORE](https://github.com/N3V3MORE) to invite your GitHub username and accept the invitation before cloning. Work on a branch and open a pull request; see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Layout
+
+| Path | Purpose |
+|---|---|
+| `study.toml` | Universe, dates, and calculation settings |
+| `src/financial_economics/` | Data, calculations, CLI, and outputs |
+| `tests/` | Synthetic numerical and workflow checks |
+| `docs/` | Phase plan and methodology |
+| `data/` | Ignored local source snapshots |
+| `outputs/` | Ignored reproducible tables and figures |
