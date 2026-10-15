@@ -51,10 +51,10 @@ def prices_to_returns(prices: pd.DataFrame, start: str, end: str) -> pd.DataFram
     return returns
 
 
-def monthly_fixed_weight(
-    returns: pd.DataFrame, target_weights: dict[str, float], name: str = "Portfolio"
-) -> pd.Series:
-    """Reset to fixed long-only targets monthly; let holdings drift otherwise."""
+def _fixed_weight_path(
+    returns: pd.DataFrame, target_weights: dict[str, float]
+) -> tuple[list[float], np.ndarray]:
+    """Portfolio returns and the beginning-of-day weights that produced them."""
     _check_returns(returns)
     if not isinstance(target_weights, dict) or set(target_weights) != set(returns.columns):
         raise ValueError("Target weights must name every return column exactly once.")
@@ -67,14 +67,30 @@ def monthly_fixed_weight(
         raise ValueError("Target weights must lie between zero and one and sum to one.")
     weights = targets.copy()
     months = returns.index.to_period("M")
-    portfolio_returns = []
+    portfolio_returns, held = [], np.empty(returns.shape)
     for position, daily_returns in enumerate(returns.to_numpy(dtype=float)):
         if position == 0 or months[position] != months[position - 1]:
             weights[:] = targets
+        held[position] = weights
         portfolio_return = float(weights @ daily_returns)
         portfolio_returns.append(portfolio_return)
         weights = weights * (1 + daily_returns) / (1 + portfolio_return)
+    return portfolio_returns, held
+
+
+def monthly_fixed_weight(
+    returns: pd.DataFrame, target_weights: dict[str, float], name: str = "Portfolio"
+) -> pd.Series:
+    """Reset to fixed long-only targets monthly; let holdings drift otherwise."""
+    portfolio_returns, _ = _fixed_weight_path(returns, target_weights)
     return pd.Series(portfolio_returns, index=returns.index, name=name)
+
+
+def monthly_equal_weight_holdings(returns: pd.DataFrame) -> pd.DataFrame:
+    """Beginning-of-day weights of the monthly equal-weight mix, before each return."""
+    _check_returns(returns)
+    _, held = _fixed_weight_path(returns, dict.fromkeys(returns.columns, 1 / returns.shape[1]))
+    return pd.DataFrame(held, index=returns.index, columns=returns.columns)
 
 
 def monthly_equal_weight(returns: pd.DataFrame) -> pd.Series:

@@ -29,6 +29,14 @@ def main(argv: list[str] | None = None) -> int:
     compare.add_argument("--data-dir", type=Path, default=Path("data/snapshot"))
     compare.add_argument("--output-dir", type=Path, default=Path("outputs/phase3"))
     compare.add_argument("--evaluation-start", default="2018-01-01")
+    explain = commands.add_parser("explain", help="Add uncertainty ranges and fund contributions offline")
+    explain.add_argument("--data-dir", type=Path, default=Path("data/snapshot"))
+    explain.add_argument("--output-dir", type=Path, default=Path("outputs/phase4"))
+    explain.add_argument("--evaluation-start", default="2018-01-01")
+    explain.add_argument("--resamples", type=int, default=10_000)
+    explain.add_argument("--block-length", type=float, default=21)
+    explain.add_argument("--seed", type=int, default=20260101)
+    explain.add_argument("--bond-fund", default="TLT")
     args = parser.parse_args(argv)
 
     try:
@@ -42,7 +50,22 @@ def main(argv: list[str] | None = None) -> int:
             returns, factors = align_sample(returns, factors, study)
             if args.output_dir.resolve().is_relative_to(args.data_dir.resolve()):
                 raise ValueError("Keep generated outputs outside the source snapshot.")
-            if args.command == "compare":
+            if args.command == "explain":
+                from .explain import explain_comparison
+                from .explain_report import write_explain_outputs
+
+                result = explain_comparison(
+                    returns, factors["RF"], study.benchmark, args.bond_fund,
+                    args.evaluation_start, study.trading_days, args.resamples,
+                    args.block_length, args.seed)
+                write_explain_outputs(study, result.calibration, result.uncertainty,
+                                      result.contributions, result.episode_windows,
+                                      result.correlation, args.bond_fund, manifest,
+                                      args.output_dir)
+                sharpe = result.uncertainty.iloc[0]
+                print(f"Sharpe difference, mix minus {sharpe.reference}: {sharpe.estimate:+.3f} "
+                      f"(95% range {sharpe.ci_low:+.3f} to {sharpe.ci_high:+.3f}).")
+            elif args.command == "compare":
                 from .comparison import compare_portfolios
                 from .comparison_report import write_comparison_outputs
 

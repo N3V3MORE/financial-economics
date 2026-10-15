@@ -1,6 +1,6 @@
 # Financial Economics
 
-An ETF study connecting portfolio theory to actual returns. Phase 1 establishes return and risk comparisons, co-movement, a monthly equal-weight portfolio, and CAPM estimates with uncertainty. Phase 2 compares the same portfolios during benchmark declines. Phase 3 asks whether the mix offers benefits beyond simply holding less stock-market risk.
+An ETF study connecting portfolio theory to actual returns. Phase 1 establishes return and risk comparisons, co-movement, a monthly equal-weight portfolio, and CAPM estimates with uncertainty. Phase 2 compares the same portfolios during benchmark declines. Phase 3 asks whether the mix offers benefits beyond simply holding less stock-market risk. Phase 4 measures how much those Phase 3 differences could reflect chance, and which funds drove the mix's gains and losses.
 
 The question is whether apparently different ETF exposures provide useful diversification, including during market declines. Phase 3 uses earlier returns to set a SPY/cash comparison, then evaluates later returns. The dataset and fund selection had already been inspected, so this remains a chronological historical evaluation.
 
@@ -50,6 +50,14 @@ Open `outputs/phase3/summary.md`. The command uses only 2010–2017 to estimate 
 
 The three portfolios are evaluated over 2018–2025: the existing eight-fund mix, SPY plus cash, and SPY alone. Monthly targets stay fixed while holdings drift between resets. The report saves performance, training and evaluation exposure estimates, identical-date downturn and recovery comparisons, calibration details, source hashes, and three figures. `compare` also runs offline. See [Phase 3](docs/phase-3.md) for the exact split and assumptions.
 
+To check how sure the Phase 3 comparison is, and which funds drove it:
+
+```sh
+uv run fecon explain
+```
+
+Open `outputs/phase4/summary.md`. The command rebuilds the 2018–2025 period 10,000 times from month-like blocks of real trading days, keeping all portfolios on the same days, and reports 95% ranges for the Sharpe, growth, and volatility differences. It also measures each fund's gain or loss in every Phase 3 SPY decline, adding up exactly to the mix's loss, and the yearly SPY/TLT correlation. A fixed seed makes reruns identical. `explain` runs offline. See [Phase 4](docs/phase-4.md).
+
 A snapshot is never silently replaced. To refresh data, choose a new directory:
 
 ```sh
@@ -67,24 +75,33 @@ Changing the assets or dates in `study.toml` requires a matching new snapshot. I
 - SPY is the portfolio benchmark. TLT is a risky bond fund, not the risk-free asset.
 - A whole-period correlation matrix does not establish protection in a market decline. Historical alpha is not proof of skill or mispricing.
 
-See [Phase 1](docs/phase-1.md), [Phase 2](docs/phase-2.md), [Phase 3](docs/phase-3.md), and the [baseline methodology](docs/methodology.md) for scope, formulas, assumptions, and sources.
+See [Phase 1](docs/phase-1.md), [Phase 2](docs/phase-2.md), [Phase 3](docs/phase-3.md), [Phase 4](docs/phase-4.md), and the [baseline methodology](docs/methodology.md) for scope, formulas, assumptions, and sources.
 
 ## Watch the results
 
-The unified film follows the question through all three phases: the mix's lower
-risk, its behavior during market declines, and the comparison with SPY plus cash.
+The unified film follows the question through all four phases: the mix's lower
+risk, its behavior during market declines, the comparison with SPY plus cash,
+how much of that comparison chance could explain, and which funds drove the falls.
 For a plain-language explanation and the next research step, read
 [Results explained](docs/results-explained.md).
 
-Generate all three reports, then render the captioned Manim film:
+Generate all four reports, then render the captioned Manim film:
 
 ```sh
 uv run fecon analyze
 uv run fecon stress
 uv run fecon compare
+uv run fecon explain
 uv sync --frozen --group animation
-uv run --frozen --group animation manim -qh --fps 30 --media_dir outputs/unified --progress_bar none -v WARNING animations/project_results.py ProjectResults
+uv run --frozen --group animation manim -qh --fps 30 --disable_caching --media_dir outputs/unified --progress_bar none -v WARNING animations/project_results.py ProjectResults
+uv run --frozen --group animation python scripts/verify_render.py
 ```
+
+`--disable_caching` keeps the chapter times in `evidence.json` exact; Manim's
+reused clips can leave its scene clock slightly out of step with the video.
+The last command checks the video's size, frame rate, and length against
+`evidence.json`, saves a review frame for every chapter cue, and builds
+`outputs/unified/final-contact.png`, a one-page contact sheet of those frames.
 
 The rendered file is
 `outputs/unified/videos/project_results/1080p30/ProjectResults.mp4`;
@@ -97,12 +114,15 @@ different question; CAPM details stay in the written reports.
 The film is silent, with on-screen captions, and needs no LaTeX installation.
 It uses Segoe UI on Windows; Manim's text renderer substitutes an available font
 on other systems. All figures come from the retained local analysis outputs.
-Rendering stops if the three reports disagree with the verified source snapshot.
+Rendering stops if the four reports disagree with the verified source snapshot;
+checking Phase 4 repeats its resampling, adding about 20 seconds.
 Growth paths use weekly endpoints; the 2020 detail and numerical estimates use
 daily data. The time cursor advances all portfolios together, and rebasing the
 2020 display does not reset their holdings. `outputs/unified/evidence.json`
 records the input files and chapter times.
-For a faster draft, replace `-qh --fps 30` with `-ql --fps 15`.
+For a faster draft, replace `-qh --fps 30` with `-ql --fps 15` and
+`--media_dir outputs/unified` with `--media_dir outputs/unified-draft`, then run
+`scripts/verify_render.py --draft`.
 No provider data is downloaded during rendering. Generated videos and rendering caches
 stay inside ignored `outputs/`.
 
@@ -128,6 +148,7 @@ This repository is private. Ask [@N3V3MORE](https://github.com/N3V3MORE) to invi
 | `src/financial_economics/` | Data, calculations, CLI, and outputs |
 | `tests/` | Synthetic numerical and workflow checks |
 | `animations/` | Manim presentations of the saved study results |
+| `scripts/` | Rendered-film verification and review frames |
 | `docs/` | Phase plan and methodology |
 | `data/` | Ignored local source snapshots |
 | `outputs/` | Ignored reproducible tables and figures |
