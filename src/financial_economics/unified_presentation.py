@@ -1,4 +1,4 @@
-"""Verify all three saved phases before displaying their findings in one film."""
+"""Verify all four saved phases before displaying their findings in one film."""
 
 from dataclasses import dataclass
 from hashlib import sha256
@@ -14,6 +14,7 @@ from .analysis import (capm_summary, monthly_equal_weight, performance_summary,
 from .comparison import compare_portfolios
 from .config import load_study
 from .data import align_sample, load_snapshot
+from .explain import explain_comparison
 from .presentation import PresentationData, load_presentation
 from .stress import compare_episodes, drawdown_episodes
 
@@ -31,6 +32,10 @@ class StoryData:
     exposure: pd.DataFrame
     calibration: dict
     evidence: dict
+    uncertainty: pd.DataFrame
+    contributions: pd.DataFrame
+    bond_correlation: pd.Series
+    bond_fund: str
 
 
 def _check_table(path: Path, expected: pd.DataFrame, *, indexed: bool = False) -> None:
@@ -71,7 +76,7 @@ def load_story(root: Path) -> StoryData:
     combined = returns.copy()
     combined["Equal weight"] = monthly_equal_weight(returns)
     seed = prices.index[prices.index < returns.index[0]][-1]
-    folders = [root / "outputs" / f"phase{phase}" for phase in [1, 2, 3]]
+    folders = [root / "outputs" / f"phase{phase}" for phase in [1, 2, 3, 4]]
     metadata = [json.loads((folder / "run.json").read_text(encoding="utf-8"))
                 for folder in folders]
     for phase, run in enumerate(metadata, start=1):
@@ -119,13 +124,31 @@ def load_story(root: Path) -> StoryData:
     ]:
         _check_table(folders[2] / filename, table, indexed=indexed)
 
-    inputs = [root / "study.toml", root / "data/snapshot/manifest.json",
+    settings = metadata[3].get("settings", {})
+    if (settings.get("evaluation_start") != "2018-01-01"
+            or not isinstance(settings.get("resamples"), int)
+            or not isinstance(settings.get("seed"), int)):
+        raise ValueError("Phase 4 settings are inconsistent; rerun explain.")
+    _check_calibration(metadata[3].get("calibration", {}), result.calibration)
+    explained = explain_comparison(
+        returns, factors["RF"], study.benchmark, settings.get("bond_fund"), "2018-01-01",
+        study.trading_days, settings["resamples"], settings.get("mean_block_length"),
+        settings["seed"])
+    for filename, table, indexed in [
+        ("uncertainty.csv", explained.uncertainty, False),
+        ("contributions.csv", explained.contributions, False),
+        ("bond_correlation.csv", explained.correlation.to_frame(), True),
+    ]:
+        _check_table(folders[3] / filename, table, indexed=indexed)
+
+    inputs =[root / "study.toml", root / "data/snapshot/manifest.json",
               *[root / "data/snapshot" / name for name in manifest["files"]]]
     filenames = [
         ["daily_returns.csv", "performance.csv", "capm.csv", "run.json"],
         ["episodes.csv", "episode_comparison.csv", "run.json"],
         ["calibration.json", "evaluation_returns.csv", "performance.csv",
          "stock_exposure.csv", "episodes.csv", "episode_comparison.csv", "run.json"],
+        ["uncertainty.csv", "contributions.csv", "bond_correlation.csv", "run.json"],
     ]
     outputs = [folder / name for folder, names in zip(folders, filenames) for name in names]
     def hashes(paths):
@@ -141,4 +164,6 @@ def load_story(root: Path) -> StoryData:
         "phase2_episodes": len(episodes2), "phase3_episodes": len(episodes3),
     }
     return StoryData(phase1, combined, episodes2, comparison2, evaluation, performance,
-                     episodes3, comparison3, result.exposure, calibration, evidence)
+                     episodes3, comparison3, result.exposure, calibration, evidence,
+                     explained.uncertainty, explained.contributions, explained.correlation,
+                     settings["bond_fund"])

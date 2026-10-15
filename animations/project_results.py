@@ -6,8 +6,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from manim import (
-    Arrow, Circle, DashedLine, Dot, FadeIn, FadeOut, FadeTransform, Group, Line, Rectangle,
-    Scene, Text, ValueTracker, VGroup, VMobject, linear,
+    LEFT, RIGHT, Arrow, Circle, DashedLine, DashedVMobject, Dot, FadeIn, FadeOut,
+    FadeTransform, GrowFromEdge, GrowFromPoint, Group, Line, Rectangle, Scene, Text,
+    ValueTracker, VGroup, VMobject, linear,
 )
 
 from financial_economics.presentation import time_prefix
@@ -19,6 +20,7 @@ PAPER, INK, MUTED, GRID = "#F5F1E9", "#252925", "#62665F", "#D8D3C9"
 ASSETS = ["SPY", "Equal weight", "SPY + cash"]
 NAMES = ["SPY", "8-fund mix", "SPY + cash"]
 COLORS = ["#B45232", "#285E89", "#30766B"]
+DASH = .16
 
 
 def words(value, size=28, color=INK, headline=False):
@@ -69,13 +71,14 @@ class SharedTimeline(VGroup):
         dates, values = time_prefix(self.times, self.values, day)
         for column, (curve, dot) in enumerate(zip(self.curves, self.dots)):
             points = np.array([self.point(x, y) for x, y in zip(dates, values[:, column])])
-            if column == 2 and len(points) > 1:
-                curve.clear_points()
-                for position in range(0, len(points) - 1, 2):
-                    curve.start_new_path(points[position])
-                    curve.add_line_to(points[position + 1])
-            else:
-                curve.set_points_as_corners(np.repeat(points, 2, axis=0) if len(points) == 1 else points)
+            path = VMobject(stroke_color=curve.get_stroke_color(), stroke_width=3.3)
+            path.set_points_as_corners(np.repeat(points, 2, axis=0) if len(points) == 1 else points)
+            length = np.linalg.norm(np.diff(points, axis=0), axis=1).sum()
+            if column == 2 and length > DASH:
+                # Dash the whole revealed path so every dash has the same length.
+                path = DashedVMobject(path, num_dashes=int(length / DASH), dashed_ratio=.55,
+                                      color=COLORS[2]).set_stroke(width=3.3)
+            curve.become(path)
             dot.move_to(points[-1])
         x = self.point(dates[-1], 0)[0]
         self.cursor.put_start_and_end_on([x, self.bottom, 0], [x, self.top, 0])
@@ -89,12 +92,13 @@ class ProjectResults(Scene):
         expected = {"SPY", "QQQ", "VNQ", "GLD", "XLE", "XLY", "VIG", "TLT"}
         if (set(self.data.phase1.metadata["study"]["assets"]) != expected
                 or self.data.phase1.benchmark != "SPY"
-                or self.data.calibration["requested_evaluation_start"] != "2018-01-01"):
+                or self.data.calibration["requested_evaluation_start"] != "2018-01-01"
+                or self.data.bond_fund != "TLT"):
             raise ValueError("Review the film's story before changing the universe or evaluation split.")
         self.chapters, self.cues = [], []
         self.body = VGroup()
         self.title = left_at(words("What did the mix change?", 48, headline=True), -6.15, 3.05)
-        self.subtitle = left_at(words("A diversification study in three steps", 27, MUTED), -6.15, 2.35)
+        self.subtitle = left_at(words("A diversification study in four steps", 27, MUTED), -6.15, 2.35)
         self.caption = words("Eight funds. Equal weights. Reset monthly.", 28).move_to([0, -3.05, 0])
         self.footer = words("Selected funds · Historical returns · Zero trading costs and taxes", 17, MUTED)
         self.footer.move_to([0, -3.72, 0])
@@ -114,17 +118,19 @@ class ProjectResults(Scene):
         self.evaluation_downturns()
         self.tradeoff()
         self.exposure()
+        self.uncertainty()
+        self.contributions()
 
         self.section("Extra growth came with extra risk.",
-                     "The lesson from all three phases", "Lower losses versus SPY were only the first comparison.")
+                     "The lesson from all four phases", "Lower losses versus SPY were only the first comparison.")
         conclusion = VGroup(
             left_at(words("The mix added growth versus SPY + cash.", 33), -5.55, .9),
             left_at(words("It also added risk.", 38, COLORS[1], headline=True), -5.55, -.05),
-            left_at(words("No clear advantage over the simpler control.", 31), -5.55, -1.05),
+            left_at(words("Chance alone could explain the gap in Sharpe ratio.", 31), -5.55, -1.05),
         )
         self.body = conclusion
         self.play(FadeIn(conclusion), run_time=.8)
-        self.caption_to("The full history was already examined. No significance test.")
+        self.caption_to("The full history was already examined. Rebuilt histories reuse the same days.")
         self.cue("conclusion")
         self.wait(7)
         self.safe(Group(*self.mobjects))
@@ -134,7 +140,8 @@ class ProjectResults(Scene):
                     "duration_seconds": round(self.time, 3),
                     "path_display": "Weekly growth endpoints plus the final day; daily 2020 detail and all numerical estimates.",
                     "common_episode": "2020-02-19 close through 2020-08-31 close; no extra rebalance.",
-                    "limitation": "Already-inspected historical sample; zero costs and taxes; descriptive comparison, not a superiority test."}
+                    "uncertainty": "Phase 4 percentile ranges from stationary-bootstrap rebuilds of the 2018–2025 days.",
+                    "limitation": "Already-inspected historical sample; zero costs and taxes; resampling reuses the same days and is not new evidence."}
         (output / "evidence.json").write_text(json.dumps(evidence, indent=2) + "\n", encoding="utf-8")
 
     def section(self, title, subtitle, caption):
@@ -149,12 +156,15 @@ class ProjectResults(Scene):
         self.safe(Group(*replacements))
         self.play(*(FadeTransform(old, new) for old, new in zip(
             [self.title, self.subtitle, self.caption], replacements)), run_time=.7)
+        # FadeTransform restores the old text afterwards; remove it so it cannot linger.
+        self.remove(self.title, self.subtitle, self.caption)
         self.title, self.subtitle, self.caption = replacements
 
     def caption_to(self, value):
         replacement = words(value, 28).move_to([0, -3.05, 0])
         self.safe(replacement)
         self.play(FadeTransform(self.caption, replacement), run_time=.45)
+        self.remove(self.caption)
         self.caption = replacement
 
     def cue(self, name):
@@ -397,6 +407,102 @@ class ProjectResults(Scene):
         self.play(FadeIn(group), run_time=.8)
         self.cue("realized_exposure")
         self.wait(7)
+
+    def uncertainty(self):
+        table = self.data.uncertainty.loc[self.data.uncertainty.reference.eq("SPY + cash")]
+        table = table.set_index("measure")
+        resamples = int(table.resamples.iloc[0])
+        self.section("Could chance explain the gap?",
+                     f"Phase 4 · 2018–2025 rebuilt {resamples:,} times from month-long blocks of real days",
+                     "Every rebuilt history keeps all portfolios on the same days.")
+        center, half = 1.7, 3.6
+        group = VGroup(Line([center, 1.55, 0], [center, -1.75, 0], stroke_color=MUTED, stroke_width=1.2),
+                       words("No difference", 22, MUTED).move_to([center, 1.78, 0]))
+        rows = []
+        for y, measure, label, limit, scale, spec in [
+                (.75, "sharpe", "Sharpe ratio", .3, 1, "+.3f"),
+                (-.95, "cagr", "Yearly growth", 5, 100, "+.1f")]:
+            row = table.loc[measure]
+            if not row.ci_low < 0 < row.ci_high:
+                raise ValueError("Review the film's story: a Phase 4 range no longer includes zero.")
+            x = lambda value: center + half * scale * value / limit
+            unit = "" if measure == "sharpe" else " pp"
+            group.add(left_at(words(label, 27), -6.1, y + .17),
+                      left_at(words("mix minus SPY + cash", 21, MUTED), -6.1, y - .2),
+                      Line([center - half, y, 0], [center + half, y, 0], stroke_color=GRID, stroke_width=1))
+            dot = Dot([x(row.estimate), y, 0], radius=.1, color=INK)
+            bar = Line([x(row.ci_low), y, 0], [x(row.ci_high), y, 0], stroke_color=COLORS[1],
+                       stroke_width=12, stroke_opacity=.45)
+            ends = VGroup(words(format(scale * row.ci_low, spec) + unit, 22, MUTED).move_to([x(row.ci_low), y - .42, 0]),
+                          words(format(scale * row.ci_high, spec) + unit, 22, MUTED).move_to([x(row.ci_high), y - .42, 0]))
+            estimate = words(format(scale * row.estimate, spec) + unit, 25).move_to([x(row.estimate), y + .42, 0])
+            rows.append((dot, bar, ends, estimate))
+        self.body = group
+        self.play(FadeIn(group), run_time=.6)
+        for dot, bar, ends, estimate in rows:
+            self.play(FadeIn(dot), FadeIn(estimate), run_time=.5)
+            self.play(GrowFromPoint(bar, dot.get_center()), run_time=1.2)
+            self.remove(dot)
+            self.add(dot)  # Keep the observed value drawn above its range.
+            self.play(FadeIn(ends), run_time=.4)
+            self.body.add(bar, dot, ends, estimate)
+        self.caption_to("Both ranges cross zero: these eight years cannot separate the two.")
+        self.cue("uncertainty_ranges")
+        self.wait(5)
+        ahead = table.loc["sharpe", "share_favoring_portfolio"]
+        calmer = 1 - table.loc["annualized_volatility", "share_favoring_portfolio"]
+        self.caption_to(f"The mix had the better Sharpe in {ahead:.0%} of rebuilt histories, "
+                        f"higher volatility in {calmer:.0%}.")
+        self.cue("uncertainty_share")
+        self.wait(5)
+
+    def contributions(self):
+        bond = self.data.bond_fund
+        self.section("Bonds and energy swapped roles.",
+                     "Phase 4 · each fund's gain or loss per $1 in the mix at the SPY peak",
+                     "Gains and losses within each fall add up to the mix's loss.")
+        table = self.data.contributions
+        windows = {"Feb 2020 fall": (-2.0, "Feb–Mar 2020"), "Jan 2022 fall": (3.3, "Jan–Oct 2022")}
+        if not set(windows).issubset(table.window):
+            raise ValueError("Review the film's story: the 2020 and 2022 falls changed.")
+        highlight, scale = {bond, "XLE"}, .3
+        funds = list(dict.fromkeys(table.asset))
+        ys = 1.1 - .42 * np.arange(len(funds))
+        labels = VGroup(*(left_at(words(fund, 23, INK if fund in highlight else MUTED), -6.1, y)
+                          for fund, y in zip(funds, ys)))
+        self.body = VGroup(labels)
+        self.play(FadeIn(labels), run_time=.5)
+        captions = [f"2020: Treasuries ({bond}) gained; energy (XLE) lost the most.",
+                    "2022: Treasuries fell with stocks; energy was the only gain."]
+        for (window, (zero, heading)), caption, cue in zip(windows.items(), captions,
+                                                           ["contributions_2020", "contributions_2022"]):
+            values = table.loc[table.window.eq(window)].set_index("asset").contribution.reindex(funds)
+            panel = VGroup(words(f"{heading} · mix {values.sum():.1%}", 24).move_to([zero, 1.62, 0]),
+                           Line([zero, 1.35, 0], [zero, ys[-1] - .3, 0], stroke_color=MUTED, stroke_width=1))
+            bars, notes = VGroup(), VGroup()
+            for fund, y, value in zip(funds, ys, values):
+                width = max(abs(value) * 100 * scale, .02)
+                color = (COLORS[0] if value < 0 else COLORS[2]) if fund in highlight else GRID
+                bar = Rectangle(width=width, height=.27, stroke_width=0, fill_color=color, fill_opacity=1)
+                bar.move_to([zero + np.sign(value) * width / 2, y, 0])
+                bars.add(bar)
+                if fund in highlight:
+                    note = words(f"{100 * value:+.1f}", 23, color)
+                    side = 1 if value > 0 else -1
+                    notes.add(note.move_to([zero + side * (width + .12 + note.width / 2), y, 0]))
+            self.play(FadeIn(panel), run_time=.4)
+            self.play(*(GrowFromEdge(bar, LEFT if value > 0 else RIGHT)
+                        for bar, value in zip(bars, values)), run_time=1.2)
+            self.play(FadeIn(notes), run_time=.4)
+            self.body.add(panel, bars, notes)
+            self.caption_to(caption)
+            self.cue(cue)
+            self.wait(4.5)
+        correlation = self.data.bond_correlation
+        self.caption_to(f"SPY–{bond} daily correlation: {correlation[2020]:+.2f} in 2020, "
+                        f"{correlation[2022]:+.2f} in 2022. The bond cushion faded.")
+        self.cue("bond_correlation")
+        self.wait(5)
 
     def safe(self, group):
         if (group.get_left()[0] < -6.9 or group.get_right()[0] > 6.9
