@@ -1,5 +1,7 @@
 """Daily return calculations. All inputs and outputs use decimal returns."""
 
+from numbers import Real
+
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
@@ -49,19 +51,38 @@ def prices_to_returns(prices: pd.DataFrame, start: str, end: str) -> pd.DataFram
     return returns
 
 
-def monthly_equal_weight(returns: pd.DataFrame) -> pd.Series:
-    """Reset to equal weights each month; let holdings drift between resets."""
+def monthly_fixed_weight(
+    returns: pd.DataFrame, target_weights: dict[str, float], name: str = "Portfolio"
+) -> pd.Series:
+    """Reset to fixed long-only targets monthly; let holdings drift otherwise."""
     _check_returns(returns)
-    weights = np.full(returns.shape[1], 1 / returns.shape[1])
+    if not isinstance(target_weights, dict) or set(target_weights) != set(returns.columns):
+        raise ValueError("Target weights must name every return column exactly once.")
+    if any(not isinstance(value, Real) or isinstance(value, (bool, np.bool_))
+           for value in target_weights.values()):
+        raise ValueError("Target weights must be numeric, finite, and between zero and one.")
+    targets = np.array([target_weights[asset] for asset in returns], dtype=float)
+    if (not np.isfinite(targets).all() or (targets < 0).any() or (targets > 1).any()
+            or not np.isclose(targets.sum(), 1, rtol=0, atol=1e-12)):
+        raise ValueError("Target weights must lie between zero and one and sum to one.")
+    weights = targets.copy()
     months = returns.index.to_period("M")
     portfolio_returns = []
     for position, daily_returns in enumerate(returns.to_numpy(dtype=float)):
         if position == 0 or months[position] != months[position - 1]:
-            weights[:] = 1 / len(weights)
+            weights[:] = targets
         portfolio_return = float(weights @ daily_returns)
         portfolio_returns.append(portfolio_return)
         weights = weights * (1 + daily_returns) / (1 + portfolio_return)
-    return pd.Series(portfolio_returns, index=returns.index, name="Equal weight")
+    return pd.Series(portfolio_returns, index=returns.index, name=name)
+
+
+def monthly_equal_weight(returns: pd.DataFrame) -> pd.Series:
+    """Reset to equal weights each month; let holdings drift between resets."""
+    _check_returns(returns)
+    return monthly_fixed_weight(
+        returns, dict.fromkeys(returns.columns, 1 / returns.shape[1]), "Equal weight"
+    )
 
 
 def drawdowns(returns: pd.DataFrame) -> pd.DataFrame:
