@@ -4,7 +4,7 @@ import argparse
 from pathlib import Path
 import sys
 
-from .analysis import monthly_equal_weight, prices_to_returns
+from .analysis import monthly_equal_weight, performance_summary, prices_to_returns
 from .config import load_study
 from .data import align_sample, download_snapshot, load_snapshot
 from .report import write_outputs
@@ -25,6 +25,10 @@ def main(argv: list[str] | None = None) -> int:
     stress.add_argument("--output-dir", type=Path, default=Path("outputs/phase2"))
     stress.add_argument("--drawdown-threshold", type=float, default=0.10)
     stress.add_argument("--rolling-window", type=int, default=63)
+    compare = commands.add_parser("compare", help="Compare a train-calibrated stock/cash control offline")
+    compare.add_argument("--data-dir", type=Path, default=Path("data/snapshot"))
+    compare.add_argument("--output-dir", type=Path, default=Path("outputs/phase3"))
+    compare.add_argument("--evaluation-start", default="2018-01-01")
     args = parser.parse_args(argv)
 
     try:
@@ -38,7 +42,25 @@ def main(argv: list[str] | None = None) -> int:
             returns, factors = align_sample(returns, factors, study)
             if args.output_dir.resolve().is_relative_to(args.data_dir.resolve()):
                 raise ValueError("Keep generated outputs outside the source snapshot.")
-            if args.command == "stress":
+            if args.command == "compare":
+                from .comparison import compare_portfolios
+                from .comparison_report import write_comparison_outputs
+
+                result = compare_portfolios(returns, factors["RF"], study.benchmark,
+                                            args.evaluation_start)
+                evaluation = result.evaluation_returns
+                metrics = performance_summary(evaluation, factors.loc[evaluation.index, "RF"],
+                                              study.trading_days)
+                seed = result.calibration["evaluation_seed_date"]
+                episodes = drawdown_episodes(evaluation[study.benchmark], seed, threshold=.10)
+                comparisons = compare_episodes(evaluation, episodes, seed)
+                write_comparison_outputs(study, result, metrics, episodes, comparisons,
+                                         manifest, args.output_dir)
+                print(f"Calibrated on {len(result.training_returns):,} days; "
+                      f"compared three portfolios on {len(evaluation):,} later days.")
+                print(f"Frozen targets: {result.calibration['stock_weight']:.2%} "
+                      f"{study.benchmark}, {result.calibration['cash_weight']:.2%} cash.")
+            elif args.command == "stress":
                 from .stress_report import write_stress_outputs
 
                 seed = prices.index[prices.index < returns.index[0]][-1]

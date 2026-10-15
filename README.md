@@ -1,8 +1,8 @@
 # Financial Economics
 
-An ETF study connecting portfolio theory to actual returns. Phase 1 establishes a reproducible baseline: return and risk comparisons, co-movement, a monthly equal-weight portfolio, and CAPM estimates with uncertainty. Phase 2 compares the same portfolios during benchmark declines and tracks how their correlations change.
+An ETF study connecting portfolio theory to actual returns. Phase 1 establishes return and risk comparisons, co-movement, a monthly equal-weight portfolio, and CAPM estimates with uncertainty. Phase 2 compares the same portfolios during benchmark declines. Phase 3 asks whether the mix offers benefits beyond simply holding less stock-market risk.
 
-The question is whether apparently different ETF exposures provide useful diversification, including during market declines. These phases describe the historical sample. An out-of-sample strategy test remains future work.
+The question is whether apparently different ETF exposures provide useful diversification, including during market declines. Phase 3 uses earlier returns to set a SPY/cash comparison, then evaluates later returns. The dataset and fund selection had already been inspected, so this remains a chronological historical evaluation.
 
 ## Current study
 
@@ -40,6 +40,16 @@ uv run fecon stress --data-dir data/snapshot --output-dir outputs/phase2 --drawd
 
 `stress` runs offline. The existing monthly portfolio continues through each episode; chart rebasing does not reset its weights. Episode dates are selected retrospectively and do not define a trading rule.
 
+To compare the mix with a simple portfolio holding less SPY:
+
+```sh
+uv run fecon compare
+```
+
+Open `outputs/phase3/summary.md`. The command uses only 2010–2017 to estimate the mix's sensitivity to SPY excess returns, including an intercept. It bounds that estimate between 0% and 100% to set a frozen SPY target, with the remainder in French's daily risk-free return as a cash proxy. The target is calculated from the snapshot, not hard-coded.
+
+The three portfolios are evaluated over 2018–2025: the existing eight-fund mix, SPY plus cash, and SPY alone. Monthly targets stay fixed while holdings drift between resets. The report saves performance, training and evaluation exposure estimates, identical-date downturn and recovery comparisons, calibration details, source hashes, and three figures. `compare` also runs offline. See [Phase 3](docs/phase-3.md) for the exact split and assumptions.
+
 A snapshot is never silently replaced. To refresh data, choose a new directory:
 
 ```sh
@@ -52,12 +62,12 @@ Changing the assets or dates in `study.toml` requires a matching new snapshot. I
 ## What the results mean
 
 - CAGR measures compounded historical growth; volatility measures total return variability.
-- Sharpe uses daily excess returns. Beta measures exposure to French's market factor, not total risk.
+- Sharpe uses daily excess returns. Phase 1 CAPM beta measures exposure to French's broad-market factor; Phase 3 beta measures sensitivity to SPY excess returns. Neither measures total risk.
 - The equal-weight portfolio resets monthly, with weights drifting between resets. Trading costs and taxes are zero.
 - SPY is the portfolio benchmark. TLT is a risky bond fund, not the risk-free asset.
 - A whole-period correlation matrix does not establish protection in a market decline. Historical alpha is not proof of skill or mispricing.
 
-See [Phase 1](docs/phase-1.md), [Phase 2](docs/phase-2.md), and the [baseline methodology](docs/methodology.md) for scope, formulas, assumptions, and sources.
+See [Phase 1](docs/phase-1.md), [Phase 2](docs/phase-2.md), [Phase 3](docs/phase-3.md), and the [baseline methodology](docs/methodology.md) for scope, formulas, assumptions, and sources.
 
 ## Watch the results
 
