@@ -4,10 +4,11 @@ import argparse
 from pathlib import Path
 import sys
 
-from .analysis import prices_to_returns
+from .analysis import monthly_equal_weight, prices_to_returns
 from .config import load_study
 from .data import align_sample, download_snapshot, load_snapshot
 from .report import write_outputs
+from .stress import compare_episodes, drawdown_episodes, rolling_correlations
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -19,6 +20,11 @@ def main(argv: list[str] | None = None) -> int:
     analyze = commands.add_parser("analyze", help="Analyze a verified snapshot offline")
     analyze.add_argument("--data-dir", type=Path, default=Path("data/snapshot"))
     analyze.add_argument("--output-dir", type=Path, default=Path("outputs/phase1"))
+    stress = commands.add_parser("stress", help="Compare benchmark downturns offline")
+    stress.add_argument("--data-dir", type=Path, default=Path("data/snapshot"))
+    stress.add_argument("--output-dir", type=Path, default=Path("outputs/phase2"))
+    stress.add_argument("--drawdown-threshold", type=float, default=0.10)
+    stress.add_argument("--rolling-window", type=int, default=63)
     args = parser.parse_args(argv)
 
     try:
@@ -32,8 +38,26 @@ def main(argv: list[str] | None = None) -> int:
             returns, factors = align_sample(returns, factors, study)
             if args.output_dir.resolve().is_relative_to(args.data_dir.resolve()):
                 raise ValueError("Keep generated outputs outside the source snapshot.")
-            write_outputs(study, returns, factors, manifest, args.output_dir)
-            print(f"Analyzed {len(returns):,} days and {len(returns.columns)} funds.")
+            if args.command == "stress":
+                from .stress_report import write_stress_outputs
+
+                seed = prices.index[prices.index < returns.index[0]][-1]
+                combined = returns.copy()
+                combined["Equal weight"] = monthly_equal_weight(returns)
+                episodes = drawdown_episodes(combined[study.benchmark], seed,
+                                             args.drawdown_threshold)
+                comparison = compare_episodes(combined[[study.benchmark, "Equal weight"]],
+                                              episodes, seed)
+                correlations = rolling_correlations(combined, study.benchmark, args.rolling_window)
+                write_stress_outputs(
+                    study, combined, episodes, comparison, correlations, manifest, args.output_dir,
+                    drawdown_threshold=args.drawdown_threshold, rolling_window=args.rolling_window,
+                    seed_date=seed,
+                )
+                print(f"Compared {len(episodes)} downturns across {len(returns):,} daily observations.")
+            else:
+                write_outputs(study, returns, factors, manifest, args.output_dir)
+                print(f"Analyzed {len(returns):,} days and {len(returns.columns)} funds.")
             print(f"Open: {(args.output_dir / 'summary.md').resolve()}")
         return 0
     except (ValueError, OSError, RuntimeError, KeyError, TypeError) as error:

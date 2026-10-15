@@ -34,7 +34,7 @@ The universe is a retrospective selection of surviving funds. Results apply to t
 
 ## Later phases
 
-Efficient-frontier optimization and CAL construction; chronological out-of-sample evaluation and transaction costs; stress-period studies; optional factor-model extensions. Crypto, leveraged/volatility products, DCF, and dividend-discount valuation remain separate extensions.
+[Phase 2](phase-2.md) now compares benchmark-defined downturns and recovery, with changing correlations. Remaining extensions include efficient-frontier optimization and CAL construction, chronological out-of-sample evaluation with transaction costs, and optional factor-model extensions. Crypto, leveraged/volatility products, DCF, and dividend-discount valuation remain separate extensions.
 
 ## Status
 
