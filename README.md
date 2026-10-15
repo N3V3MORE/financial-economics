@@ -43,6 +43,26 @@ Changing the assets or dates in `study.toml` requires a matching new snapshot. I
 
 See [the Phase 1 plan](docs/phase-1.md) and [methodology](docs/methodology.md) for scope, formulas, assumptions, and sources.
 
+## Watch the results
+
+After generating the analysis, render the captioned Manim film:
+
+```sh
+uv sync --frozen --group animation
+uv run --frozen --group animation manim -qh --fps 30 --media_dir outputs/animation --progress_bar none -v WARNING animations/phase1_results.py PhaseOneResults
+```
+
+The 1080p video is `outputs/animation/videos/phase1_results/1080p30/PhaseOneResults.mp4`.
+It shows the eight-fund allocation, growth of $1,000, risk comparisons, and CAPM interpretation.
+Every estimate comes from the local analysis outputs; inconsistent return statistics stop the render.
+The film is silent, with on-screen captions, and needs no LaTeX installation. It uses Segoe UI
+on Windows; Manim's text renderer substitutes an available font on other systems.
+For a faster draft, replace `-qh --fps 30` with `-ql --fps 15`.
+Set `FECON_RESULTS_DIR` to show another analysis of the same eight-fund SPY universe.
+CAPM estimates are read from the saved table rather than re-estimated by the film.
+No provider data is downloaded during rendering. Generated videos and rendering caches
+stay inside ignored `outputs/`.
+
 ## Develop and collaborate
 
 ```sh
@@ -60,6 +80,7 @@ This repository is private. Ask [@N3V3MORE](https://github.com/N3V3MORE) to invi
 | `study.toml` | Universe, dates, and calculation settings |
 | `src/financial_economics/` | Data, calculations, CLI, and outputs |
 | `tests/` | Synthetic numerical and workflow checks |
+| `animations/` | Manim presentation of the saved Phase 1 results |
 | `docs/` | Phase plan and methodology |
 | `data/` | Ignored local source snapshots |
 | `outputs/` | Ignored reproducible tables and figures |
