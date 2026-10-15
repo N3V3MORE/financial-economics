@@ -81,7 +81,7 @@ class TimelinePlot(VGroup):
 
 
 class PhaseOneResults(Scene):
-    """Full-period growth, a common-date 2020 example, and the research next step."""
+    """Full-period growth and a common-date 2020 example."""
 
     def construct(self):
         self.camera.background_color = PAPER
@@ -152,13 +152,11 @@ class PhaseOneResults(Scene):
         self.play(FadeIn(self.ends), FadeOut(self.caption), run_time=0.5)
         comparison = text(f"Annual volatility:  SPY {vol.iloc[0]:.1%}  ·  mix {vol.iloc[1]:.1%}", 29)
         comparison.move_to([0, -2.7, 0])
-        next_step = text("Next: compare the mix across several downturns.", 28, MUTED)
-        next_step.move_to([0, -3.3, 0])
         qualification = text("Selected funds · Historical returns · Trading costs and taxes excluded", 19, MUTED)
         qualification.move_to([0, -3.75, 0])
         self.play(FadeIn(comparison), run_time=0.6)
         self.wait(2.5)
-        self.play(FadeIn(next_step), FadeIn(qualification), run_time=0.6)
+        self.play(FadeIn(qualification), run_time=0.6)
         self.wait(3.5)
         self.check_bounds(Group(*self.mobjects))
         out = ROOT / "outputs/animation"
