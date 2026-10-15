@@ -70,4 +70,4 @@ Verification was local on Windows. The branch has not been pushed, so hosted che
 
 ## After Phase 2
 
-Use the evidence to define a focused question for chronological out-of-sample evaluation. If alternative weights are tested, choose them using earlier observations, evaluate them on later observations, and account for trading costs. Those choices require a separate design; this phase does not select a winning strategy.
+[Phase 3](phase-3.md) compares the existing mix with a SPY/cash portfolio whose target is calibrated using 2010–2017 and frozen for evaluation over 2018–2025. It reuses this phase's 10% SPY episode and recovery definitions. Because the dataset and funds had already been inspected, the comparison is a chronological historical evaluation. Trading costs and taxes remain zero for this controlled comparison; optimization and cost modelling remain later work.
