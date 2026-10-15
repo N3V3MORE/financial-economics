@@ -1,8 +1,8 @@
 # Financial Economics
 
-An ETF study connecting portfolio theory to actual returns. Phase 1 establishes a reproducible baseline: return and risk comparisons, co-movement, a monthly equal-weight portfolio, and CAPM estimates with uncertainty.
+An ETF study connecting portfolio theory to actual returns. Phase 1 establishes a reproducible baseline: return and risk comparisons, co-movement, a monthly equal-weight portfolio, and CAPM estimates with uncertainty. Phase 2 compares the same portfolios during benchmark declines and tracks how their correlations change.
 
-The longer-term question is whether apparently different ETF exposures provide useful diversification, including during market declines. Phase 1 supplies the data and calculations; it does not yet answer the stress-period or out-of-sample questions.
+The question is whether apparently different ETF exposures provide useful diversification, including during market declines. These phases describe the historical sample. An out-of-sample strategy test remains future work.
 
 ## Current study
 
@@ -24,6 +24,22 @@ uv run fecon analyze
 
 Open `outputs/phase1/summary.md`. It links four figures and summarizes the saved CSV results. Only `download` contacts the finance data providers. `analyze` uses the retained, hash-checked snapshot.
 
+To compare declines using that same snapshot:
+
+```sh
+uv run fecon stress
+```
+
+Open `outputs/phase2/summary.md`. By default, the report includes every non-overlapping SPY episode reaching a 10% drawdown, compares losses over the same SPY peak-to-trough dates, and measures recovery from the common trough. It also plots correlations over 63 trailing daily observations. Unfinished recoveries are marked missing, never zero.
+
+The settings can be made explicit:
+
+```sh
+uv run fecon stress --data-dir data/snapshot --output-dir outputs/phase2 --drawdown-threshold 0.10 --rolling-window 63
+```
+
+`stress` runs offline. The existing monthly portfolio continues through each episode; chart rebasing does not reset its weights. Episode dates are selected retrospectively and do not define a trading rule.
+
 A snapshot is never silently replaced. To refresh data, choose a new directory:
 
 ```sh
@@ -41,7 +57,7 @@ Changing the assets or dates in `study.toml` requires a matching new snapshot. I
 - SPY is the portfolio benchmark. TLT is a risky bond fund, not the risk-free asset.
 - A whole-period correlation matrix does not establish protection in a market decline. Historical alpha is not proof of skill or mispricing.
 
-See [the Phase 1 plan](docs/phase-1.md) and [methodology](docs/methodology.md) for scope, formulas, assumptions, and sources.
+See [Phase 1](docs/phase-1.md), [Phase 2](docs/phase-2.md), and the [baseline methodology](docs/methodology.md) for scope, formulas, assumptions, and sources.
 
 ## Watch the results
 
@@ -58,7 +74,7 @@ with both rebased to $100 at the February 19 close. The existing monthly portfol
 continues unchanged; rebasing the display does not add a rebalance.
 The 2020 example is illustrative, not evidence of protection in every downturn.
 Its losses from the common starting date differ from full-sample maximum drawdowns.
-The film ends with full-period growth and volatility; CAPM stays in the written report.
+The film ends with full-period growth and volatility and a brief historical-results qualification; CAPM stays in the written report.
 Every estimate comes from the local analysis outputs; inconsistent return statistics stop the render.
 The film is silent, with on-screen captions, and needs no LaTeX installation. It uses Segoe UI
 on Windows; Manim's text renderer substitutes an available font on other systems.
