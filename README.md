@@ -71,29 +71,44 @@ See [Phase 1](docs/phase-1.md), [Phase 2](docs/phase-2.md), [Phase 3](docs/phase
 
 ## Watch the results
 
-After generating the analysis, render the captioned Manim film:
+The unified film follows the question through all three phases: the mix's lower
+risk, its behavior during market declines, and the comparison with SPY plus cash.
+For a plain-language explanation and the next research step, read
+[Results explained](docs/results-explained.md).
+
+Generate all three reports, then render the captioned Manim film:
 
 ```sh
+uv run fecon analyze
+uv run fecon stress
+uv run fecon compare
 uv sync --frozen --group animation
-uv run --frozen --group animation manim -qh --fps 30 --media_dir outputs/animation --progress_bar none -v WARNING animations/phase1_results.py PhaseOneResults
+uv run --frozen --group animation manim -qh --fps 30 --media_dir outputs/unified --progress_bar none -v WARNING animations/project_results.py ProjectResults
 ```
 
-The 1080p video is `outputs/animation/videos/phase1_results/1080p30/PhaseOneResults.mp4`.
-It follows two portfolios through the same dates, then zooms into the 2020 decline
-with both rebased to $100 at the February 19 close. The existing monthly portfolio
-continues unchanged; rebasing the display does not add a rebalance.
-The 2020 example is illustrative, not evidence of protection in every downturn.
-Its losses from the common starting date differ from full-sample maximum drawdowns.
-The film ends with full-period growth and volatility and a brief historical-results qualification; CAPM stays in the written report.
-Every estimate comes from the local analysis outputs; inconsistent return statistics stop the render.
-The film is silent, with on-screen captions, and needs no LaTeX installation. It uses Segoe UI
-on Windows; Manim's text renderer substitutes an available font on other systems.
+The rendered file is
+`outputs/unified/videos/project_results/1080p30/ProjectResults.mp4`;
+the delivery copy is `outputs/unified/project-results.mp4`.
+The film distinguishes the full 2010–2025 history from the 2018–2025 comparison.
+It shows why a mix can lose less than SPY yet fail to improve on a simpler
+SPY/cash portfolio. Growth, risk, downturn losses, and recovery each answer a
+different question; CAPM details stay in the written reports.
+
+The film is silent, with on-screen captions, and needs no LaTeX installation.
+It uses Segoe UI on Windows; Manim's text renderer substitutes an available font
+on other systems. All figures come from the retained local analysis outputs.
+Rendering stops if the three reports disagree with the verified source snapshot.
+Growth paths use weekly endpoints; the 2020 detail and numerical estimates use
+daily data. The time cursor advances all portfolios together, and rebasing the
+2020 display does not reset their holdings. `outputs/unified/evidence.json`
+records the input files and chapter times.
 For a faster draft, replace `-qh --fps 30` with `-ql --fps 15`.
-Set `FECON_RESULTS_DIR` to show another analysis of the same eight-fund SPY universe.
-Growth curves and their markers advance under one shared time cursor. Full-period
-paths use weekly points; the 2020 detail and numerical statistics use daily data.
 No provider data is downloaded during rendering. Generated videos and rendering caches
 stay inside ignored `outputs/`.
+
+The approved Phase 1 film remains available at
+`outputs/animation/phase1-results-final.mp4`. Its source is
+`animations/phase1_results.py`; the unified film does not replace that source.
 
 ## Develop and collaborate
 
@@ -112,7 +127,7 @@ This repository is private. Ask [@N3V3MORE](https://github.com/N3V3MORE) to invi
 | `study.toml` | Universe, dates, and calculation settings |
 | `src/financial_economics/` | Data, calculations, CLI, and outputs |
 | `tests/` | Synthetic numerical and workflow checks |
-| `animations/` | Manim presentation of the saved Phase 1 results |
+| `animations/` | Manim presentations of the saved study results |
 | `docs/` | Phase plan and methodology |
 | `data/` | Ignored local source snapshots |
 | `outputs/` | Ignored reproducible tables and figures |
