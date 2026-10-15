@@ -111,10 +111,9 @@ def fund_contributions(returns: pd.DataFrame, weights: pd.DataFrame,
     rows = []
     for name, start, end in windows:
         start, end = pd.Timestamp(start), pd.Timestamp(end)
-        if start >= end or end not in returns.index:
-            raise ValueError("Windows need an observed end close after their start close.")
-        if not (returns.index <= start).any():
-            raise ValueError("Window starts need an observed close in the return history.")
+        # Contributions are per $1 at the starting close, so that close must exist.
+        if start >= end or start not in returns.index or end not in returns.index:
+            raise ValueError("Windows need observed start and end closes, in increasing order.")
         days = (returns.index > start) & (returns.index <= end)
         held, daily = weights.loc[days].to_numpy(), returns.loc[days].to_numpy()
         portfolio = (held * daily).sum(axis=1)
