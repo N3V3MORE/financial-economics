@@ -2,12 +2,7 @@
 
 Do different ETFs help spread investment risk, especially when markets fall?
 
-The study has four parts so far:
-
-1. **Baseline.** Historical returns, risk, correlations, a monthly equal-weight portfolio of eight funds (the "mix"), and CAPM estimates with uncertainty.
-2. **Market falls.** How the mix and SPY behaved over the same dates in every SPY decline of at least 10%, and how long each took to recover.
-3. **A fairer comparison.** Whether the mix did better than simply holding less stock: a SPY + cash portfolio chosen using 2010–2017 alone, compared over 2018–2025.
-4. **How sure, and why.** Whether chance alone could explain the Part 3 differences, and which funds produced the mix's gains and losses in each market fall.
+Phase 1 builds the baseline: historical returns, risk, correlations, a monthly equal-weight portfolio of the eight funds (the "mix"), and CAPM estimates with uncertainty. Phase 2 compares the mix with SPY in every SPY decline of at least 10%, including how long each took to recover. Phase 3 asks whether the mix did better than simply holding less stock, using a SPY + cash portfolio chosen from 2010–2017 and tested on 2018–2025. Phase 4 checks whether chance alone could explain the Phase 3 differences, and which funds produced the mix's gains and losses in each fall.
 
 For a plain-language account of what the study has found, read [Results explained](docs/results-explained.md).
 
@@ -46,11 +41,11 @@ Existing snapshots are never silently replaced. Changing the ETFs or dates also 
 
 `stress` and `compare` accept settings too, for example `--drawdown-threshold 0.10 --rolling-window 63` or `--evaluation-start 2018-01-01`. See [Phase 2](docs/phase-2.md) and [Phase 3](docs/phase-3.md).
 
-`explain` rebuilds 2018–2025 10,000 times from month-long blocks of real trading days, keeping every portfolio on the same days, and reports how far the Part 3 differences move. A fixed random seed makes reruns identical; `--resamples`, `--block-length`, and `--seed` change the settings. It also measures each fund's gain or loss in every SPY fall, adding up exactly to the mix's loss. See [Phase 4](docs/phase-4.md).
+`explain` rebuilds 2018–2025 10,000 times from month-long blocks of real trading days, keeping every portfolio on the same days, and reports how far the Phase 3 differences move. A fixed random seed makes reruns identical; `--resamples`, `--block-length`, and `--seed` change the settings. It also measures each fund's gain or loss in every SPY fall, adding up exactly to the mix's loss. See [Phase 4](docs/phase-4.md).
 
 ## Watch the results
 
-A short captioned film follows the question through all four parts. Run the four analysis commands first, then:
+A short captioned film follows the question through all four phases. Run the four analysis commands first, then:
 
 ```sh
 uv sync --frozen --group animation
