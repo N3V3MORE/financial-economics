@@ -56,7 +56,7 @@ GLD = "Gold"
         return prices, factors, manifest
 
     monkeypatch.setattr(unified_presentation, "load_snapshot", snapshot_boundary)
-    monkeypatch.setattr(report, "_figures", lambda *args: None)
+    monkeypatch.setattr(report, "_write_figures", lambda *args: None)
     monkeypatch.setattr(stress_report, "_episode_figures", lambda *args: None)
     monkeypatch.setattr(stress_report, "_correlation_figure", lambda *args: None)
     monkeypatch.setattr(comparison_report, "_figures", lambda *args: None)
