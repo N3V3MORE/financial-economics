@@ -1,65 +1,84 @@
-# Financial Economics
+# ETF diversification study
 
-An ETF study connecting portfolio theory to actual returns. Phase 1 establishes a reproducible baseline: return and risk comparisons, co-movement, a monthly equal-weight portfolio, and CAPM estimates with uncertainty.
+Do different ETFs help spread investment risk, especially when markets fall?
 
-The longer-term question is whether apparently different ETF exposures provide useful diversification, including during market declines. Phase 1 supplies the data and calculations; it does not yet answer the stress-period or out-of-sample questions.
+The current code builds the baseline: historical returns, risk, correlations, a monthly equal-weight portfolio, and CAPM estimates with uncertainty. Stress-period analysis and testing on unseen data are planned extensions.
 
-## Current study
+## Run the study
 
-Eight unleveraged instruments: SPY, QQQ, VNQ, GLD, XLE, XLY, VIG, and TLT. The requested return sample is 2010-01-01 through 2025-12-31. Exact choices live in [study.toml](study.toml).
-
-Prices come from Yahoo Finance through yfinance; daily risk-free and broad-market excess returns come from Kenneth French. Downloaded data stays local. A manifest records its origin, settings, retrieval time, and hashes so the same snapshot can be analyzed again offline.
-
-## Run it
-
-Install [uv](https://docs.astral.sh/uv/getting-started/installation/), then:
+Install [uv](https://docs.astral.sh/uv/getting-started/installation/), then run these commands from the project folder:
 
 ```sh
-git clone https://github.com/N3V3MORE/financial-economics.git
-cd financial-economics
 uv sync --frozen
 uv run fecon download
 uv run fecon analyze
 ```
 
-Open `outputs/phase1/summary.md`. It links four figures and summarizes the saved CSV results. Only `download` contacts the finance data providers. `analyze` uses the retained, hash-checked snapshot.
+Open `outputs/phase1/summary.md` for the results. It links the charts and accompanies six CSV tables.
 
-A snapshot is never silently replaced. To refresh data, choose a new directory:
+`download` saves prices from Yahoo Finance through yfinance and daily market and risk-free returns from Kenneth French. `analyze` reads that saved snapshot offline and checks that its files and settings still match.
+
+To refresh the data, use a new snapshot directory:
 
 ```sh
 uv run fecon download --data-dir data/new-snapshot
 uv run fecon analyze --data-dir data/new-snapshot --output-dir outputs/new-run
 ```
 
-Changing the assets or dates in `study.toml` requires a matching new snapshot. If a provider is unavailable or returns incomplete data, downloading fails visibly; there is no synthetic-data fallback.
+Existing snapshots are never silently replaced. Changing the ETFs or dates also requires a matching new snapshot. Incomplete or unavailable provider data produces an error.
 
-## What the results mean
+## Find your way around
 
-- CAGR measures compounded historical growth; volatility measures total return variability.
-- Sharpe uses daily excess returns. Beta measures exposure to French's market factor, not total risk.
+```text
+study.toml                         Your ETFs, dates, and calculation settings
+    |
+    v
+data/snapshot/                     Downloaded inputs, saved locally
+    |
+    v
+src/financial_economics/           Python code
+    |-- config.py                 Read the study settings
+    |-- data.py                   Download, save, and validate the inputs
+    |-- analysis.py               Calculate returns, risk, and market exposure
+    |-- report.py                 Write tables, charts, and the summary
+    |-- cli.py                    Connect the download and analyze commands
+    |-- __main__.py               Support python -m financial_economics
+    +-- __init__.py                Identify the Python package
+    |
+    v
+outputs/phase1/                    Results, saved locally
+```
+
+`data/` and `outputs/` are created when you run the commands and are ignored by Git.
+
+| Other files | Purpose |
+|---|---|
+| `tests/` | Check calculations, data validation, and the command workflow using synthetic examples |
+| [docs/methodology.md](docs/methodology.md) | Formulas, sources, assumptions, and interpretation |
+| [docs/phase-1.md](docs/phase-1.md) | Research scope, completed baseline work, and later extensions |
+| `pyproject.toml` | Python requirements, packages, and the `fecon` command |
+| `uv.lock` | Exact package versions |
+| `.github/workflows/tests.yml` | Run tests on Windows and Linux in GitHub Actions |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Collaborator access, branches, and pull requests |
+
+To change **what is studied**, edit `study.toml`. To change **how results are calculated**, start in `analysis.py`. To change **how results are presented**, start in `report.py`.
+
+## Current settings and assumptions
+
+The study selects SPY, QQQ, VNQ, GLD, XLE, XLY, VIG, and TLT for January 1, 2010 through December 31, 2025. The exact settings live in `study.toml`.
+
+- CAGR measures compounded growth; volatility measures total return variability. Sharpe uses daily excess returns.
 - The equal-weight portfolio resets monthly, with weights drifting between resets. Trading costs and taxes are zero.
-- SPY is the portfolio benchmark. TLT is a risky bond fund, not the risk-free asset.
-- A whole-period correlation matrix does not establish protection in a market decline. Historical alpha is not proof of skill or mispricing.
+- SPY is the portfolio benchmark. CAPM uses French's broader market factor; beta measures exposure to that factor.
+- TLT is a risky bond fund. The risk-free return comes from French's factor file.
+- These are retrospectively selected surviving funds. Full-period correlations do not establish protection during market declines, and historical alpha does not prove skill or mispricing.
 
-See [the Phase 1 plan](docs/phase-1.md) and [methodology](docs/methodology.md) for scope, formulas, assumptions, and sources.
-
-## Develop and collaborate
+## Development
 
 ```sh
 uv run pytest -q
 ```
 
-Tests use small synthetic examples and require no live finance service. GitHub Actions runs the locked environment and tests on Windows and Linux.
+Tests use synthetic data and require no live finance service. GitHub Actions installs the locked environment and runs the tests on Windows and Linux.
 
-This repository is private. Ask [@N3V3MORE](https://github.com/N3V3MORE) to invite your GitHub username and accept the invitation before cloning. Work on a branch and open a pull request; see [CONTRIBUTING.md](CONTRIBUTING.md).
-
-## Layout
-
-| Path | Purpose |
-|---|---|
-| `study.toml` | Universe, dates, and calculation settings |
-| `src/financial_economics/` | Data, calculations, CLI, and outputs |
-| `tests/` | Synthetic numerical and workflow checks |
-| `docs/` | Phase plan and methodology |
-| `data/` | Ignored local source snapshots |
-| `outputs/` | Ignored reproducible tables and figures |
+This repository is private. Ask [@N3V3MORE](https://github.com/N3V3MORE) to invite your GitHub username before cloning. Follow [CONTRIBUTING.md](CONTRIBUTING.md) when making changes, and keep downloaded data and generated results out of Git.
