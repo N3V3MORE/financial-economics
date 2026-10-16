@@ -114,11 +114,12 @@ def align_sample(
     missing = matched.index.difference(sample.index)
     extra = sample.index.difference(matched.index)
     if len(missing) or len(extra):
-        show = lambda dates: ", ".join(dates[:5].strftime("%Y-%m-%d")) or "none"
+        missing_dates = ", ".join(missing[:5].strftime("%Y-%m-%d")) or "none"
+        unexpected_dates = ", ".join(extra[:5].strftime("%Y-%m-%d")) or "none"
         raise ValueError(
             "ETF and French trading dates differ: "
-            f"missing ETF dates ({len(missing)}): {show(missing)}; "
-            f"unexpected ETF dates ({len(extra)}): {show(extra)}. No dates were dropped."
+            f"missing ETF dates ({len(missing)}): {missing_dates}; "
+            f"unexpected ETF dates ({len(extra)}): {unexpected_dates}. No dates were dropped."
         )
     return sample.copy(), matched.copy()
 
