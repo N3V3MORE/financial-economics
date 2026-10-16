@@ -2,11 +2,7 @@
 
 Do different ETFs help spread investment risk, especially when markets fall?
 
-The study has three parts so far:
-
-1. **Baseline.** Historical returns, risk, correlations, a monthly equal-weight portfolio of eight funds (the "mix"), and CAPM estimates with uncertainty.
-2. **Market falls.** How the mix and SPY behaved over the same dates in every SPY decline of at least 10%, and how long each took to recover.
-3. **A fairer comparison.** Whether the mix did better than simply holding less stock: a SPY + cash portfolio chosen using 2010–2017 alone, compared over 2018–2025.
+Phase 1 builds the baseline: historical returns, risk, correlations, a monthly equal-weight portfolio of the eight funds (the "mix"), and CAPM estimates with uncertainty. Phase 2 compares the mix with SPY in every SPY decline of at least 10%, including how long each took to recover. Phase 3 asks whether the mix did better than simply holding less stock, using a SPY + cash portfolio chosen from 2010–2017 and tested on 2018–2025.
 
 For a plain-language account of what the study has found, read [Results explained](docs/results-explained.md).
 
