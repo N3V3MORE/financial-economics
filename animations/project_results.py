@@ -6,8 +6,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from manim import (
-    Arrow, Circle, DashedLine, Dot, FadeIn, FadeOut, FadeTransform, Group, Line, Rectangle,
-    Scene, Text, ValueTracker, VGroup, VMobject, linear,
+    Arrow, Circle, DashedLine, DashedVMobject, Dot, FadeIn, FadeOut, FadeTransform, Group,
+    Line, Rectangle, Scene, Text, ValueTracker, VGroup, VMobject, linear,
 )
 
 from financial_economics.presentation import time_prefix
@@ -19,6 +19,7 @@ PAPER, INK, MUTED, GRID = "#F5F1E9", "#252925", "#62665F", "#D8D3C9"
 ASSETS = ["SPY", "Equal weight", "SPY + cash"]
 NAMES = ["SPY", "8-fund mix", "SPY + cash"]
 COLORS = ["#B45232", "#285E89", "#30766B"]
+DASH = .16
 
 
 def words(value, size=28, color=INK, headline=False):
@@ -69,13 +70,14 @@ class SharedTimeline(VGroup):
         dates, values = time_prefix(self.times, self.values, day)
         for column, (curve, dot) in enumerate(zip(self.curves, self.dots)):
             points = np.array([self.point(x, y) for x, y in zip(dates, values[:, column])])
-            if column == 2 and len(points) > 1:
-                curve.clear_points()
-                for position in range(0, len(points) - 1, 2):
-                    curve.start_new_path(points[position])
-                    curve.add_line_to(points[position + 1])
-            else:
-                curve.set_points_as_corners(np.repeat(points, 2, axis=0) if len(points) == 1 else points)
+            path = VMobject(stroke_color=curve.get_stroke_color(), stroke_width=3.3)
+            path.set_points_as_corners(np.repeat(points, 2, axis=0) if len(points) == 1 else points)
+            length = np.linalg.norm(np.diff(points, axis=0), axis=1).sum()
+            if column == 2 and length > DASH:
+                # Dash the whole revealed path so every dash has the same length.
+                path = DashedVMobject(path, num_dashes=int(length / DASH), dashed_ratio=.55,
+                                      color=COLORS[2]).set_stroke(width=3.3)
+            curve.become(path)
             dot.move_to(points[-1])
         x = self.point(dates[-1], 0)[0]
         self.cursor.put_start_and_end_on([x, self.bottom, 0], [x, self.top, 0])
@@ -149,12 +151,15 @@ class ProjectResults(Scene):
         self.safe(Group(*replacements))
         self.play(*(FadeTransform(old, new) for old, new in zip(
             [self.title, self.subtitle, self.caption], replacements)), run_time=.7)
+        # FadeTransform restores the old text afterwards; remove it so it cannot linger.
+        self.remove(self.title, self.subtitle, self.caption)
         self.title, self.subtitle, self.caption = replacements
 
     def caption_to(self, value):
         replacement = words(value, 28).move_to([0, -3.05, 0])
         self.safe(replacement)
         self.play(FadeTransform(self.caption, replacement), run_time=.45)
+        self.remove(self.caption)
         self.caption = replacement
 
     def cue(self, name):
