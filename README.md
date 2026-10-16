@@ -41,7 +41,7 @@ Existing snapshots are never silently replaced. Changing the ETFs or dates also 
 
 `stress` and `compare` accept settings too, for example `--drawdown-threshold 0.10 --rolling-window 63` or `--evaluation-start 2018-01-01`. See [Phase 2](docs/phase-2.md) and [Phase 3](docs/phase-3.md).
 
-`explain` rebuilds 2018–2025 10,000 times from month-long blocks of real trading days, keeping every portfolio on the same days, and reports how far the Phase 3 differences move. A fixed random seed makes reruns identical; `--resamples`, `--block-length`, and `--seed` change the settings. It also measures each fund's gain or loss in every SPY fall, adding up exactly to the mix's loss. See [Phase 4](docs/phase-4.md).
+`explain` rebuilds 2018–2025 10,000 times from runs of real trading days, 21 days long on average, keeping every portfolio on the same days, and reports how far the Phase 3 differences move. A fixed random seed makes reruns identical; `--resamples`, `--block-length`, and `--seed` change the settings. It also measures each fund's gain or loss in every SPY fall, adding up exactly to the mix's loss. See [Phase 4](docs/phase-4.md).
 
 ## See the results
 
@@ -51,7 +51,7 @@ After the four analysis commands, put the main findings on one page:
 uv run fecon page
 ```
 
-Open `outputs/page/index.html` in a browser. It is a single file with no outside links, so you can also send it to someone. Each chart sits next to a table of the exact numbers, and hovering over a growth chart shows the values for that week. The page reads only the saved outputs, and it stops if they came from different snapshots or settings.
+Open `outputs/page/index.html` in a browser. It is a single file with no outside links, so you can also send it to someone. Each chart sits next to a table of the exact numbers, and hovering over a growth chart shows the values for that week. The page reads only the saved outputs. It stops if they came from different snapshots or settings, or if Phases 3 and 4 used different test periods or SPY + cash splits.
 
 ## Find your way around
 

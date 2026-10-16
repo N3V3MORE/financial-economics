@@ -10,7 +10,7 @@ Nothing from Phases 1–3 changes. The snapshot, the mix, the 69.19% SPY target,
 
 Eight years is one history. To see how much the comparison depends on the particular order of days, we rebuild those years 10,000 times and recalculate the comparison each time.
 
-Each rebuilt history has the same 2,011 days as the original period, drawn in runs of consecutive real days. A run starts on a random day, and each day has a 1-in-21 chance of jumping to a new random day, so runs last about a month on average. This is the stationary bootstrap of Politis and Romano (1994). Runs keep calm and stormy stretches together, which drawing single days would break apart. Every portfolio and the risk-free rate use the same drawn days, so the comparison stays like for like.
+Each rebuilt history is 2,011 days long, like the original period, and is drawn in runs of consecutive real days. Some days appear more than once and others not at all. A run starts on a random day, and each day has a 1-in-21 chance of jumping to a new random day, so run lengths vary and average 21 trading days, roughly a month. This is the stationary bootstrap of Politis and Romano (1994). Runs keep calm and stormy stretches together, which drawing single days would break apart. Every portfolio and the risk-free rate use the same drawn days, so the comparison stays like for like.
 
 For each rebuilt history we calculate the mix minus the other portfolio for Sharpe ratio, yearly growth (CAGR), and yearly fluctuation (volatility), with the Phase 1 formulas. The report gives the observed difference, the middle 95% of the rebuilt differences, and how often the mix came out better. For fluctuation, lower counts as better.
 
@@ -50,7 +50,9 @@ Over 2018–2025 as a whole, QQQ (+27.9 points) and GLD (+27.2) contributed the 
 
 ## Limits
 
-The rebuilt histories reuse the days this sample contains, and the funds and dates had already been examined, so this is not new evidence. A range that includes zero means the data cannot separate the portfolios; it does not prove they are equal. Trading costs and taxes are still zero.
+The rebuilt histories reuse the days this sample contains, and the funds and dates had already been examined, so this is not new evidence. A range that includes zero means the data cannot separate the portfolios; it does not prove they are equal. The rebuilds reshuffle the finished portfolio returns with the 69.19% SPY split held fixed. They do not redo the choice of funds or the fitting of that split, so they leave out the uncertainty from those research choices.
+
+The match between the two portfolios was also only approximate. Over 2018–2025 the mix moved 0.73% for each 1% move in SPY, and SPY + cash moved 0.68%. Part of the difference between them comes from that gap in stock exposure, not only from diversification. Trading costs and taxes are still zero.
 
 ## References
 

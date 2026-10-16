@@ -1,5 +1,7 @@
 """The results page is built from the four saved phase outputs."""
 
+import json
+
 import numpy as np
 import pandas as pd
 from financial_economics import cli
@@ -36,9 +38,14 @@ BND = "Bond fund"
                      "--output", str(page)]) == 0
     html = page.read_text(encoding="utf-8")
     assert html.count("<section>") == 6 and "Jan 2018 fall" in html
+    # Wording comes from the recorded settings, not this study's defaults.
+    assert "3 funds" in html and "The 2018 test period" in html and "21 days long on average" in html
 
-    # A page must not mix outputs from different runs.
-    (tmp_path / "phase4" / "run.json").write_text('{"snapshot_files": {}, "study": {}}')
+    # Phase 4 must describe the same comparison as Phase 3.
+    run4 = tmp_path / "phase4" / "run.json"
+    run = json.loads(run4.read_text(encoding="utf-8"))
+    run["calibration"]["evaluation_start"] = "2018-02-01"
+    run4.write_text(json.dumps(run), encoding="utf-8")
     assert cli.main(["--config", str(config), "page", "--outputs-dir", str(tmp_path),
                      "--output", str(page)]) == 1
-    assert "different snapshots" in capsys.readouterr().err
+    assert "different test periods" in capsys.readouterr().err

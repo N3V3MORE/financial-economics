@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pandas as pd
 
-NAMES = {"SPY": "SPY", "Equal weight": "8-fund mix", "SPY + cash": "SPY + cash"}
+NAMES = {"SPY": "SPY", "Equal weight": "Equal-weight mix", "SPY + cash": "SPY + cash"}
 CLASSES = {"SPY": "spy", "Equal weight": "mix", "SPY + cash": "cash"}
 WIDTH = 720
 
@@ -26,14 +26,19 @@ def _load(outputs: Path) -> dict:
            for run in runs):
         raise ValueError("The four phase outputs come from different snapshots or settings; rerun them.")
     phase1, phase2, phase3, phase4 = folders
+    # Phase 4 must explain the same comparison Phase 3 made: same test period and same split.
+    calibration = json.loads((phase3 / "calibration.json").read_text(encoding="utf-8"))
+    if runs[3]["calibration"] != calibration:
+        raise ValueError("Phases 3 and 4 used different test periods or SPY + cash splits; rerun them.")
     return {
         "study": runs[0]["study"], "files": runs[0]["snapshot_files"],
-        "seed": runs[1]["seed_date"],
+        "seed": runs[1]["seed_date"], "threshold": runs[1]["drawdown_threshold"],
+        "exposure": _read(phase3, "stock_exposure.csv"),
         "returns1": _read(phase1, "daily_returns.csv", index_col=0, parse_dates=True),
         "performance1": _read(phase1, "performance.csv", index_col=0),
         "episodes2": _read(phase2, "episodes.csv"),
         "comparison2": _read(phase2, "episode_comparison.csv"),
-        "calibration": json.loads((phase3 / "calibration.json").read_text(encoding="utf-8")),
+        "calibration": calibration,
         "returns3": _read(phase3, "evaluation_returns.csv", index_col=0, parse_dates=True),
         "performance3": _read(phase3, "performance.csv", index_col=0),
         "comparison3": _read(phase3, "episode_comparison.csv"),
@@ -245,6 +250,12 @@ def _write_html(data: dict) -> str:
     tradeoff = (mix3.cagr > cash3.cagr and mix3.annualized_volatility > cash3.annualized_volatility
                 and mix3.max_drawdown < cash3.max_drawdown and mix3.sharpe < cash3.sharpe)
     chance = sharpe.ci_low < 0 < sharpe.ci_high
+    first, last = calibration["evaluation_start"][:4], calibration["evaluation_end"][:4]
+    test_years = first if first == last else f"{first}–{last}"
+    fund_count = len(study["assets"])
+    block = data["settings"]["mean_block_length"]
+    beta = data["exposure"].set_index(["period", "asset"]).beta
+    mix_beta, cash_beta = beta[("evaluation", "Equal weight")], beta[("evaluation", "SPY + cash")]
     first_hash = next(iter(data["files"].values()))["sha256"][:12]
 
     episode_rows = []
@@ -274,14 +285,14 @@ def _write_html(data: dict) -> str:
         f"""<section>
 <h2>{'A smoother ride than SPY, with slower growth' if smoother else 'How the mix compared with SPY'}</h2>
 <p>Over {study['start'][:4]}–{study['end'][:4]} the mix grew {perf1.loc['Equal weight', 'cagr']:.2%} a year against
-{perf1.loc['SPY', 'cagr']:.2%} for SPY. Its returns also varied less: a yearly fluctuation of
+{perf1.loc['SPY', 'cagr']:.2%} for SPY. Its returns varied {'less' if mix1.annualized_volatility < spy1.annualized_volatility else 'more'}: a yearly fluctuation of
 {perf1.loc['Equal weight', 'annualized_volatility']:.2%} against {perf1.loc['SPY', 'annualized_volatility']:.2%}.</p>
 {_growth_chart(data['returns1'][['SPY', 'Equal weight']], data['seed'], f"Growth of $1,000, {study['start'][:4]} to {study['end'][:4]}")}
 {_metrics_table(perf1, ['SPY', 'Equal weight'])}
 </section>""",
         f"""<section>
 <h2>{'The mix lost less in every market fall' if fewer == len(losses2) else f'The mix lost less in {fewer} of {len(losses2)} market falls'}</h2>
-<p>Each row is a time SPY fell at least 10% from a peak. Both portfolios are measured from the same SPY peak
+<p>Each row is a time SPY fell at least {data['threshold']:.0%} from a peak. Both portfolios are measured from the same SPY peak
 to the same SPY trough. The mix lost less in {fewer} of {len(losses2)} falls.</p>
 {_keys(['SPY', 'Equal weight'])}
 {_loss_chart(data['episodes2'], data['comparison2'], ['SPY', 'Equal weight'], 'Loss in each SPY fall')}
@@ -293,15 +304,18 @@ to the same SPY trough. The mix lost less in {fewer} of {len(losses2)} falls.</p
 <p>A smaller loss than SPY could just mean the mix held less stock. So we built a simpler portfolio with the
 same stock sensitivity: using {calibration['training_start'][:4]}–{calibration['training_end'][:4]} only, the mix moved about {calibration['raw_beta']:.2f}% for each 1%
 move in SPY, which sets {calibration['stock_weight']:.2%} SPY and {calibration['cash_weight']:.2%} cash.
-That split was then frozen and tested on {calibration['evaluation_start'][:4]}–{calibration['evaluation_end'][:4]}.</p>
+That split was then frozen and tested on {test_years}.</p>
 {_growth_chart(data['returns3'], calibration['evaluation_seed_date'], f"Growth of $1,000, {calibration['evaluation_start'][:4]} to {calibration['evaluation_end'][:4]}")}
 {_metrics_table(perf3, three)}
 {'<p>The mix grew a little faster than SPY + cash, but it also fluctuated more, fell further at its worst, and had a slightly lower Sharpe ratio.</p>' if tradeoff else ''}
+<p>The match was only approximate. Over {test_years} the mix moved {mix_beta:.2f}% for each 1% move in SPY,
+against {cash_beta:.2f}% for SPY + cash. Part of any difference
+comes from that gap in stock exposure, not only from diversification.</p>
 </section>""",
         f"""<section>
 <h2>{'Chance alone could explain the difference' if chance else 'The Sharpe gap is larger than these rebuilds explain'}</h2>
-<p>Eight years is one history. We rebuilt it {data['settings']['resamples']:,} times from month-long runs of real
-trading days, keeping every portfolio on the same days, and recalculated the comparison each time. The bars show
+<p>The {test_years} test period is one history. We rebuilt it {data['settings']['resamples']:,} times from runs of real trading
+days, {block:g} days long on average, keeping every portfolio on the same days, and recalculated the comparison each time. The bars show
 the middle 95% of the results. The Sharpe gap against SPY + cash was {sharpe.estimate:+.3f}, and the mix came
 out ahead in {sharpe.share_favoring_portfolio:.0%} of the rebuilt histories.</p>
 <div class="pair">
@@ -310,7 +324,10 @@ out ahead in {sharpe.share_favoring_portfolio:.0%} of the rebuilt histories.</p>
 </div>
 {_table(['Comparison', 'Measure', 'Observed', '95% range', 'Mix better in'], range_rows, 2)}
 <p class="note">For fluctuation, lower counts as better. These ranges reuse the same days, so they show how much
-the result could move by chance; they are not a formal significance test.</p>
+the result could move by chance; they are not a formal significance test. A range that includes zero means these
+years cannot tell the portfolios apart; it does not show they are equal. The rebuilds reshuffle the finished portfolio
+returns with the {calibration['stock_weight']:.2%} SPY split held fixed. They do not redo the choice of funds or the
+fitting of that split.</p>
 </section>""",
         f"""<section>
 <h2>Which funds drove the deepest falls</h2>
@@ -328,10 +345,10 @@ it was positive: {', '.join(year for year, value in correlation.items() if value
 {_bar_chart(whole, f"{whole_name}, whole period · mix {100 * whole.sum():+.0f} points", 40, 100, '+.1f')}
 </div>
 </section>""",
-        """<section>
+        f"""<section>
 <h2>What this can't show</h2>
-<p>These are eight funds picked with hindsight, and the full history had already been looked at before the
-2018–2025 test, so it is a historical check rather than a test on unseen data. Market falls are dated after the
+<p>These are {fund_count} funds picked with hindsight, and the full history had already been looked at before the
+{test_years} test, so it is a historical check rather than a test on unseen data. Market falls are dated after the
 fact. Trading costs and taxes are zero. Contributions show where gains and losses came from, not what a different
 mix would have earned.</p>
 </section>""",
@@ -349,7 +366,7 @@ mix would have earned.</p>
 <main>
 <header>
 <p class="kicker">ETF diversification study · {study['start'][:4]}–{study['end'][:4]}</p>
-<h1>{'The mix was calmer than SPY, but no better than holding less SPY' if smoother and tradeoff and chance else 'Did eight ETFs spread risk better than holding less SPY?'}</h1>
+<h1>{'The mix reduced risk relative to SPY, but showed no clear risk-adjusted edge over SPY plus cash' if smoother and chance else f'Did {fund_count} ETFs spread risk better than holding less SPY?'}</h1>
 <p class="lede">The mix holds {len(study['assets'])} funds ({funds}) in equal amounts, reset each month. This page
 follows one question: do different ETFs help spread risk, especially when markets fall?</p>
 {_keys(three)}

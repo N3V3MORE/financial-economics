@@ -79,14 +79,15 @@ alternative estimates for the same period.
 
 ## How sure are we, and why? (Phase 4)
 
-Eight years is one history, so we rebuilt it 10,000 times from month-long
-runs of real trading days, keeping all three portfolios on the same days.
+Eight years is one history, so we rebuilt it 10,000 times from runs of
+real trading days averaging 21 days, keeping all three portfolios on the same days.
 The mix's Sharpe ratio was 0.020 lower than SPY plus cash's. Across the
 rebuilt histories, the middle 95% of that gap ran from −0.215 to +0.171,
 and the mix came out ahead in 41% of them. The growth gap, +0.56 points a
 year, ranged from −2.57 to +3.91. These eight years cannot tell the two
-portfolios apart on risk-adjusted return. The mix's higher volatility
-showed up in every rebuilt history.
+portfolios apart on risk-adjusted return. That is not the same as showing
+they are equal: both ranges include sizeable differences either way. The
+mix's higher volatility showed up in every rebuilt history.
 
 We also measured each fund's gain or loss in every market fall, per $1 in
 the mix at the SPY peak. The amounts add up to the mix's loss. Two funds
