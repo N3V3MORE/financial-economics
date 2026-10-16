@@ -17,12 +17,12 @@ from .analysis import capm_summary, drawdowns, monthly_equal_weight, performance
 from .config import Study
 
 
-def _save(figure, destination: Path) -> None:
+def _save_figure(figure, destination: Path) -> None:
     figure.savefig(destination, dpi=160, bbox_inches="tight")
     plt.close(figure)
 
 
-def _figures(returns: pd.DataFrame, metrics: pd.DataFrame, benchmark: str, output: Path) -> None:
+def _write_figures(returns: pd.DataFrame, metrics: pd.DataFrame, benchmark: str, output: Path) -> None:
     comparison = returns[[benchmark, "Equal weight"]]
     colors = ["#2563a6", "#b36b00"]
     with plt.rc_context({"font.size": 11, "axes.spines.top": False,
@@ -38,7 +38,7 @@ def _figures(returns: pd.DataFrame, metrics: pd.DataFrame, benchmark: str, outpu
         axis.set(title="Growth of an initial $1", ylabel="Portfolio value ($)", xlabel="")
         axis.grid(axis="y", alpha=.2)
         axis.legend(title=None)
-        _save(figure, output / "growth.png")
+        _save_figure(figure, output / "growth.png")
 
         figure, axis = plt.subplots(figsize=(10, 5))
         declines = drawdowns(comparison)
@@ -49,7 +49,7 @@ def _figures(returns: pd.DataFrame, metrics: pd.DataFrame, benchmark: str, outpu
         axis.yaxis.set_major_formatter(PercentFormatter(1))
         axis.grid(axis="y", alpha=.2)
         axis.legend(title=None)
-        _save(figure, output / "drawdowns.png")
+        _save_figure(figure, output / "drawdowns.png")
 
         correlation = returns.drop(columns="Equal weight").corr()
         figure, axis = plt.subplots(figsize=(8, 7))
@@ -63,7 +63,7 @@ def _figures(returns: pd.DataFrame, metrics: pd.DataFrame, benchmark: str, outpu
                           color="white" if abs(value) > .65 else "#202020")
         axis.set_title("Daily adjusted-price return correlations", pad=15)
         figure.colorbar(cells, ax=axis, fraction=.046, pad=.04, label="Correlation")
-        _save(figure, output / "correlations.png")
+        _save_figure(figure, output / "correlations.png")
 
         figure, axis = plt.subplots(figsize=(9, 6))
         for i, (name, row) in enumerate(metrics.iterrows()):
@@ -77,11 +77,12 @@ def _figures(returns: pd.DataFrame, metrics: pd.DataFrame, benchmark: str, outpu
                  ylabel="CAGR (%)")
         axis.margins(.17)
         axis.grid(alpha=.2)
-        _save(figure, output / "risk_return.png")
+        _save_figure(figure, output / "risk_return.png")
 
 
 def write_outputs(study: Study, returns: pd.DataFrame, factors: pd.DataFrame,
                   manifest: dict, output: Path) -> None:
+    """Calculate results and write the tables, figures, metadata, and summary."""
     combined = returns.copy()
     combined["Equal weight"] = monthly_equal_weight(returns)
     metrics = performance_summary(combined, factors["RF"], study.trading_days)
@@ -98,15 +99,16 @@ def write_outputs(study: Study, returns: pd.DataFrame, factors: pd.DataFrame,
     }
     for name, table in tables.items():
         table.to_csv(output / f"{name}.csv", float_format="%.12g", na_rep="NA")
-    _figures(combined, metrics, study.benchmark, output)
+    _write_figures(combined, metrics, study.benchmark, output)
+    software_versions = {"python": platform.python_version()}
+    for package in ("financial-economics", "numpy", "pandas", "statsmodels", "matplotlib"):
+        software_versions[package] = version(package)
     run = {
         "study": study.settings(), "observations": len(returns),
         "actual_start": str(returns.index[0].date()),
         "actual_end": str(returns.index[-1].date()),
         "snapshot_files": manifest["files"],
-        "software_versions": {"python": platform.python_version(), **{
-            name: version(name) for name in ["financial-economics", "numpy", "pandas", "statsmodels", "matplotlib"]
-        }},
+        "software_versions": software_versions,
         "portfolio": {"rule": "monthly equal weight; drift within month",
                       "trading_costs": 0, "taxes": 0},
         "capm": {"market": "French Mkt-RF", "covariance": "HAC",
@@ -115,8 +117,15 @@ def write_outputs(study: Study, returns: pd.DataFrame, factors: pd.DataFrame,
     }
     (output / "run.json").write_text(json.dumps(run, indent=2) + "\n", encoding="utf-8")
 
+    _write_summary(study, metrics, capm, run, output)
+
+
+def _write_summary(
+    study: Study, metrics: pd.DataFrame, capm: pd.DataFrame, run: dict, output: Path
+) -> None:
+    """Write the summary using the results exported to the CSV tables."""
     lines = ["# Phase 1: ETF baseline", "",
-             f"{run['actual_start']} to {run['actual_end']}; {len(returns):,} daily observations.", "",
+             f"{run['actual_start']} to {run['actual_end']}; {run['observations']:,} daily observations.", "",
              "Historical descriptions of a fixed, retrospectively selected ETF universe. "
              "No optimized strategy or out-of-sample investment result is claimed.", "",
              "## Return and risk", "",
