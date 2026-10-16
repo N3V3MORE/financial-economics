@@ -79,37 +79,38 @@ alternative estimates for the same period.
 
 ## How sure are we, and why? (Phase 4)
 
-Eight years is one history, so we rebuilt it 10,000 times from month-like
-blocks of real trading days, keeping all three portfolios on the same days.
-The mix's Sharpe ratio minus SPY plus cash's was −0.020. Across the rebuilt
-histories, the middle 95% ran from −0.215 to +0.171, and the mix came out
-ahead in 41% of them. The growth gap, +0.56 percentage points a year, ranged
-from −2.57 to +3.91. **These eight years cannot tell the two portfolios
-apart on risk-adjusted return.** The mix's higher volatility, by contrast,
-was clear in every rebuilt history.
+Eight years is one history, so we rebuilt it 10,000 times from month-long
+runs of real trading days, keeping all three portfolios on the same days.
+The mix's Sharpe ratio was 0.020 lower than SPY plus cash's. Across the
+rebuilt histories, the middle 95% of that gap ran from −0.215 to +0.171,
+and the mix came out ahead in 41% of them. The growth gap, +0.56 points a
+year, ranged from −2.57 to +3.91. These eight years cannot tell the two
+portfolios apart on risk-adjusted return. The mix's higher volatility
+showed up in every rebuilt history.
 
-We also measured each fund's own gain or loss in every market fall, per $1 in
-the mix at the SPY peak; the amounts add up to the mix's loss. Two funds
-swapped roles. In the 2020 fall, long-term Treasuries (TLT) added 1.6 points
-while energy (XLE) lost 7.5, the largest single loss. In the 2022 fall, TLT
-lost 3.9 points and XLE gained 5.0, the only fund to gain. The SPY/TLT daily
-correlation was negative every year from 2010 to 2021, and slightly positive
-from 2022 to 2025. Published research links this pattern to high inflation
-and tight monetary policy. The bond hedge that cushioned 2020 was missing in
-2022, which helps explain the mix's slower 2022 recovery.
+We also measured each fund's gain or loss in every market fall, per $1 in
+the mix at the SPY peak. The amounts add up to the mix's loss. Two funds
+swapped roles. In the 2020 fall, long-term Treasuries (TLT) added 1.6
+points and energy (XLE) lost 7.5, the largest loss of any fund. In the 2022
+fall, TLT lost 3.9 points and XLE gained 5.0, the only fund to gain. The
+SPY/TLT daily correlation was negative every year from 2010 to 2021 and
+slightly positive from 2022 to 2025. Research on stock–bond correlations
+links this to high inflation and tight monetary policy. The bond cushion
+that helped in 2020 was gone in 2022, which helps explain the mix's slower
+2022 recovery.
 
 ## What to do next
 
-1. **Explain the contributions.** Done in Phase 4; see
-   [Phase 4](phase-4.md).
-2. **Check whether the conclusion survives reasonable changes.** Examine
-   other historical splits and a simple allowance for trading costs. Treat
-   these as sensitivity checks on inspected data, rather than fresh proof.
-3. **Consider changing weights only after that explanation.** Optimizing now
-   could produce attractive weights fitted to this particular history. First
-   establish what problem new weights are meant to solve and how they will
-   be evaluated.
+Phase 4 explained the contributions; see [Phase 4](phase-4.md).
 
-The unified Manim film presents this progression. The numerical details,
-definitions, and source records remain in the three generated reports and
-the [Phase 3 methodology](phase-3.md).
+Next, check whether the conclusion holds up under reasonable changes:
+other training and evaluation years, dropping one fund at a time, and a
+simple allowance for trading costs. These are checks on data we have
+already looked at, not fresh proof.
+
+Only after that is it worth changing the weights. Optimizing now would
+likely find weights that fit this particular history. First decide what
+new weights are meant to fix and how they will be tested.
+
+The film follows the same story. The numbers, definitions, and source
+records are in the four generated reports and the phase documents.

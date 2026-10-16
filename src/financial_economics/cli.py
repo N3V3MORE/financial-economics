@@ -58,10 +58,7 @@ def main(argv: list[str] | None = None) -> int:
                     returns, factors["RF"], study.benchmark, args.bond_fund,
                     args.evaluation_start, study.trading_days, args.resamples,
                     args.block_length, args.seed)
-                write_explain_outputs(study, result.calibration, result.uncertainty,
-                                      result.contributions, result.episode_windows,
-                                      result.correlation, args.bond_fund, manifest,
-                                      args.output_dir)
+                write_explain_outputs(study, result, args.bond_fund, manifest, args.output_dir)
                 sharpe = result.uncertainty.iloc[0]
                 print(f"Sharpe difference, mix minus {sharpe.reference}: {sharpe.estimate:+.3f} "
                       f"(95% range {sharpe.ci_low:+.3f} to {sharpe.ci_high:+.3f}).")

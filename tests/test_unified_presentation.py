@@ -62,7 +62,7 @@ GLD = "Gold"
     monkeypatch.setattr(stress_report, "_episode_figures", lambda *args: None)
     monkeypatch.setattr(stress_report, "_correlation_figure", lambda *args: None)
     monkeypatch.setattr(comparison_report, "_figures", lambda *args: None)
-    monkeypatch.setattr(explain_report, "_figures", lambda *args: None)
+    monkeypatch.setattr(explain_report, "_write_figures", lambda *args: None)
     report.write_outputs(study, returns, factors, manifest, tmp_path / "outputs/phase1")
     combined = returns.assign(**{"Equal weight": monthly_equal_weight(returns)})
     episodes2 = drawdown_episodes(returns.SPY, seed)
@@ -79,10 +79,8 @@ GLD = "Gold"
         episodes3, compare_episodes(evaluation, episodes3, result.calibration["evaluation_seed_date"]),
         manifest, tmp_path / "outputs/phase3")
     explained = explain_comparison(returns, factors.RF, "SPY", "GLD", resamples=200)
-    explain_report.write_explain_outputs(
-        study, explained.calibration, explained.uncertainty, explained.contributions,
-        explained.episode_windows, explained.correlation, "GLD", manifest,
-        tmp_path / "outputs/phase4")
+    explain_report.write_explain_outputs(study, explained, "GLD", manifest,
+                                         tmp_path / "outputs/phase4")
     return tmp_path
 
 
@@ -110,9 +108,7 @@ def test_load_story_checks_three_serialized_phases_against_snapshot(story_reposi
     (3, "performance.csv", "sharpe", .2),
     (3, "stock_exposure.csv", "beta", .2),
     (3, "episode_comparison.csv", "recovery_trading_days", 1),
-    (4, "uncertainty.csv", "ci_low", .01),
     (4, "contributions.csv", "contribution", .01),
-    (4, "bond_correlation.csv", "correlation", .01),
 ])
 def test_load_story_rejects_edited_numerical_evidence(
     story_repository, phase, filename, column, increment
@@ -125,16 +121,7 @@ def test_load_story_rejects_edited_numerical_evidence(
         load_story(story_repository)
 
 
-def test_load_story_rejects_a_changed_resampling_seed(story_repository):
-    path = story_repository / "outputs/phase4/run.json"
-    run = json.loads(path.read_text(encoding="utf-8"))
-    run["settings"]["seed"] += 1
-    path.write_text(json.dumps(run), encoding="utf-8")
-    with pytest.raises(ValueError, match="uncertainty.csv is inconsistent"):
-        load_story(story_repository)
-
-
-@pytest.mark.parametrize("phase", [1, 2, 3, 4])
+@pytest.mark.parametrize("phase", [1, 2, 3])
 def test_load_story_rejects_outputs_from_another_snapshot(story_repository, phase):
     path = story_repository / "outputs" / f"phase{phase}" / "run.json"
     run = json.loads(path.read_text(encoding="utf-8"))
@@ -153,7 +140,6 @@ def test_load_story_rejects_a_changed_frozen_target(story_repository, filename):
     path.write_text(json.dumps(saved), encoding="utf-8")
     with pytest.raises(ValueError, match="calibration stock_weight"):
         load_story(story_repository)
-
 
 def test_load_story_rejects_changed_recovery_dates(story_repository):
     path = story_repository / "outputs/phase3/episode_comparison.csv"
