@@ -43,20 +43,6 @@ Existing snapshots are never silently replaced. Changing the ETFs or dates also 
 
 `explain` rebuilds 2018–2025 10,000 times from month-long blocks of real trading days, keeping every portfolio on the same days, and reports how far the Phase 3 differences move. A fixed random seed makes reruns identical; `--resamples`, `--block-length`, and `--seed` change the settings. It also measures each fund's gain or loss in every SPY fall, adding up exactly to the mix's loss. See [Phase 4](docs/phase-4.md).
 
-## Watch the results
-
-A short captioned film follows the question through all four phases. Run the four analysis commands first, then:
-
-```sh
-uv sync --frozen --group animation
-uv run --frozen --group animation manim -qh --fps 30 --disable_caching --media_dir outputs/unified --progress_bar none -v WARNING animations/project_results.py ProjectResults
-uv run --frozen --group animation python scripts/verify_render.py
-```
-
-The last command checks the video's size, frame rate, and length, saves the finished film as `outputs/unified/project-results.mp4`, and builds `outputs/unified/final-contact.png`, one page of review frames from every chapter. Before drawing anything, the film recalculates every number it shows from the saved snapshot, and it stops if a report disagrees; repeating the Part 4 resampling adds about 20 seconds. `--disable_caching` keeps the chapter times recorded in `outputs/unified/evidence.json` exact. For a quicker draft, replace `-qh --fps 30` with `-ql --fps 15` and `outputs/unified` with `outputs/unified-draft`, then run `scripts/verify_render.py --draft`. The film needs no LaTeX and uses Segoe UI on Windows; other systems substitute an available font.
-
-The earlier Phase 1 film, `animations/phase1_results.py`, remains available.
-
 ## Find your way around
 
 ```text
@@ -77,25 +63,19 @@ src/financial_economics/           Python code
     |-- comparison_report.py      Write the Phase 3 report
     |-- explain.py                Resample the comparison and split gains by fund
     |-- explain_report.py         Write the Phase 4 report
-    |-- presentation.py           Check Phase 1 results for the films
-    |-- unified_presentation.py   Check all saved results for the film
     |-- cli.py                    Connect the commands
     |-- __main__.py               Support python -m financial_economics
     +-- __init__.py                Identify the Python package
     |
     v
 outputs/phase1/ ... phase4/        Results, saved locally
-    |
-    v
-animations/project_results.py      The film, built from those results
-scripts/verify_render.py           Check the rendered film and save review frames
 ```
 
 `data/` and `outputs/` are created when you run the commands and are ignored by Git.
 
 | Other files | Purpose |
 |---|---|
-| `tests/` | Check calculations, data validation, the commands, and the film's data checks using synthetic examples |
+| `tests/` | Check calculations, data validation, and the commands using synthetic examples |
 | [docs/results-explained.md](docs/results-explained.md) | What the study has found, in plain language |
 | [docs/methodology.md](docs/methodology.md) | Formulas, sources, assumptions, and interpretation |
 | [docs/phase-1.md](docs/phase-1.md), [phase-2.md](docs/phase-2.md), [phase-3.md](docs/phase-3.md), [phase-4.md](docs/phase-4.md) | Each part's question, method, outputs, and checks |
@@ -104,7 +84,7 @@ scripts/verify_render.py           Check the rendered film and save review frame
 | `.github/workflows/tests.yml` | Run tests on Windows and Linux in GitHub Actions |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Collaborator access, branches, and pull requests |
 
-To change **what is studied**, edit `study.toml`. To change **how results are calculated**, start in `analysis.py`, `stress.py`, `comparison.py`, or `explain.py`. To change **how results are presented**, start in the matching `*_report.py` file or in `animations/`.
+To change **what is studied**, edit `study.toml`. To change **how results are calculated**, start in `analysis.py`, `stress.py`, `comparison.py`, or `explain.py`. To change **how results are presented**, start in the matching `*_report.py` file.
 
 ## Current settings and assumptions
 

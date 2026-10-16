@@ -16,9 +16,6 @@ dependencies = [
 fecon = "financial_economics.cli:main"
 
 [dependency-groups]
-animation = [
-    "manim==0.22.0",
-]
 dev = ["pytest>=8,<10"]
 
 [build-system]

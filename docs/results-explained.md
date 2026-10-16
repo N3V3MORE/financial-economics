@@ -112,5 +112,5 @@ Only after that is it worth changing the weights. Optimizing now would
 likely find weights that fit this particular history. First decide what
 new weights are meant to fix and how they will be tested.
 
-The film follows the same story. The numbers, definitions, and source
-records are in the four generated reports and the phase documents.
+The numbers, definitions, and source records are in the four generated
+reports and the phase documents.

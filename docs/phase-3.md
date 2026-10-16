@@ -4,7 +4,7 @@
 
 Did the eight-fund mix offer useful benefits beyond holding less stock-market risk? Compare it with a SPY/cash control and SPY alone over 2018–2025. Set the control's allocation using 2010–2017 only.
 
-The existing funds, source snapshot, monthly equal-weight mix, and approved Phase 1 video remain unchanged. This phase adds no optimization, new fund selection, trading-cost model, or tax model.
+The existing funds, source snapshot, and monthly equal-weight mix remain unchanged. This phase adds no optimization, new fund selection, trading-cost model, or tax model.
 
 ## Calibration
 
@@ -79,7 +79,7 @@ This is a chronological historical evaluation. The allocation is fitted on earli
 
 The control makes the lower-market-risk explanation easier to assess. A performance difference can still reflect changing stock sensitivity, bond duration, sector exposure, or other risks that SPY beta does not capture. The report therefore shows realized betas and does not claim causal attribution or statistical superiority. Benchmark peaks, troughs, and recovery dates are selected retrospectively.
 
-Optimization, cost modelling, and a genuinely new evaluation sample remain separate work. The approved video continues to present Phase 1.
+Optimization, cost modelling, and a genuinely new evaluation sample remain separate work.
 
 ## Verification
 
