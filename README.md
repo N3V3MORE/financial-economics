@@ -43,6 +43,16 @@ Existing snapshots are never silently replaced. Changing the ETFs or dates also 
 
 `explain` rebuilds 2018–2025 10,000 times from month-long blocks of real trading days, keeping every portfolio on the same days, and reports how far the Phase 3 differences move. A fixed random seed makes reruns identical; `--resamples`, `--block-length`, and `--seed` change the settings. It also measures each fund's gain or loss in every SPY fall, adding up exactly to the mix's loss. See [Phase 4](docs/phase-4.md).
 
+## See the results
+
+After the four analysis commands, put the main findings on one page:
+
+```sh
+uv run fecon page
+```
+
+Open `outputs/page/index.html` in a browser. It is a single file with no outside links, so you can also send it to someone. Each chart sits next to a table of the exact numbers, and hovering over a growth chart shows the values for that week. The page reads only the saved outputs, and it stops if they came from different snapshots or settings.
+
 ## Find your way around
 
 ```text
@@ -63,12 +73,16 @@ src/financial_economics/           Python code
     |-- comparison_report.py      Write the Phase 3 report
     |-- explain.py                Resample the comparison and split gains by fund
     |-- explain_report.py         Write the Phase 4 report
+    |-- page.py                   Write the one-page summary of all four phases
     |-- cli.py                    Connect the commands
     |-- __main__.py               Support python -m financial_economics
     +-- __init__.py                Identify the Python package
     |
     v
 outputs/phase1/ ... phase4/        Results, saved locally
+    |
+    v
+outputs/page/index.html            One page with the main charts and numbers
 ```
 
 `data/` and `outputs/` are created when you run the commands and are ignored by Git.

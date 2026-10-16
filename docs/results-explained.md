@@ -112,5 +112,6 @@ Only after that is it worth changing the weights. Optimizing now would
 likely find weights that fit this particular history. First decide what
 new weights are meant to fix and how they will be tested.
 
-The numbers, definitions, and source records are in the four generated
-reports and the phase documents.
+`uv run fecon page` puts the main charts and numbers on one page. The full
+numbers, definitions, and source records are in the four generated reports
+and the phase documents.

@@ -1,0 +1,44 @@
+"""The results page is built from the four saved phase outputs."""
+
+import numpy as np
+import pandas as pd
+from financial_economics import cli
+
+
+def test_page_shows_all_four_phases(tmp_path, monkeypatch, capsys):
+    config = tmp_path / "study.toml"
+    config.write_text('''[study]
+name = "synthetic-page"
+start = "2017-12-01"
+end = "2018-03-30"
+benchmark = "SPY"
+[assets]
+SPY = "Stocks"
+OTH = "Other fund"
+BND = "Bond fund"
+''')
+    dates = pd.bdate_range("2017-11-30", "2018-03-30")
+    market = np.sin(np.arange(len(dates))) * .005
+    market[dates.get_loc("2018-02-05")] = -.15
+    daily = np.column_stack([market, .2 * market + .0003, -.3 * market + .0001])
+    prices = pd.DataFrame(100 * (1 + daily).cumprod(axis=0), index=dates, columns=["SPY", "OTH", "BND"])
+    noise = np.random.default_rng(1).normal(0, .001, len(dates))
+    factors = pd.DataFrame({"Mkt-RF": market + noise, "RF": .0001}, index=dates)
+    manifest = {"files": {"prices.csv": {"sha256": "0" * 64}}}
+    monkeypatch.setattr(cli, "load_snapshot", lambda *_: (prices, factors, manifest))
+
+    for phase, command in enumerate(["analyze", "stress", "compare", "explain"], start=1):
+        extra = ["--resamples", "200", "--bond-fund", "BND"] if command == "explain" else []
+        assert cli.main(["--config", str(config), command, "--output-dir",
+                         str(tmp_path / f"phase{phase}"), *extra]) == 0
+    page = tmp_path / "page.html"
+    assert cli.main(["--config", str(config), "page", "--outputs-dir", str(tmp_path),
+                     "--output", str(page)]) == 0
+    html = page.read_text(encoding="utf-8")
+    assert html.count("<section>") == 6 and "Jan 2018 fall" in html
+
+    # A page must not mix outputs from different runs.
+    (tmp_path / "phase4" / "run.json").write_text('{"snapshot_files": {}, "study": {}}')
+    assert cli.main(["--config", str(config), "page", "--outputs-dir", str(tmp_path),
+                     "--output", str(page)]) == 1
+    assert "different snapshots" in capsys.readouterr().err

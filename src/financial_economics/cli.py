@@ -37,11 +37,19 @@ def main(argv: list[str] | None = None) -> int:
     explain.add_argument("--block-length", type=float, default=21)
     explain.add_argument("--seed", type=int, default=20260101)
     explain.add_argument("--bond-fund", default="TLT")
+    page = commands.add_parser("page", help="Write one HTML page from the saved phase outputs")
+    page.add_argument("--outputs-dir", type=Path, default=Path("outputs"))
+    page.add_argument("--output", type=Path, default=Path("outputs/page/index.html"))
     args = parser.parse_args(argv)
 
     try:
         study = load_study(args.config)
-        if args.command == "download":
+        if args.command == "page":
+            from .page import write_page
+
+            write_page(args.outputs_dir, args.output)
+            print(f"Open: {args.output.resolve()}")
+        elif args.command == "download":
             download_snapshot(study, args.data_dir)
             print(f"Saved source snapshot: {args.data_dir.resolve()}")
         else:
