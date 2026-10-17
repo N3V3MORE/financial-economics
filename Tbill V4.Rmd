@@ -1,0 +1,53 @@
+---
+title: "Tbill V4"
+output: html_document
+date: "2026-10-16"
+---
+
+#Summary Statistics
+
+```{r Monthly.Tbill.Data, echo=TRUE}
+
+library(lubridate)
+
+data <- Monthly.TBill.Data
+
+summary(Monthly.TBill.Data)
+
+dates <- mdy(as.character(data$observation_date))
+yield_pct <- as.numeric(data$DGS1MO)
+
+valid <- !is.na(dates) & !is.na(yield_pct)
+dates <- dates[valid]
+yield_pct <- yield_pct[valid]
+
+order_rows <- order(dates)
+dates <- dates[order_rows]
+yield_pct <- yield_pct[order_rows]
+
+month_id <- as.integer(format(dates, "%Y")) * 12 +
+            as.integer(format(dates, "%m"))
+
+
+monthly_return <- (yield_pct / 100) / 12
+
+wealth <- cumprod(1 + monthly_return)
+running_peak <- cummax(c(1, wealth))[-1]
+drawdown <- wealth / running_peak - 1
+
+n <- length(monthly_return)
+
+statistics <- data.frame(
+  first_observation = format(dates[1], "%m/%d/%Y"),
+  last_observation = format(dates[n], "%m/%d/%Y"),
+  observations = n,
+  cumulative_return = tail(wealth, 1) - 1,
+  ending_value_from_1000 = 1000 * tail(wealth, 1),
+  CAGR = tail(wealth, 1)^(12 / n) - 1,
+  annualized_volatility = sd(monthly_return) * sqrt(12),
+  maximum_drawdown = min(drawdown),
+  Sharpe = NA_real_)
+
+print(statistics)
+
+```
