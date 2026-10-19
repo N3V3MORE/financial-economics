@@ -1,0 +1,24 @@
+TVM
+  DCF FV
+    $1000 forecasted across same timespan
+    Comapre compounding to cumulative return or CAGR
+    Can be difficult ti compare between as ETF all have difference values
+
+Risk / return
+Graph returns to omcpare and describe tails
+  monthly scatters to find outliers and visualize correlation between funds
+  skewness, kurtosis, correlation
+  Compare volatility
+
+Portfolio optimization / efficient frontier/ CAL
+ Compare expected return, variance, the efficient frontier, and CAL between bundles
+  Estimate expected return and covariance, construct constrained portfolios, find efficient frontier / tangency portfolio / CAL off tbill as Rf
+
+CAPM / beta / SML
+  Compare betas / SML to measure market exposure
+  Would involve regression comparisons
+
+APT / multifactor models
+ Construct / compare factor models
+    If ambitious, could introduce deeper factor models
+Compare alpha / factor exposures / model fit
