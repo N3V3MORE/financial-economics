@@ -12,7 +12,7 @@
 
 <meta name="date" content="2026-10-16" />
 
-<title>Tbill V4</title>
+<title>One-month Treasury yield cash illustration</title>
 
 <script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
 // be compatible with the behavior of Pandoc < 2.8).
@@ -349,67 +349,26 @@ display: none;
 
 
 
-<h1 class="title toc-ignore">Tbill V4</h1>
+<h1 class="title toc-ignore">One-month Treasury yield cash illustration</h1>
 <h4 class="date">2026-10-16</h4>
 
 </div>
 
 
-<p>#Summary Statistics</p>
-<pre class="r"><code>library(lubridate)
-
-data &lt;- Monthly.TBill.Data
-
-summary(Monthly.TBill.Data)</code></pre>
-<pre><code>##   observation_date     DGS1MO     
-##  Length   :142     Min.   :0.010  
-##  N.unique :133     1st Qu.:0.125  
-##  N.blank  : 10     Median :1.455  
-##  Min.nchar:  0     Mean   :1.985  
-##  Max.nchar:  9     3rd Qu.:4.155  
-##                    Max.   :5.570  
-##                    NAs    :10</code></pre>
-<pre class="r"><code>dates &lt;- mdy(as.character(data$observation_date))
-yield_pct &lt;- as.numeric(data$DGS1MO)
-
-valid &lt;- !is.na(dates) &amp; !is.na(yield_pct)
-dates &lt;- dates[valid]
-yield_pct &lt;- yield_pct[valid]
-
-order_rows &lt;- order(dates)
-dates &lt;- dates[order_rows]
-yield_pct &lt;- yield_pct[order_rows]
-
-month_id &lt;- as.integer(format(dates, &quot;%Y&quot;)) * 12 +
-            as.integer(format(dates, &quot;%m&quot;))
-
-
-monthly_return &lt;- (yield_pct / 100) / 12
-
-wealth &lt;- cumprod(1 + monthly_return)
-running_peak &lt;- cummax(c(1, wealth))[-1]
-drawdown &lt;- wealth / running_peak - 1
-
-n &lt;- length(monthly_return)
-
-statistics &lt;- data.frame(
-  first_observation = format(dates[1], &quot;%m/%d/%Y&quot;),
-  last_observation = format(dates[n], &quot;%m/%d/%Y&quot;),
-  observations = n,
-  cumulative_return = tail(wealth, 1) - 1,
-  ending_value_from_1000 = 1000 * tail(wealth, 1),
-  CAGR = tail(wealth, 1)^(12 / n) - 1,
-  annualized_volatility = sd(monthly_return) * sqrt(12),
-  maximum_drawdown = min(drawdown),
-  Sharpe = NA_real_)
-
-print(statistics)</code></pre>
-<pre><code>##   first_observation last_observation observations cumulative_return
-## 1        01/01/2015       12/01/2025          132         0.2435943
-##   ending_value_from_1000      CAGR annualized_volatility maximum_drawdown
-## 1               1243.594 0.0200164           0.005761396                0
-##   Sharpe
-## 1     NA</code></pre>
+<h2>Approximate results</h2>
+<p>The CSV contains monthly dated values for <a href="https://fred.stlouisfed.org/series/DGS1MO">FRED DGS1MO</a>, an annualized one-month Treasury constant-maturity yield quoted in percent. FRED publishes the series daily; the CSV does not record how its monthly values were selected or aggregated.</p>
+<p>Each CSV yield is applied for one month as yield / 1200 and reinvested. These are approximate cash growth figures, not measured Treasury bill total returns. Trading costs, taxes, and timing differences are excluded.</p>
+<table class="table table-striped"><tbody>
+<tr><th>First observation</th><td>01/01/2015</td></tr>
+<tr><th>Last observation</th><td>12/01/2025</td></tr>
+<tr><th>Monthly observations</th><td>132</td></tr>
+<tr><th>Cumulative approximate growth</th><td>24.3594%</td></tr>
+<tr><th>Ending value from $1,000</th><td>$1,243.59</td></tr>
+<tr><th>Annualized approximate growth</th><td>2.0016%</td></tr>
+<tr><th>Annualized volatility of approximated monthly changes</th><td>0.5761%</td></tr>
+<tr><th>Maximum drawdown of illustration</th><td>0.0000%</td></tr>
+</tbody></table>
+<p>This static companion was updated from the CSV. The R Markdown source was not executed in this environment.</p>
 
 
 

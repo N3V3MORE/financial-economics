@@ -1,53 +1,49 @@
 ---
-title: "Tbill V4"
+title: "One-month Treasury yield cash illustration"
 output: html_document
 date: "2026-10-16"
 ---
 
-#Summary Statistics
+The CSV contains monthly dated values for [FRED DGS1MO](https://fred.stlouisfed.org/series/DGS1MO), an annualized one-month Treasury constant-maturity yield quoted in percent. FRED publishes the series daily; the CSV does not record how its monthly values were selected or aggregated. This illustration applies each CSV yield for one month at `yield / 1200` and reinvests the result. It is an approximation, not a measured Treasury bill total-return series. It excludes trading costs, taxes, and timing differences between the quote date and investment date.
 
-```{r Monthly.Tbill.Data, echo=TRUE}
+## Cash illustration
 
-library(lubridate)
+```{r cash-illustration, echo=TRUE}
+data <- read.csv("Monthly TBill Data.csv", stringsAsFactors = FALSE)
+stopifnot(identical(names(data), c("observation_date", "DGS1MO")))
 
-data <- Monthly.TBill.Data
+dates <- as.Date(data$observation_date, format = "%m/%d/%Y")
+yield_pct <- suppressWarnings(as.numeric(data$DGS1MO))
+stopifnot(nrow(data) >= 2L,
+          !anyNA(dates), !anyNA(yield_pct),
+          all(is.finite(yield_pct)),
+          all(yield_pct / 1200 > -1))
 
-summary(Monthly.TBill.Data)
-
-dates <- mdy(as.character(data$observation_date))
-yield_pct <- as.numeric(data$DGS1MO)
-
-valid <- !is.na(dates) & !is.na(yield_pct)
-dates <- dates[valid]
-yield_pct <- yield_pct[valid]
-
-order_rows <- order(dates)
-dates <- dates[order_rows]
-yield_pct <- yield_pct[order_rows]
-
-month_id <- as.integer(format(dates, "%Y")) * 12 +
+ordered <- order(dates)
+dates <- dates[ordered]
+yield_pct <- yield_pct[ordered]
+month_id <- as.integer(format(dates, "%Y")) * 12L +
             as.integer(format(dates, "%m"))
+stopifnot(!anyDuplicated(month_id),
+          all(diff(month_id) == 1L),
+          all(format(dates, "%d") == "01"))
 
-
-monthly_return <- (yield_pct / 100) / 12
-
-wealth <- cumprod(1 + monthly_return)
+monthly_approx_return <- yield_pct / 1200
+wealth <- cumprod(1 + monthly_approx_return)
 running_peak <- cummax(c(1, wealth))[-1]
 drawdown <- wealth / running_peak - 1
 
-n <- length(monthly_return)
+n <- length(monthly_approx_return)
 
 statistics <- data.frame(
   first_observation = format(dates[1], "%m/%d/%Y"),
   last_observation = format(dates[n], "%m/%d/%Y"),
   observations = n,
-  cumulative_return = tail(wealth, 1) - 1,
+  cumulative_approx_return = tail(wealth, 1) - 1,
   ending_value_from_1000 = 1000 * tail(wealth, 1),
-  CAGR = tail(wealth, 1)^(12 / n) - 1,
-  annualized_volatility = sd(monthly_return) * sqrt(12),
-  maximum_drawdown = min(drawdown),
-  Sharpe = NA_real_)
+  annualized_approx_growth = tail(wealth, 1)^(12 / n) - 1,
+  annualized_approx_volatility = sd(monthly_approx_return) * sqrt(12),
+  maximum_approx_drawdown = min(drawdown))
 
 print(statistics)
-
 ```
