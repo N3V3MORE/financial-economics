@@ -12,6 +12,9 @@ dependencies = [
     "yfinance>=0.2.66,<2",
 ]
 
+[project.optional-dependencies]
+wrds = ["psycopg2-binary==2.9.13"]
+
 [project.scripts]
 fecon = "financial_economics.cli:main"
 

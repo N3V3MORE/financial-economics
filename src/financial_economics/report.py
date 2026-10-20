@@ -15,6 +15,7 @@ import pandas as pd
 
 from .analysis import capm_summary, drawdowns, monthly_equal_weight, performance_summary
 from .config import Study
+from .data import price_source_description
 
 
 def _save_figure(figure, destination: Path) -> None:
@@ -108,6 +109,7 @@ def write_outputs(study: Study, returns: pd.DataFrame, factors: pd.DataFrame,
         "actual_start": str(returns.index[0].date()),
         "actual_end": str(returns.index[-1].date()),
         "snapshot_files": manifest["files"],
+        "sources": manifest.get("sources", {}),
         "software_versions": software_versions,
         "portfolio": {"rule": "monthly equal weight; drift within month",
                       "trading_costs": 0, "taxes": 0},
@@ -163,7 +165,7 @@ def _write_summary(
               "- Historical mean returns and CAPM alpha are estimates, not guaranteed future premiums or proof of skill.",
               "- No missing prices or unmatched factor dates were filled or silently removed.", "",
               "## Sources and reproduction", "",
-              "ETF provider snapshot: Yahoo Finance via yfinance. Factors: "
+              "ETF provider snapshot: " + price_source_description(run) + ". Factors: "
               "[Kenneth French Data Library](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html).",
               "", "The source manifest records settings, retrieval time, versions, and file hashes. "
               "run.json records the snapshot hashes and conventions used for this analysis. "

@@ -17,6 +17,8 @@ def main(argv: list[str] | None = None) -> int:
     commands = parser.add_subparsers(dest="command", required=True)
     download = commands.add_parser("download", help="Save a new source snapshot")
     download.add_argument("--data-dir", type=Path, default=Path("data/snapshot"))
+    download.add_argument("--source", choices=["public", "wrds"], default="public")
+    download.add_argument("--verify-monthly", action="store_true", help="Require CRSP daily/monthly reconciliation")
     analyze = commands.add_parser("analyze", help="Analyze a verified snapshot offline")
     analyze.add_argument("--data-dir", type=Path, default=Path("data/snapshot"))
     analyze.add_argument("--output-dir", type=Path, default=Path("outputs/phase1"))
@@ -43,6 +45,9 @@ def main(argv: list[str] | None = None) -> int:
     checks.add_argument("--additions", nargs="*", default=[])
     checks.add_argument("--windows", nargs="+")
     checks.add_argument("--costs-bps", nargs="+", type=float, default=[0, 10, 25])
+    protection = commands.add_parser("protection", help="Run the frozen ETF-versus-cash study offline")
+    protection.add_argument("--data-dir", type=Path, required=True)
+    protection.add_argument("--output-dir", type=Path, required=True)
     page = commands.add_parser("page", help="Write one HTML page from the saved phase outputs")
     page.add_argument("--outputs-dir", type=Path, default=Path("outputs"))
     page.add_argument("--output", type=Path, default=Path("outputs/page/index.html"))
@@ -56,8 +61,30 @@ def main(argv: list[str] | None = None) -> int:
             write_page(args.outputs_dir, args.output)
             print(f"Open: {args.output.resolve()}")
         elif args.command == "download":
-            download_snapshot(study, args.data_dir)
+            if args.source == "wrds":
+                from .wrds_source import download_wrds_snapshot
+                if args.verify_monthly:
+                    download_wrds_snapshot(study, args.data_dir, verify_monthly=True)
+                else:
+                    download_wrds_snapshot(study, args.data_dir)
+            else:
+                download_snapshot(study, args.data_dir)
             print(f"Saved source snapshot: {args.data_dir.resolve()}")
+        elif args.command == "protection":
+            from .protection_config import load_protection
+            from .return_data import load_returns
+            from .protection import run_protection
+            from .protection_report import write_protection
+            if args.output_dir.exists() or args.output_dir.resolve().is_relative_to(args.data_dir.resolve()):
+                raise ValueError("Use a new output directory outside the source snapshot.")
+            settings = load_protection(args.config, study)
+            data = load_returns(study, args.data_dir, verified_monthly=True)
+            result = run_protection(data, study, settings)
+            write_protection(result, study, settings, data.provenance, args.output_dir, args.config)
+            print(f"Validated {result.metadata['monthly_observations']} months, "
+                  f"{result.metadata['candidate_count']} candidates, and "
+                  f"{result.metadata['portfolio_count']} fixed portfolio definitions.")
+            print(f"Results: {args.output_dir.resolve()}")
         else:
             prices, factors, manifest = load_snapshot(study, args.data_dir)
             returns = prices_to_returns(prices, study.start, study.end)

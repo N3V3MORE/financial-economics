@@ -1,0 +1,43 @@
+[study]
+name = "protection-common-2015-2025"
+start = "2015-01-01"
+end = "2025-12-31"
+benchmark = "SPY"
+trading_days = 252
+hac_lags = 6
+
+[assets]
+SPY = "Broad US stock reference"
+QQQ = "Growth, innovation, and technology"
+IWF = "Growth, innovation, and technology"
+SCHG = "Growth, innovation, and technology"
+VUG = "Growth, innovation, and technology"
+XLK = "Growth, innovation, and technology"
+ARKK = "Growth, innovation, and technology"
+XLE = "Sector and real estate"
+XLY = "Sector and real estate"
+VNQ = "Sector and real estate"
+VIG = "Dividend growth"
+TLT = "Other assets: long government bonds"
+GLD = "Other assets: gold"
+DBC = "Other assets: commodities"
+
+[protection]
+allocations = [0.1, 0.2, 0.4]
+costs_bps = [0, 10, 25]
+resamples = 10000
+block_lengths = [6, 3, 12]
+seed = 20260101
+hac_lags = 6
+alpha = 0.05
+primary_inference = true
+severe_threshold = -0.05
+training_start = "2015-01-01"
+training_end = "2019-12-31"
+evaluation_start = "2020-01-01"
+windows = ["2015:2019", "2020:2021", "2022:2025"]
+
+[protection.fixed_portfolios]
+original_eight = ["SPY", "QQQ", "VNQ", "GLD", "XLE", "XLY", "VIG", "TLT"]
+jake_twelve = ["ARKK", "DBC", "GLD", "IWF", "QQQ", "SCHG", "SPY", "VNQ", "VUG", "XLE", "XLK", "XLY"]
+combined_fourteen = ["SPY", "QQQ", "IWF", "SCHG", "VUG", "XLK", "ARKK", "XLE", "XLY", "VNQ", "VIG", "TLT", "GLD", "DBC"]

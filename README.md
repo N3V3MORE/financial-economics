@@ -77,6 +77,75 @@ Differences are portfolio minus reference: higher growth and Sharpe are
 favorable, lower volatility is favorable, and a positive drawdown difference
 means a shallower loss. This is a historical check, not a fund-ranking rule.
 
+## ETF additions versus cash: the protection study
+
+The expanded study asks which funds help in stock-market declines **relative
+to cash**, and what growth and risk come with that choice. It preserves the
+original eight-fund work below. The frozen settings are in `protection.toml`
+(14 funds, 2015–2025) and `protection-long.toml` (SPY/TLT/GLD/DBC, 2007–2025).
+Read the measured findings in [results-explained.md](docs/results-explained.md#which-additions-earned-their-place-relative-to-cash).
+
+The October 20, 2026 source decision was **WRDS / CRSP CIZ for both samples**.
+All 1,848 main-sample and 912 longer-sample fund-months passed the daily/monthly
+reconciliation threshold of one basis point; maximum differences were 0.0555
+and 0.0433 basis points. Complete French trading calendars, historical PERMNO
+coverage, ETF classifications, valid return flags, and duplicates were checked.
+No provider splice, missing-return filling, or public-data fallback was needed.
+
+```sh
+uv sync --extra wrds
+uv run --extra wrds fecon --config protection.toml download --source wrds --verify-monthly --data-dir data/protection-wrds-20261020
+uv run --extra wrds fecon --config protection-long.toml download --source wrds --verify-monthly --data-dir data/protection-long-wrds-20261020
+uv run fecon --config protection.toml protection --data-dir data/protection-wrds-20261020 --output-dir outputs/protection-main-final
+uv run fecon --config protection-long.toml protection --data-dir data/protection-long-wrds-20261020 --output-dir outputs/protection-long-final
+uv run python scripts/verify_protection.py --config protection.toml --data-dir data/protection-wrds-20261020 --output-dir outputs/protection-main-final
+uv run python scripts/verify_protection.py --config protection-long.toml --data-dir data/protection-long-wrds-20261020 --output-dir outputs/protection-long-final
+```
+
+Skip downloads when those snapshots already exist. Downloads and protection
+outputs refuse existing destinations; choose new names for a later vintage or
+rerun. WRDS uses an existing local PostgreSQL password file and optional
+`WRDS_USERNAME`; passwords and raw provider errors are never printed. There
+is no automatic fallback. If verified WRDS coverage is unavailable, explicitly
+use `download --source public` into a separately named directory and carry that
+provider label through the entire run. Never combine the providers' returns.
+
+`load_returns` supplies validated daily returns, aligned factors, an initial
+valuation date, and provenance. CRSP returns are consumed directly. Its
+normalized total-return index exists only to preserve legacy command support.
+Version-1 public snapshots and earlier version-2 WRDS snapshots still load;
+the protection command requires the extra monthly check for WRDS sources.
+
+The main run contains 46 portfolio definitions across three cost scenarios:
+39 candidate additions, three same-SPY-weight cash controls, SPY, and the
+three fixed equal-weight fund lists. The longer run contains 13 definitions.
+The primary statistical family is only the 13 fund-versus-cash comparisons
+in 2015–2025. Allocation sizes, subperiods, and the longer sample are not
+independent confirmations. All bootstrap jobs run sequentially on CPU in
+batches of 250; no GPU training is used.
+
+| Saved evidence in each output directory | Contents |
+|---|---|
+| `fund_conditions.csv`, `fund_monthly_returns.csv` | All, negative-SPY, and severe-SPY month descriptions and underlying local monthly series |
+| `primary_tests.csv`, `bootstrap_intervals.csv` | Main sample only: HAC/Holm tests and 10,000-draw intervals at 6-, 3-, and 12-month blocks |
+| `performance.csv`, `portfolio_conditions.csv` | All allocations, costs, fixed mixes, and descriptive periods |
+| `portfolio_definitions.csv`, `target_weights.csv` | Explicit portfolio membership and weights |
+| `daily_returns.csv`, `monthly_returns.csv`, `fees.csv` | Full local portfolio paths and fee/traded-notional accounting per initial dollar |
+| `beta_calibration.csv`, `beta_performance.csv`, `beta_conditions.csv` | Training estimates, clipped control targets, realized exposures, and evaluation results |
+| `spy_episodes.csv`, `episode_comparisons.csv`, `fund_episode_comparisons.csv` | Common SPY decline windows, losses, and recoveries |
+| `protection.png`, `tradeoffs.png`, `declines.png` | The three main figures, each backed by a `figure_*.csv` table |
+| `run.json` | Source manifest, frozen settings, units, code/config/output hashes, software versions, and run conventions |
+
+The independently written verifier checks all main metrics, conditional means,
+zero-cost monthly portfolio identities, and plotted numbers. It recomputes HAC
+covariance and Holm adjustment using matrix algebra, without the inference
+module. Synthetic tests cover resampling dependence and paired observations,
+seed reproducibility, source failures, alignment, and fee accounting.
+
+Raw licensed observations and generated detailed paths stay local in ignored
+`data/` and `outputs/`. Do not redistribute them.
+Repository documentation contains aggregate findings, not licensed observations.
+
 ## See the original phase results
 
 After the four analysis commands, put the main findings on one page:
@@ -99,6 +168,8 @@ data/snapshot/                     Downloaded inputs, saved locally
 src/financial_economics/           Python code
     |-- config.py                 Read the study settings
     |-- data.py                   Download, save, and validate the inputs
+    |-- wrds_source.py            Private CRSP extracts and monthly reconciliation
+    |-- return_data.py            Provider-independent returns and complete months
     |-- analysis.py               Calculate returns, risk, and market exposure
     |-- report.py                 Write Phase 1 tables, charts, and the summary
     |-- stress.py                 Find SPY declines and compare recoveries
@@ -107,6 +178,10 @@ src/financial_economics/           Python code
     |-- comparison_report.py      Write the Phase 3 report
     |-- costs.py                  Deduct self-financing ETF trading fees
     |-- fund_checks.py            Compare removals, additions, periods, and costs
+    |-- protection_config.py      Frozen protection-study settings
+    |-- protection.py             Fixed additions, costs, periods, and beta controls
+    |-- protection_inference.py   Thirteen HAC/Holm tests and paired bootstrap
+    |-- protection_report.py      Protection tables, three figures, and run metadata
     |-- explain.py                Resample the comparison and split gains by fund
     |-- explain_report.py         Write the Phase 4 report
     |-- page.py                   Write the one-page summary of all four phases

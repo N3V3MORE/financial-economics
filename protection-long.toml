@@ -1,0 +1,28 @@
+[study]
+name = "protection-core-2007-2025"
+start = "2007-01-01"
+end = "2025-12-31"
+benchmark = "SPY"
+trading_days = 252
+hac_lags = 6
+
+[assets]
+SPY = "Broad US stock reference"
+TLT = "Other assets: long government bonds"
+GLD = "Other assets: gold"
+DBC = "Other assets: commodities"
+
+[protection]
+allocations = [0.1, 0.2, 0.4]
+costs_bps = [0, 10, 25]
+resamples = 10000
+block_lengths = [6, 3, 12]
+seed = 20260101
+hac_lags = 6
+alpha = 0.05
+primary_inference = false
+severe_threshold = -0.05
+training_start = "2015-01-01"
+training_end = "2019-12-31"
+evaluation_start = "2020-01-01"
+windows = ["2007:2009", "2010:2014", "2015:2019", "2020:2021", "2022:2025"]

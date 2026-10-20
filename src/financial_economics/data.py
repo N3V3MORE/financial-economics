@@ -157,17 +157,29 @@ def load_snapshot(
         manifest = json.loads((directory / "manifest.json").read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
         raise ValueError(f"Cannot read snapshot manifest in {directory}.") from error
-    if manifest.get("schema_version") != 1 or manifest.get("settings") != study.settings():
+    schema = manifest.get("schema_version")
+    if schema not in (1, 2) or manifest.get("settings") != study.settings():
         raise ValueError("Snapshot settings do not match this study; use the original settings or fetch a new snapshot.")
+    if schema == 2:
+        from .wrds_source import INDEX_FILE, SNAPSHOT_FILES, MONTHLY_FILE, QUERY_FILE, validate_snapshot_returns
+
+        if (manifest.get("sources", {}).get("prices", {}).get("provider") != "WRDS / CRSP CIZ"
+                or manifest["sources"]["prices"].get("representation") != "total_return_index"):
+            raise ValueError("Invalid WRDS snapshot source definition.")
+        price_file, required_files = INDEX_FILE, SNAPSHOT_FILES
+        if "coverage" in manifest:
+            required_files = SNAPSHOT_FILES | {MONTHLY_FILE, QUERY_FILE}
+    else:
+        price_file, required_files = PRICE_FILE, {PRICE_FILE, FACTOR_FILE, SOURCE_ZIP}
     files = manifest.get("files", {})
-    if set(files) != {PRICE_FILE, FACTOR_FILE, SOURCE_ZIP}:
-        raise ValueError("Snapshot manifest does not list the three required data files.")
+    if set(files) != required_files:
+        raise ValueError("Snapshot manifest does not list the required data files.")
     for name, info in files.items():
         path = directory / name
         if not path.is_file() or _file_info(path)["sha256"] != info.get("sha256"):
             raise ValueError(f"Snapshot hash verification failed for {name}.")
 
-    prices = _read_frame(directory / PRICE_FILE)
+    prices = _read_frame(directory / price_file)
     factors = _read_frame(directory / FACTOR_FILE)
     _validate_frame(prices, study.tickers, "Adjusted close", positive=True)
     _validate_frame(factors, FACTOR_COLUMNS, "Factors")
@@ -182,11 +194,22 @@ def load_snapshot(
         if not len(seed_days) or seed_days[-1] != previous_days[-1]:
             expected = previous_days[-1].strftime("%Y-%m-%d")
             raise ValueError(f"The seed must be the immediately preceding French trading close: {expected}.")
-    for name, frame in ((PRICE_FILE, prices), (FACTOR_FILE, factors)):
+    for name, frame in ((price_file, prices), (FACTOR_FILE, factors)):
         if _file_info(directory / name, frame) != files[name]:
             raise ValueError(f"Snapshot row count or date bounds disagree for {name}.")
     align_sample(prices.pct_change(fill_method=None).iloc[1:], factors, study)
+    if schema == 2:
+        validate_snapshot_returns(study, factors, directory, prices, manifest)
     return prices, factors, manifest
+
+
+def price_source_description(manifest: dict) -> str:
+    """Describe the consumed provider instead of hard-coding a Yahoo label."""
+    source = manifest.get("sources", {}).get("prices", {})
+    provider = source.get("provider", "Unspecified saved provider")
+    if source.get("representation") == "total_return_index":
+        return f"{provider}; total-return index reconstructed from daily total returns, not traded prices"
+    return f"{provider}; adjusted closes"
 
 
 def download_snapshot(study: Study, directory: Path) -> dict:

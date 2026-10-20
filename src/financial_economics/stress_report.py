@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import PercentFormatter
 import numpy as np
 import pandas as pd
+from .data import price_source_description
 
 from .config import Study
 
@@ -139,6 +140,7 @@ def write_stress_outputs(study: Study, returns: pd.DataFrame, episodes: pd.DataF
         "study": study.settings(), "observations": len(returns),
         "actual_start": _date(returns.index[0]), "actual_end": _date(returns.index[-1]),
         "seed_date": _date(seed_date), "snapshot_files": manifest["files"],
+        "sources": manifest.get("sources", {}),
         "drawdown_threshold": drawdown_threshold, "rolling_window": rolling_window,
         "episodes": len(episodes),
         "software_versions": {"python": platform.python_version(), **{
@@ -250,7 +252,7 @@ def write_stress_outputs(study: Study, returns: pd.DataFrame, episodes: pd.DataF
               f"uv run fecon stress --drawdown-threshold {drawdown_threshold:g} --rolling-window {rolling_window}",
               "```", "", "The command uses the retained, hash-checked Phase 1 snapshot offline. "
               "run.json records the settings, source hashes, software versions, and exact definitions. "
-              "ETF prices originate from Yahoo Finance via yfinance; the shared trading calendar comes from "
+              "ETF source: " + price_source_description(run) + "; the shared trading calendar comes from "
               "[Kenneth French's daily factors](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html). "
               "Generated tables and figures stay local and are not redistributed in Git.", ""]
     (output / "summary.md").write_text("\n".join(lines), encoding="utf-8")

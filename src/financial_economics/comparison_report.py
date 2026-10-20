@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import PercentFormatter, StrMethodFormatter
 import numpy as np
 import pandas as pd
+from .data import price_source_description
 
 from .analysis import drawdowns
 from .comparison import ComparisonResult
@@ -146,6 +147,7 @@ def write_comparison_outputs(study: Study, result: ComparisonResult,
     run = {
         "study": study.settings(), "calibration": calibration,
         "snapshot_files": manifest["files"],
+        "sources": manifest.get("sources", {}),
         "software_versions": {"python": platform.python_version(), **{
             name: version(name) for name in ["financial-economics", "numpy", "pandas", "statsmodels", "matplotlib"]}},
         "portfolio": {
@@ -296,6 +298,6 @@ def write_comparison_outputs(study: Study, result: ComparisonResult,
               "performance.csv, stock_exposure.csv, episodes.csv, and episode_comparison.csv retain the numerical "
               "results. run.json records source hashes, versions, assumptions, and definitions. Generated data "
               "and figures stay local rather than being redistributed in Git.", "",
-              "ETF adjusted prices originate from Yahoo Finance via yfinance. The cash proxy comes from "
+              "ETF source: " + price_source_description(run) + ". The cash proxy comes from "
               "[Kenneth French's daily factors](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html).", ""]
     (output / "summary.md").write_text("\n".join(lines), encoding="utf-8")

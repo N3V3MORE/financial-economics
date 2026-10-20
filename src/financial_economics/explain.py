@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
-from .analysis import monthly_equal_weight_holdings
+from .analysis import _check_frame, _check_returns, monthly_equal_weight_holdings
 from .comparison import compare_portfolios
 from .stress import drawdown_episodes
 
@@ -50,6 +50,10 @@ def bootstrap_differences(returns: pd.DataFrame, risk_free: pd.Series, portfolio
                           resamples: int = 10_000, block_length: float = 21,
                           seed: int = 20260101) -> pd.DataFrame:
     """95% ranges for portfolio-minus-reference differences, resampling the same days for all."""
+    _check_returns(returns, minimum=2)
+    _check_frame(risk_free.to_frame(), "Cash returns", minimum=2)
+    if not risk_free.index.equals(returns.index):
+        raise ValueError("Cash-return dates must exactly match portfolio dates.")
     if resamples < 100 or not 1 <= block_length <= len(returns):
         raise ValueError("Use at least 100 resamples and a block length within the sample.")
     values = returns[[portfolio, *references]].to_numpy().T
@@ -84,6 +88,13 @@ def fund_contributions(returns: pd.DataFrame, weights: pd.DataFrame,
 
     The amounts add up exactly to the mix's compounded return over the window.
     """
+    _check_returns(returns)
+    _check_frame(weights, "Contribution weights")
+    if not weights.index.equals(returns.index) or set(weights.columns) != set(returns.columns):
+        raise ValueError("Contribution weights must match return dates and assets exactly.")
+    weights = weights.reindex(index=returns.index, columns=returns.columns)
+    if (weights < 0).any().any() or not np.allclose(weights.sum(axis=1), 1, atol=1e-12, rtol=0):
+        raise ValueError("Contribution weights must be nonnegative and sum to one.")
     rows = []
     for name, start, end in windows:
         start, end = pd.Timestamp(start), pd.Timestamp(end)
