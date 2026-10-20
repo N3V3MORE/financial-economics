@@ -43,7 +43,41 @@ Existing snapshots are never silently replaced. Changing the ETFs or dates also 
 
 `explain` rebuilds 2018–2025 10,000 times from runs of real trading days, 21 days long on average, keeping every portfolio on the same days, and reports how far the Phase 3 differences move. A fixed random seed makes reruns identical; `--resamples`, `--block-length`, and `--seed` change the settings. It also measures each fund's gain or loss in every SPY fall, adding up exactly to the mix's loss. See [Phase 4](docs/phase-4.md).
 
-## See the results
+## Check which funds help
+
+`fund-checks` removes each fund in turn and redistributes its weight equally
+among the remaining funds. It keeps the original mix's SPY + cash comparison
+and adds a separately calibrated SPY + cash comparison for each variant.
+Each control uses only returns before its evaluation period.
+
+```sh
+uv run fecon fund-checks --data-dir data/public-review-20261019 --output-dir outputs/fund-checks-original
+uv run fecon --config study-commodities.toml download --data-dir data/commodities-20261020
+uv run fecon --config study-commodities.toml fund-checks --additions DBC --data-dir data/commodities-20261020 --output-dir outputs/fund-checks-commodities
+```
+
+The first command uses the recovered eight-fund snapshot. The other two use
+a separate nine-fund snapshot, comparing the eight-fund baseline and its DBC
+extension on exactly the same observations. Downloaded snapshots stay local;
+use a new directory when fetching another data vintage.
+
+Defaults cover 2016–2025, 2018–2025, 2020–2025, and four two-year periods
+from 2018 through 2025. The longer windows overlap. Change them with
+`--windows 2018-01-01:2025-12-31`, and costs with `--costs-bps 0 10 25`.
+Ten basis points means $1 per $1,000 of ETF purchases or sales. Both sides of
+a trade are charged; the RF cash proxy has no fee. These are cost scenarios,
+not estimates of historical execution costs. Entry fees are included, exit
+fees and taxes are excluded. Fees come out of portfolio capital before the
+next return. Monthly targets stay fixed and holdings drift between resets.
+
+Each output directory contains `performance.csv`, `differences.csv`,
+`calibration.csv`, `daily_returns.csv`, and `run.json`. The JSON records
+the source manifest and assumptions. Existing result directories are refused.
+Differences are portfolio minus reference: higher growth and Sharpe are
+favorable, lower volatility is favorable, and a positive drawdown difference
+means a shallower loss. This is a historical check, not a fund-ranking rule.
+
+## See the original phase results
 
 After the four analysis commands, put the main findings on one page:
 
@@ -71,6 +105,8 @@ src/financial_economics/           Python code
     |-- stress_report.py          Write the Phase 2 report
     |-- comparison.py             Fit the SPY + cash portfolio and compare
     |-- comparison_report.py      Write the Phase 3 report
+    |-- costs.py                  Deduct self-financing ETF trading fees
+    |-- fund_checks.py            Compare removals, additions, periods, and costs
     |-- explain.py                Resample the comparison and split gains by fund
     |-- explain_report.py         Write the Phase 4 report
     |-- page.py                   Write the one-page summary of all four phases
@@ -105,7 +141,7 @@ To change **what is studied**, edit `study.toml`. To change **how results are ca
 The study selects SPY, QQQ, VNQ, GLD, XLE, XLY, VIG, and TLT for January 1, 2010 through December 31, 2025. The exact settings live in `study.toml`.
 
 - CAGR measures compounded growth; volatility measures total return variability. Sharpe uses daily excess returns.
-- The equal-weight portfolio resets monthly, with weights drifting between resets. Trading costs and taxes are zero.
+- The equal-weight portfolio resets monthly, with weights drifting between resets. Phases 1–4 omit costs and taxes; `fund-checks` includes explicit trading-cost scenarios and omits taxes.
 - SPY is the portfolio benchmark. CAPM uses French's broader market factor; beta measures exposure to that factor. Phase 3 instead measures sensitivity to SPY's own excess returns.
 - TLT is a risky bond fund. The risk-free return, and the "cash" in SPY + cash, come from French's factor file.
 - Market falls are dated after the fact, using SPY's own peaks and troughs; they are not a trading rule.
@@ -114,6 +150,9 @@ The study selects SPY, QQQ, VNQ, GLD, XLE, XLY, VIG, and TLT for January 1, 2010
 - These are retrospectively selected surviving funds. Full-period correlations do not establish protection during market declines, and historical alpha does not prove skill or mispricing.
 
 ## Development
+
+The NumPy portfolio calculations and block bootstrap are CPU-native algorithms;
+they run on CPU and do not select or fall back from a GPU backend.
 
 ```sh
 uv run pytest -q

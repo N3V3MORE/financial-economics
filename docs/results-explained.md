@@ -100,18 +100,89 @@ links this to high inflation and tight monetary policy. The bond cushion
 that helped in 2020 was gone in 2022, which helps explain the mix's slower
 2022 recovery.
 
+## What the fund-removal checks add
+
+On October 20, 2026 we recovered the public-data snapshot saved on October 19
+and reran all four phases. It reproduces the headline figures above at their
+displayed precision, including the bootstrap ranges. This establishes numerical
+reproduction from the recovered snapshot; it does not establish that these are
+the exact source bytes used for the original write-up.
+
+We then removed each fund in turn, splitting the remaining allocation equally
+and keeping monthly rebalancing. The comparison includes the original SPY + cash
+portfolio and a separate control fitted to each variant's earlier stock
+sensitivity. We tested seven periods and costs of 0, 10, and 25 basis points
+per ETF dollar bought or sold. These costs are assumptions. Entry is charged,
+exit is not, and taxes are excluded. Cash is still French's RF proxy.
+
+At 10 basis points, the 2018–2025 results are:
+
+| Portfolio | Annual growth | Annual volatility | Largest fall |
+|---|---:|---:|---:|
+| Original eight funds | 11.43% | 14.93% | −27.91% |
+| SPY + cash | 10.90% | 13.31% | −24.02% |
+| Without SPY | 11.01% | 14.46% | −27.18% |
+| Without QQQ | 10.22% | 14.19% | −28.00% |
+| Without VNQ | 12.33% | 14.59% | −26.10% |
+| Without GLD | 10.58% | 16.67% | −31.09% |
+| Without XLE | 11.48% | 14.34% | −26.72% |
+| Without XLY | 11.12% | 14.15% | −27.08% |
+| Without VIG | 11.30% | 14.82% | −27.88% |
+| Without TLT | 13.23% | 17.26% | −33.06% |
+
+VNQ is the clearest candidate for further investigation: removing it increased
+growth and reduced both volatility and the largest loss in all three longer
+windows, at all three cost levels. It did not improve every shorter period.
+For example, removing it slightly reduced growth and increased volatility in
+2018–2019. Its removal also left a deeper worst loss than its own SPY/cash
+control, despite a higher historical Sharpe ratio.
+
+TLT illustrates why growth alone is a poor removal rule. Removing it raised
+2018–2025 growth by 1.80 percentage points, but increased volatility by 2.33
+points and deepened the largest loss by 5.16 points. Gold had a useful role
+over the longer windows: removing it reduced growth and increased risk. XLE's
+role changed with the period. Removing it helped in 2020–2021 but reduced
+annual growth by 3.94 points and deepened the largest loss by 6.87 points in
+2022–2023, at the same 10-basis-point cost assumption.
+
+The original mix still had a lower Sharpe ratio and a deeper worst loss than
+SPY + cash in each of the 2016–2025, 2018–2025, and 2020–2025 windows, at all
+three costs. These windows overlap and are not three independent tests.
+The four shorter windows cover 2018–2019, 2020–2021, 2022–2023, and 2024–2025.
+The mix's growth advantage over SPY + cash changed sign across those periods.
+
+## Does the commodities addition help?
+
+Before running the extension, we chose one question: does adding DBC improve
+protection, especially in 2022–2023, enough to justify its effect on longer-term
+growth? DBC provides exposure to commodity futures; see the
+[issuer's fund description](https://www.invesco.com/us/en/financial-products/etfs/invesco-db-commodity-index-tracking-fund.html).
+The test gives each of the nine funds a one-ninth target weight. This changes
+every original fund's weight, so the result describes that allocation change.
+
+At 10 basis points, adding DBC reduced the largest 2022–2023 loss from 19.92%
+to 18.16% and raised annual growth from 1.40% to 2.09%. Over 2018–2025,
+however, it reduced annual growth from 11.43% to 10.95%. Volatility fell from
+14.93% to 14.27%, while Sharpe fell from 0.616 to 0.607. Its largest loss,
+27.63%, was still deeper than the common SPY/cash control's 24.02%.
+DBC helped in a particular difficult period; this test does not establish a
+general improvement over the simpler comparison.
+
+DBC and the original eight funds were downloaded together on October 20, so
+both sides of this comparison use the same prices and dates. The common-fund
+metrics differ from the recovered snapshot by less than 0.001 percentage
+points. Source manifests, full daily returns, and all comparison rows are
+retained in `outputs/fund-checks-original` and `outputs/fund-checks-commodities`.
+The original reruns are in `outputs/reproduced/phase1` through `phase4`.
+
 ## What to do next
 
-Phase 4 explained the contributions; see [Phase 4](phase-4.md).
-
-Next, check whether the conclusion holds up under reasonable changes:
-other training and evaluation years, dropping one fund at a time, and a
-simple allowance for trading costs. These are checks on data we have
-already looked at, not fresh proof.
-
-Only after that is it worth changing the weights. Optimizing now would
-likely find weights that fit this particular history. First decide what
-new weights are meant to fix and how they will be tested.
+Keep the original mix, the mix without VNQ, and their SPY/cash controls as a
+small research shortlist. Decide in advance how much extra loss would be
+acceptable for extra growth, then evaluate later data without retuning the
+fund selection. The VNQ result is a hypothesis worth testing, not a confirmed
+improvement. All these funds and histories were selected retrospectively;
+the removal checks have no multiple-testing adjustment.
 
 `uv run fecon page` puts the main charts and numbers on one page. The full
 numbers, definitions, and source records are in the four generated reports
