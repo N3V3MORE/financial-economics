@@ -136,4 +136,6 @@ including the paper's long Treasuries, stayed reliable over time.
 - **Frozen GRU study tag:** `frozen-gru-study-20261021`.
 - **Commands to rerun each stage:** README sections “Reconstruct the paper's
   U.S. experiment” and “Fixed GRUs and the realistic trading test”.
-- **Tests:** `uv run pytest -q` (236 pass; GPU tests skip without CUDA).
+- **Tests and lint:** `uv run pytest -q` (236 pass; GPU tests skip without CUDA)
+  and `uv run ruff check`.
+- **Write-up draft:** [Google Doc](https://docs.google.com/document/d/1aUVYdh1XzAlTyHhGPN4SLtOsYPSjuieeSwIQuM8PsnE/edit?usp=sharing).

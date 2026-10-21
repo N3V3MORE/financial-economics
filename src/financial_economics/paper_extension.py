@@ -1,11 +1,9 @@
 """CPU-native realistic portfolios for frozen, delayed Oxford-BV forecasts."""
 
 from dataclasses import asdict, dataclass, replace
-from datetime import datetime, timezone
 from hashlib import sha256
 import json
 from pathlib import Path
-import subprocess
 from tempfile import TemporaryDirectory
 import tomllib
 
@@ -16,6 +14,7 @@ from .analysis import _check_returns, performance_summary
 from .costs import dynamic_costed_path
 from .data import parse_french_factors
 from .paper import load_bipower, load_paper_settings, prepare_paper_forecasts
+from .provenance import file_digest, git_dirty, git_head, utc_now
 from .return_data import compound_months, load_returns
 
 
@@ -100,7 +99,7 @@ def load_frozen_selection(directory, paper, freeze, archive_digest):
     if source["paper"]["lookback"] != paper.lookback or model.get("num_layers") != 2:
         raise ValueError("Frozen model architecture does not match the extension.")
     path = directory / "gru_tuning.csv"
-    if sha256(path.read_bytes()).hexdigest() != source.get("files", {}).get(path.name):
+    if file_digest(path) != source.get("files", {}).get(path.name):
         raise ValueError("Frozen tuning table hash does not match its provenance.")
     tuning = pd.read_csv(path)
     selected = tuning.loc[tuning.selected.eq(True)]
@@ -307,7 +306,7 @@ def run_extension_command(args, study):
     bv = load_bipower(args.oxford_archive, paper.training_start, paper.evaluation_end)
     if bv.empty or bv.index[0] != calendar[0] or bv.index[-1] != calendar[-1]:
         raise ValueError("Original BV input must cover the full extension span; sources are never spliced.")
-    archive_digest = sha256(args.oxford_archive.read_bytes()).hexdigest()
+    archive_digest = file_digest(args.oxford_archive)
     prepared = prepare_paper_forecasts(bv, calendar, paper.lookback, horizon=2)
     forecasts = prepared.rows.copy()
     weights = paper.ewma_decay ** np.arange(paper.lookback - 1, -1, -1)
@@ -326,7 +325,7 @@ def run_extension_command(args, study):
                     or source.get("oxford_archive_sha256") != archive_digest):
                 raise ValueError("Reused extension forecasts must match horizon, model settings, and source data.")
             path = args.forecast_run / "forecasts.csv"
-            if sha256(path.read_bytes()).hexdigest() != source.get("files", {}).get(path.name):
+            if file_digest(path) != source.get("files", {}).get(path.name):
                 raise ValueError("Reused extension forecast hash does not match provenance.")
             forecasts = pd.read_csv(path, index_col="forecast_date", float_precision="round_trip")
             forecasts.index = pd.to_datetime(forecasts.index)
@@ -349,7 +348,7 @@ def run_extension_command(args, study):
                                                      ["SPY", *settings.defensive_assets]].assign(RF=data.factors.RF)
         for name, frame in tables.items():
             frame.to_csv(output / f"{name}.csv", index=not isinstance(frame.index, pd.RangeIndex))
-        metadata = {"created_at_utc": datetime.now(timezone.utc).isoformat(), "stage": "realistic original-BV extension",
+        metadata = {"created_at_utc": utc_now(), "stage": "realistic original-BV extension",
                     "study": study.settings(), "paper": asdict(paper), "extension": asdict(settings),
                     "source_manifest": data.provenance, "oxford_archive_sha256": archive_digest,
                     "gru": model, "model_parent": parent, "forecast_horizon": 2, **counts,
@@ -367,12 +366,12 @@ def run_extension_command(args, study):
                     "inference": "descriptive historical comparisons; no new significance or unseen-performance claim",
                     "limitations": ["ETF substitutes for paper indices", "Ends in 2021; no full 2022-2025 test",
                                     "Architecture chosen on previously inspected histories; 2021 is an additional historical year"],
-                    "git_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
-                    "git_dirty": bool(subprocess.check_output(["git", "status", "--porcelain"], text=True).strip()),
-                    "config_sha256": sha256(args.config.read_bytes()).hexdigest(),
-                    "code_sha256": {path.name: sha256(path.read_bytes()).hexdigest()
+                    "git_commit": git_head(),
+                    "git_dirty": git_dirty(),
+                    "config_sha256": file_digest(args.config),
+                    "code_sha256": {path.name: file_digest(path)
                                     for path in sorted(Path(__file__).parent.glob("*.py"))},
-                    "files": {path.relative_to(output).as_posix(): sha256(path.read_bytes()).hexdigest()
+                    "files": {path.relative_to(output).as_posix(): file_digest(path)
                               for path in sorted(output.rglob("*")) if path.is_file()}}
         (output / "run.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
         if destination.exists():

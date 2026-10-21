@@ -1,8 +1,7 @@
 """Download once, retain the source evidence, and analyse the same data offline."""
 
 import csv
-from datetime import date, datetime, timedelta, timezone
-from hashlib import sha256
+from datetime import date, datetime, timedelta
 from importlib.metadata import version
 from io import BytesIO, StringIO
 import json
@@ -16,6 +15,7 @@ import numpy as np
 import pandas as pd
 
 from .config import Study
+from .provenance import file_digest, utc_now
 
 
 FRENCH_URL = (
@@ -125,7 +125,7 @@ def align_sample(
 
 
 def _file_info(path: Path, frame: pd.DataFrame | None = None) -> dict:
-    info = {"sha256": sha256(path.read_bytes()).hexdigest()}
+    info = {"sha256": file_digest(path)}
     if frame is not None:
         info.update(
             rows=len(frame),
@@ -267,7 +267,7 @@ def download_snapshot(study: Study, directory: Path) -> dict:
         (staging / SOURCE_ZIP).write_bytes(archive)
         manifest = {
             "schema_version": 1,
-            "retrieved_at_utc": datetime.now(timezone.utc).isoformat(),
+            "retrieved_at_utc": utc_now(),
             "settings": study.settings(),
             "sources": {
                 "prices": {

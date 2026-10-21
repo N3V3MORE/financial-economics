@@ -549,6 +549,30 @@ src/financial_economics/           Python code
     |-- explain.py                Resample the comparison and split gains by fund
     |-- explain_report.py         Write the Phase 4 report
     |-- page.py                   Write the one-page summary of all four phases
+    |
+    |   Volatility prediction
+    |-- forecasting.py            Calendar alignment and EWMA variance forecasts
+    |-- gru_forecasting.py        CUDA GRU variance forecasts with annual refits
+    |-- prediction_config.py      Frozen prediction-experiment settings
+    |-- prediction.py             Target-volatility portfolios from issued forecasts
+    |-- prediction_inference.py   Paired forecast and portfolio tests
+    |-- prediction_report.py      Prediction tables, figures, and run metadata
+    |
+    |   Kaczmarek et al. (2022) replication and extensions
+    |-- paper.py                  Closer GRU-UNIVAR replication on Oxford-Man BV
+    |-- paper_gru.py              Its two-layer CUDA GRU
+    |-- paper_extension.py        Same forecasts with delays, fees, and cash income
+    |-- paper_sources.py          Public substitutes for the paper's U.S. series
+    |-- paper_fx.py               Dated FX, or local currency, for the foreign bonds
+    |-- paper_models.py           ARFIMA, GARCH, and GJR-GARCH forecasts
+    |-- paper_networks.py         Raw-BV GRUs for the full rebuild
+    |-- paper_networks_log.py     Post hoc log-BV GRUs
+    |-- paper_evaluation.py       Paper-style scores for all models and assets
+    |-- paper_reconstruction.py   Run and reuse the rebuild's stages
+    |-- paper_realistic.py        Realistic trading test of the saved forecasts
+    |-- paper_figures.py          Redraw the paper's Figures 3–7
+    |
+    |-- provenance.py             File hashes, git state, and timestamps for run records
     |-- cli.py                    Connect the commands
     |-- __main__.py               Support python -m financial_economics
     +-- __init__.py                Identify the Python package
@@ -562,9 +586,18 @@ outputs/page/index.html            One page with the main charts and numbers
 
 `data/` and `outputs/` are created when you run the commands and are ignored by Git.
 
+The rebuild reuses saved forecasts only while `paper_sources.py`, `paper.py`,
+`forecasting.py`, `paper_models.py`, `paper_networks.py`,
+`paper_networks_log.py`, `paper_gru.py` and `gru_forecasting.py` keep the hashes
+recorded with those forecasts. Editing any of them means retraining the GPU
+stages, so they are kept as frozen and excluded from style-only lint rules.
+
 | Other files | Purpose |
 |---|---|
 | `tests/` | Check calculations, data validation, and the commands using synthetic examples |
+| `scripts/` | The independent protection verifier and the supplement workbook refresher |
+| `supplement/` | The supplemental Excel workbook and the one-month T-bill cash illustration (R Markdown, its CSV, and rendered page) |
+| `*.toml` | Frozen settings for each study; each command reads one through `--config` |
 | [docs/results-explained.md](docs/results-explained.md) | What the study has found, in plain language |
 | [docs/methodology.md](docs/methodology.md) | Formulas, sources, assumptions, and interpretation |
 | [docs/phase-1.md](docs/phase-1.md), [phase-2.md](docs/phase-2.md), [phase-3.md](docs/phase-3.md), [phase-4.md](docs/phase-4.md) | Each part's question, method, outputs, and checks |
@@ -595,8 +628,9 @@ they run on CPU and do not select or fall back from a GPU backend.
 
 ```sh
 uv run pytest -q
+uv run ruff check
 ```
 
-Tests use synthetic data and require no live finance service. GitHub Actions installs the locked environment and runs the tests on Windows and Linux.
+Tests use synthetic data and require no live finance service. Lint settings live in `pyproject.toml`. GitHub Actions installs the locked environment, runs the linter, and runs the tests on Windows and Linux with warnings treated as errors.
 
 This repository is private. Ask [@N3V3MORE](https://github.com/N3V3MORE) to invite your GitHub username before cloning. Follow [CONTRIBUTING.md](CONTRIBUTING.md) when making changes, and keep downloaded data and generated results out of Git.

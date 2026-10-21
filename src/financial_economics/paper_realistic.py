@@ -7,12 +7,9 @@ never refitted. Portfolio accounting, HAC tests and the bootstrap run on CPU.
 """
 
 import argparse
-from datetime import datetime, timezone
-from hashlib import sha256
 from importlib.metadata import version
 import json
 from pathlib import Path
-import subprocess
 from tempfile import TemporaryDirectory
 import tomllib
 
@@ -28,6 +25,7 @@ from .data import parse_french_factors
 from .explain import bootstrap_differences
 from .paper_evaluation import DECLINES
 from .prediction_inference import _hac_test
+from .provenance import file_digest, git_branch, git_head, utc_now
 from .return_data import compound_months, load_returns
 
 
@@ -35,9 +33,6 @@ FORECAST_STAGES = {"evaluation": ("arfima", "garch", "gjr", "gru_univar", "gru_m
                    "gru_univar_log": ("gru_univar_log",), "gru_multivar_log": ("gru_multivar_log",)}
 REBALANCE_PERIODS = {"daily": None, "weekly": "W-SUN", "monthly": "M"}
 
-
-def _digest(path):
-    return sha256(Path(path).read_bytes()).hexdigest()
 
 
 def load_realistic_settings(path):
@@ -279,7 +274,7 @@ def _load_forecasts(run_dir, models):
             continue
         directory = run_dir / stage
         metadata = json.loads((directory / "run.json").read_text(encoding="utf-8"))
-        if _digest(directory / "forecasts.csv") != metadata["files"]["forecasts.csv"]:
+        if file_digest(directory / "forecasts.csv") != metadata["files"]["forecasts.csv"]:
             raise ValueError(f"Saved {stage} forecasts do not match their provenance hash.")
         frame = pd.read_csv(directory / "forecasts.csv", index_col=0, parse_dates=True, float_precision="round_trip")
         keep = [column for name in wanted for column in (f"{name}_bv", f"{name}_refit_asof")]
@@ -287,7 +282,7 @@ def _load_forecasts(run_dir, models):
         for name in wanted:
             frame[f"{name}_refit_asof"] = pd.to_datetime(frame[f"{name}_refit_asof"])
         frames.append(frame)
-        provenance[stage] = {"run_sha256": _digest(directory / "run.json"),
+        provenance[stage] = {"run_sha256": file_digest(directory / "run.json"),
                              "forecasts_sha256": metadata["files"]["forecasts.csv"]}
     combined = pd.concat(frames, axis=1, join="inner")
     if any(len(frame) != len(combined) for frame in frames):
@@ -329,16 +324,16 @@ def run(args):
         output.mkdir()
         for name, frame in tables.items():
             frame.to_csv(output / f"{name}.csv", index=name == "daily_returns")
-        code = {name: _digest(Path(__file__).with_name(name))
+        code = {name: file_digest(Path(__file__).with_name(name))
                 for name in ("paper_realistic.py", "costs.py", "analysis.py", "explain.py",
                              "prediction_inference.py", "return_data.py", "paper_evaluation.py")}
-        metadata = {"created_at_utc": datetime.now(timezone.utc).isoformat(),
+        metadata = {"created_at_utc": utc_now(),
                     "study": "Realistic trading test of saved public-data reconstruction forecasts",
-                    "settings": settings, "config_sha256": _digest(args.config),
+                    "settings": settings, "config_sha256": file_digest(args.config),
                     "source_manifest": data.provenance, "forecasts": forecast_provenance,
                     "calculation_versions": {name: version(name) for name in ("numpy", "pandas", "scipy", "statsmodels")},
-                    "branch": subprocess.check_output(["git", "branch", "--show-current"], text=True).strip(),
-                    "head": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
+                    "branch": git_branch(),
+                    "head": git_head(),
                     "code": code,
                     "bootstrap_enabled": bootstrap_enabled,
                     "signals": {"dropped_issue_dates_not_on_etf_calendar": result["dropped_issue_dates"],
@@ -360,7 +355,7 @@ def run(args):
                         "post_hoc": "log-BV GRUs were added after raw-BV results were inspected",
                         "cadence_comparisons": "weekly/monthly runs are exploratory; daily forecast allocations held longer, not longer-horizon forecasts; no adjusted primary tests for these runs",
                         "history": "2011-2020 was inspected in earlier runs; this is retrospective, not untouched data"}}
-        metadata["files"] = {path.name: _digest(path) for path in sorted(output.iterdir())}
+        metadata["files"] = {path.name: file_digest(path) for path in sorted(output.iterdir())}
         (output / "run.json").write_text(json.dumps(metadata, indent=2, default=str) + "\n", encoding="utf-8")
         output.rename(destination)
     print(f"Saved realistic test: {destination}", flush=True)

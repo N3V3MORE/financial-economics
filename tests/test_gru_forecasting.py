@@ -44,7 +44,7 @@ def test_missing_cuda_fails_clearly_without_cpu_fallback(monkeypatch):
     fake_torch = SimpleNamespace(cuda=SimpleNamespace(is_available=lambda: False))
     monkeypatch.setattr("financial_economics.gru_forecasting.importlib.import_module",
                         lambda name: fake_torch)
-    with pytest.raises(RuntimeError, match="CUDA:0.*CPU fallback is disabled"):
+    with pytest.raises(RuntimeError, match=r"CUDA:0.*CPU fallback is disabled"):
         _require_cuda()
 
 

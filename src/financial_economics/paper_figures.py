@@ -6,11 +6,8 @@ saved figure_*.csv table, with no hidden plotting calculations.
 """
 
 import argparse
-from datetime import datetime, timezone
-from hashlib import sha256
 import json
 from pathlib import Path
-import subprocess
 from tempfile import TemporaryDirectory
 
 import matplotlib
@@ -23,6 +20,7 @@ import pandas as pd
 
 from .paper_evaluation import DECLINES, MODELS
 from .paper_sources import ASSETS, load_sources, prepare_sources
+from .provenance import file_digest, git_branch, git_head, utc_now
 
 
 LABELS = {"arfima": "ARFIMA", "garch": "GARCH", "gjr": "GJR-GARCH",
@@ -38,9 +36,6 @@ BLUE, ORANGE, RED, GRAY, LIGHT, INK, MUTED = ("#2a78d6", "#eb6834", "#e34948", "
 FIGURE_MODEL = "gru_multivar"
 FIGURE_STRESS = (.9, .3)  # Figure 7's shown scenario: 90th percentile, 30% cap
 
-
-def _digest(path):
-    return sha256(Path(path).read_bytes()).hexdigest()
 
 
 def _eligible(forecasts, returns):
@@ -135,7 +130,7 @@ def _figures(output, note, local_bonds=False):
 
     paths = pd.read_csv(output / "figure3_forecasts.csv", parse_dates=["return_date"])
     fig, axes = plt.subplots(len(MODELS), 1, figsize=(11, 12), sharex=True, sharey=True)
-    for axis, model in zip(axes, MODELS):
+    for axis, model in zip(axes, MODELS, strict=True):
         axis.plot(paths.return_date, paths.realized, color=LIGHT, linewidth=.8, label="Realized (Oxford-Man BV)")
         axis.plot(paths.return_date, paths[model], color=BLUE, linewidth=.9, label=f"Predicted ({LABELS[model]})")
         axis.set_title(LABELS[model], loc="left", fontsize=11)
@@ -152,7 +147,7 @@ def _figures(output, note, local_bonds=False):
     fig, (top, bottom) = plt.subplots(2, 1, figsize=(11, 6.5), sharex=True, height_ratios=(2, 1))
     top.plot(path.Date, path.index_value, color=GRAY, linewidth=1.4, label="S&P 500 total return")
     top.plot(path.Date, path.strategy_value, color=BLUE, linewidth=1.4, label="Target-volatility strategy")
-    for column, color in (("index_value", GRAY), ("strategy_value", BLUE)):
+    for column in ("index_value", "strategy_value"):
         top.annotate(f"{path[column].iloc[-1]:.2f}", (path.Date.iloc[-1], path[column].iloc[-1]),
                      xytext=(4, 0), textcoords="offset points", va="center", fontsize=9, color=INK)
     top.set_ylabel("Value of $1")
@@ -171,7 +166,7 @@ def _figures(output, note, local_bonds=False):
 
     profile = pd.read_csv(output / "figure5_quantiles.csv")
     fig, axes = plt.subplots(2, 3, figsize=(12, 7), sharex=True, sharey=True)
-    for axis, model in zip(axes.flat, MODELS):
+    for axis, model in zip(axes.flat, MODELS, strict=False):  # the sixth panel holds the legend
         group = profile.loc[profile.model.eq(model)]
         for column, color, width, label in (("min", LIGHT, .8, "Lowest / highest return"),
                                             ("max", LIGHT, .8, "_nolegend_"), ("median", GRAY, .8, "Median return"),
@@ -201,7 +196,7 @@ def _figures(output, note, local_bonds=False):
     colormap = LinearSegmentedColormap.from_list("diverging", [BLUE, "#f0efec", RED])
     fig, axis = plt.subplots(figsize=(10, 8.5))
     image = axis.imshow(shown, cmap=colormap, vmin=-1, vmax=1)
-    for row, column in zip(*np.where(~np.isnan(shown))):
+    for row, column in zip(*np.where(~np.isnan(shown)), strict=True):
         axis.text(column, row, f"{shown[row, column]:.2f}", ha="center", va="center", fontsize=7, color=INK)
     axis.set_xticks(range(len(names) - 1), names[1:], rotation=60, ha="right")
     axis.set_yticks(range(len(names) - 1), names[:-1])
@@ -230,7 +225,7 @@ def _figures(output, note, local_bonds=False):
     right.set_xticks([.002, .005, .01, .02, .05])
     right.xaxis.set_major_formatter(PercentFormatter(1, decimals=1))
     right.xaxis.set_minor_formatter(NullFormatter())
-    position = dict(zip(check.asset, rows))
+    position = dict(zip(check.asset, rows, strict=True))
     oil = check.set_index("asset").loc["OIL"]
     right.annotate("Paper's WTI series includes the\n−306% day when oil went negative",
                    (oil.paper_daily_std, position["OIL"]), xytext=(-10, 16), textcoords="offset points",
@@ -247,7 +242,7 @@ def _figures(output, note, local_bonds=False):
     drawdowns = pd.read_csv(output / "figure7_drawdowns.csv", parse_dates=["Date"])
     quantile, cap = FIGURE_STRESS
     fig, axes = plt.subplots(len(DECLINES), 2, figsize=(12, 14))
-    for (left, right), (label, peak, trough) in zip(axes, DECLINES):
+    for (left, right), (label, peak, trough) in zip(axes, DECLINES, strict=True):
         group = drawdowns.loc[drawdowns.decline.eq(label)]
         left.plot(group.day, group.index_cumulative, color=GRAY, linewidth=1.5, label="S&P 500 total return")
         left.plot(group.day, group.strategy_cumulative, color=BLUE, linewidth=1.5, label="Strategy, no safe haven")
@@ -278,14 +273,14 @@ def run(args):
     evaluation = args.run_dir / ("evaluation_local" if local_bonds else "evaluation")
     metadata = json.loads((evaluation / "run.json").read_text(encoding="utf-8"))
     inputs = metadata["inputs"]
-    if (_digest(args.data_dir / "manifest.json") != inputs["source_manifest"]
-            or _digest(args.oxford_archive) != inputs["oxford_archive"]
-            or (not local_bonds and (args.fx_dir is None or _digest(args.fx_dir / "manifest.json")
+    if (file_digest(args.data_dir / "manifest.json") != inputs["source_manifest"]
+            or file_digest(args.oxford_archive) != inputs["oxford_archive"]
+            or (not local_bonds and (args.fx_dir is None or file_digest(args.fx_dir / "manifest.json")
                                      != metadata["evaluation_fx"]["manifest_sha256"]))):
         raise ValueError("Figure inputs must be the exact snapshots used by the evaluation run.")
     used = ("forecasts.csv", "daily_returns.csv", "model_target_weights.csv")
     for name in used:
-        if _digest(evaluation / name) != metadata["files"][name]:
+        if file_digest(evaluation / name) != metadata["files"][name]:
             raise ValueError(f"Saved evaluation file changed after its run: {name}.")
     destination = args.output_dir.resolve()
     if destination.exists():
@@ -315,22 +310,22 @@ def run(args):
             frame.to_csv(output / f"{name}.csv", index=False)
         _figures(output, f"Public-data reconstruction of Kaczmarek et al. (2022) | {args.run_dir.name}/{evaluation.name}"
                  " | descriptive", local_bonds)
-        record = {"created_at_utc": datetime.now(timezone.utc).isoformat(),
+        record = {"created_at_utc": utc_now(),
                   "study": "Paper-style figures from the saved public-data U.S. reconstruction; nothing refitted",
-                  "evaluation_run": {"path": str(evaluation), "manifest_sha256": _digest(evaluation / "run.json"),
+                  "evaluation_run": {"path": str(evaluation), "manifest_sha256": file_digest(evaluation / "run.json"),
                                      "files": {name: metadata["files"][name] for name in used}},
                   "inputs": inputs | ({"bond_currency": "local CHF/EUR, post hoc"} if local_bonds else
                                       {"fx_manifest": metadata["evaluation_fx"]["manifest_sha256"]}),
-                  "branch": subprocess.check_output(["git", "branch", "--show-current"], text=True).strip(),
-                  "head": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
-                  "code": {"paper_figures.py": _digest(__file__)},
+                  "branch": git_branch(),
+                  "head": git_head(),
+                  "code": {"paper_figures.py": file_digest(__file__)},
                   "notes": {"figure3": "22 * sqrt(BV) monthly scaling; raw-BV forecasts, floors included",
                             "figure4_and_7": f"{FIGURE_MODEL} clean strategy; zero fees, zero cash income, same-close trading",
                             "figure5": "100 equal-count forecast groups; next-day S&P 500 total returns",
                             "figure6": "Pearson correlation of daily USD returns on S&P 500 trading days",
                             "figure6_paper_check": "paper correlations read from Figure 6 at printed precision; std from Table A.2",
                             "figure7": f"published decline windows; weights at {FIGURE_STRESS[0]:g} quantile, {FIGURE_STRESS[1]:g} cap"}}
-        record["files"] = {path.name: _digest(path) for path in sorted(output.iterdir())}
+        record["files"] = {path.name: file_digest(path) for path in sorted(output.iterdir())}
         (output / "run.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
         output.rename(destination)
     print(f"Saved paper figures: {destination}", flush=True)

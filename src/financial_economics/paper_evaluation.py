@@ -162,7 +162,7 @@ def evaluate_paper(returns, forecasts, settings, models=MODELS):
             decline_means[f"{measure}_minus_clean"] = [
                 row[measure] - decline_means.loc[(decline, model, "cash"), measure]
                 for (decline, model, asset), row in decline_means.iterrows()]
-    reference = dict(zip(MODELS, PUBLISHED))
+    reference = dict(zip(MODELS, PUBLISHED, strict=True))
     published = pd.DataFrame([reference[model.removesuffix("_log")] for model in models],
                              index=pd.Index(models, name="model"),
                              columns=["published_monthly_mse", "published_monthly_mape",

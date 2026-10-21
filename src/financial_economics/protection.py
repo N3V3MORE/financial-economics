@@ -117,7 +117,7 @@ def run_protection(data, study, settings):
                                       study.trading_days, settings.severe_threshold)
             performance.append(metrics)
             advantages.append(gaps)
-        for frequency, frame, stored in [("daily", paths, stored_daily), ("monthly", months, stored_monthly)]:
+        for frame, stored in ((paths, stored_daily), (months, stored_monthly)):
             copy = frame.copy()
             copy.columns = [f"{name} | {cost:g}bps" for name in copy.columns]
             stored.append(copy)

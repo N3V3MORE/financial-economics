@@ -177,12 +177,13 @@ def test_minimum_change_schedules_are_independent_and_skipped_dates_do_not_trade
     decisions = tables["decisions"].loc[lambda x: x.risk_mode.eq("paper")]
     assert decisions.loc[decisions.model.eq("ewma"), "rebalance"].iloc[:4].tolist() == [True, False, False, True]
     assert decisions.loc[decisions.model.eq("gru"), "rebalance"].iloc[:4].tolist() == [True, True, False, True]
+    fees = tables["fees"]
     for (mode, portfolio), weights in tables["target_weights"].groupby(["risk_mode", "portfolio"]):
         weights = weights.set_index("Date")
         assert counts["rebalance_signal_days_by_strategy"][f"{portfolio.split('_')[0]} | {mode}"] == weights.rebalance.sum() - 1
-        fees = tables["fees"].loc[lambda x: x.portfolio.eq(portfolio) & x.risk_mode.eq(mode)
-                                  & x.scenario.eq("cash_10bps")].set_index("Date")
-        assert fees.loc[~weights.rebalance, ["traded_fraction", "fee_fraction"]].eq(0).all().all()
+        chosen = fees.loc[fees.portfolio.eq(portfolio) & fees.risk_mode.eq(mode)
+                          & fees.scenario.eq("cash_10bps")].set_index("Date")
+        assert chosen.loc[~weights.rebalance, ["traded_fraction", "fee_fraction"]].eq(0).all().all()
     changed = rows.copy()
     changed.loc[changed.index >= "2011-01-03", ["ewma_bv", "gru_bv"]] *= 8
     altered, _ = extension_portfolios(data, changed, calendar, paper, settings)
@@ -221,7 +222,7 @@ def test_frozen_selection_checks_dates_and_tuning_bytes(tmp_path):
 
 
 def test_baseline_extension_cli_is_offline_and_outputs_are_not_overwritten(tmp_path, monkeypatch):
-    data, _, calendar, paper, settings = extension_fixture()
+    data, _, calendar, _, _ = extension_fixture()
     config = tmp_path / "extension.toml"
     config.write_text('''[study]
 name = "test"

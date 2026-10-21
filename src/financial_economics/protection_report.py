@@ -1,6 +1,4 @@
 """Inspectable CSV evidence, three static research figures, and complete run metadata."""
-from datetime import datetime, timezone
-from hashlib import sha256
 from importlib.metadata import version
 import json
 from pathlib import Path
@@ -14,6 +12,8 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import PercentFormatter
 import numpy as np
 import pandas as pd
+
+from .provenance import file_digest, git_dirty, git_head, utc_now
 
 
 def _save(fig, output, name):
@@ -50,7 +50,7 @@ def _figures(output, study, settings, source):
     fig, axes = plt.subplots(1, len(settings.allocations), figsize=(15, 8), sharex=True, sharey=True, squeeze=False)
     funds = tradeoff.fund.drop_duplicates().tolist()
     positions = np.arange(len(funds))
-    for ax, allocation in zip(axes[0], settings.allocations):
+    for ax, allocation in zip(axes[0], settings.allocations, strict=True):
         subset = tradeoff.loc[np.isclose(tradeoff.candidate_allocation, allocation)].set_index("fund").loc[funds]
         ax.axvline(0, color="#999999", linewidth=1)
         ax.scatter(subset.cagr_difference, positions-.12, color="#31688e", marker="o", s=42, label="CAGR")
@@ -104,7 +104,8 @@ def write_protection(result, study, settings, manifest, directory, config_path):
     directory.parent.mkdir(parents=True, exist_ok=True)
     tables = dict(result.tables)
     full = f"{study.start[:4]}:{study.end[:4]}"
-    figures = tables["fund_conditions"].query("window == @full and condition == 'negative_spy'").copy()
+    conditions = tables["fund_conditions"]
+    figures = conditions.loc[conditions.window.eq(full) & conditions.condition.eq("negative_spy")].copy()
     if settings.primary_inference:
         ci = tables["bootstrap_intervals"].query("mean_block_months == 6")
         if ci.empty:
@@ -135,16 +136,16 @@ def write_protection(result, study, settings, manifest, directory, config_path):
         provider = manifest.get("sources", {}).get("prices", {}).get("provider", "Unspecified provider")
         _figures(output, study, settings, provider)
         try:
-            commit = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
-            dirty = bool(subprocess.check_output(["git", "status", "--porcelain"], text=True).strip())
+            commit = git_head()
+            dirty = git_dirty()
         except (OSError, subprocess.CalledProcessError):
             commit, dirty = "unavailable", None
         module_dir = Path(__file__).parent
-        run = {"created_at_utc": datetime.now(timezone.utc).isoformat(), "study": study.settings(),
+        run = {"created_at_utc": utc_now(), "study": study.settings(),
                "protection": settings.settings(), "source_manifest": manifest, **result.metadata,
                "git_commit": commit, "git_dirty": dirty,
-               "code_sha256": {p.name: sha256(p.read_bytes()).hexdigest() for p in sorted(module_dir.glob("*.py"))},
-               "config_sha256": sha256(Path(config_path).read_bytes()).hexdigest(),
+               "code_sha256": {p.name: file_digest(p) for p in sorted(module_dir.glob("*.py"))},
+               "config_sha256": file_digest(Path(config_path)),
                "versions": {"python": platform.python_version(), **{name: version(name) for name in
                             ["numpy", "pandas", "statsmodels", "matplotlib", "financial-economics"]}},
                "inference": {"primary_family_size": len(study.tickers)-1 if settings.primary_inference else 0,
@@ -153,7 +154,7 @@ def write_protection(result, study, settings, manifest, directory, config_path):
                "cash": "French daily RF compounded; Ibbotson through May 2024, ICE BofA from June 2024",
                "fees": "scenario bps per ETF purchase + sale notional; entry included; exit/taxes excluded",
                "undefined_values": "NA, never zero-imputed",
-               "files": {p.name: sha256(p.read_bytes()).hexdigest() for p in sorted(output.iterdir())}}
+               "files": {p.name: file_digest(p) for p in sorted(output.iterdir())}}
         (output / "run.json").write_text(json.dumps(run, indent=2) + "\n", encoding="utf-8")
         if directory.exists():
             raise FileExistsError(f"Protection output already exists: {directory}")

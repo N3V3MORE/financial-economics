@@ -29,7 +29,10 @@ explicit = true
 fecon = "financial_economics.cli:main"
 
 [dependency-groups]
-dev = ["pytest>=8,<10"]
+dev = [
+    "pytest>=8,<10",
+    "ruff==0.14.0",
+]
 
 [build-system]
 requires = ["hatchling>=1.27,<2"]
@@ -37,3 +40,20 @@ build-backend = "hatchling.build"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py312"
+extend-exclude = ["data", "outputs"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "B", "UP", "RUF"]
+# Typographic dashes, minus signs and multiplication signs in labels are deliberate.
+ignore = ["RUF001", "RUF002", "RUF003"]
+
+[tool.ruff.lint.per-file-ignores]
+# Matplotlib must select its non-interactive backend before pyplot is imported.
+"src/financial_economics/*_report.py" = ["E402"]
+"src/financial_economics/paper_figures.py" = ["E402"]
+# Saved reconstruction caches are reused only while these forecasting files keep
+# their recorded hashes (paper_reconstruction._code_hashes), so they stay as frozen.
+"src/financial_economics/{paper_sources,paper,forecasting,paper_models,paper_networks,paper_networks_log,paper_gru,gru_forecasting}.py" = ["B905", "UP017", "RUF"]

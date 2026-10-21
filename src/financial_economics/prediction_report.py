@@ -1,7 +1,5 @@
 """Saved forecast reuse, CSV-backed research figures, and atomic result output."""
 
-from datetime import datetime, timezone
-from hashlib import sha256
 from importlib.metadata import version
 import json
 from pathlib import Path
@@ -18,6 +16,7 @@ import numpy as np
 import pandas as pd
 
 from .forecasting import qlike
+from .provenance import file_digest, git_dirty, git_head, utc_now
 
 
 def load_forecast_run(directory, study, settings, manifest):
@@ -37,7 +36,7 @@ def load_forecast_run(directory, study, settings, manifest):
         raise ValueError("Saved forecast study settings do not match this run.")
     files = source.get("files", {})
     forecast_path = directory / "forecasts.csv"
-    digest = sha256(forecast_path.read_bytes()).hexdigest()
+    digest = file_digest(forecast_path)
     if files.get("forecasts.csv") != digest:
         raise ValueError("Saved forecasts.csv hash does not match its run metadata.")
     forecasts = pd.read_csv(forecast_path, index_col="forecast_date", float_precision="round_trip")
@@ -49,11 +48,11 @@ def load_forecast_run(directory, study, settings, manifest):
     for name in ("ewma_tuning", "gru_tuning"):
         path = directory / f"{name}.csv"
         if path.exists():
-            if files.get(path.name) != sha256(path.read_bytes()).hexdigest():
+            if files.get(path.name) != file_digest(path):
                 raise ValueError(f"Saved {path.name} hash does not match its run metadata.")
             tables[name] = pd.read_csv(path, float_precision="round_trip")
     metadata = {"forecast_parent": {"directory": str(directory),
-                                    "run_sha256": sha256(run_path.read_bytes()).hexdigest(),
+                                    "run_sha256": file_digest(run_path),
                                     "forecasts_sha256": digest, "stage": source.get("stage")}}
     if "gru" in source:
         metadata["gru"] = source["gru"]
@@ -120,7 +119,7 @@ def _figures(output, result, settings, source):
     windows = scores.window.drop_duplicates().tolist()
     colors = {"ewma": "#31688e", "gru": "#a66f00"}
     fig, axes = plt.subplots(1, 2, figsize=(13, 5))
-    for axis, measure, label in zip(axes, ("qlike", "mse"), ("Mean QLIKE", "Mean squared error")):
+    for axis, measure, label in zip(axes, ("qlike", "mse"), ("Mean QLIKE", "Mean squared error"), strict=True):
         for model, group in scores.groupby("model", sort=False):
             ordered = group.set_index("window").reindex(windows)
             axis.plot(range(len(windows)), ordered[measure], marker="o", color=colors[model],
@@ -143,7 +142,7 @@ def _figures(output, result, settings, source):
               "C": "C: EWMA / ETF + cash", "D": "D: GRU / ETF + cash", "SPY": "SPY (before fees)"}
     fig, axes = plt.subplots(2, 1, figsize=(12, 8), sharex=True)
     for name, group in growth.groupby("portfolio", sort=False):
-        for axis, measure in zip(axes, ("wealth", "drawdown")):
+        for axis, measure in zip(axes, ("wealth", "drawdown"), strict=True):
             axis.plot(group.Date, group[measure], color=palette[name],
                       linestyle="--" if name in ("B", "D") else "-", label=labels[name], linewidth=1.5)
     axes[0].set_ylabel("Value of initial $1")
@@ -169,7 +168,7 @@ def _figures(output, result, settings, source):
     pairs = list(pairs)
     fig, axis = plt.subplots(figsize=(11, 6))
     offsets = np.linspace(-.22, .22, len(pairs)) if len(pairs) > 1 else [0]
-    for offset, (portfolio, control) in zip(offsets, pairs):
+    for offset, (portfolio, control) in zip(offsets, pairs, strict=True):
         group = protection.loc[protection.portfolio.eq(portfolio) & protection.control.eq(control)]
         group = group.set_index("window").reindex(windows)
         axis.scatter(group.mean_advantage, np.arange(len(windows)) + offset,
@@ -177,7 +176,7 @@ def _figures(output, result, settings, source):
                      label=f"{portfolio} minus {control}", s=45)
     counts = protection.drop_duplicates("window").set_index("window").reindex(windows).months
     axis.set_yticks(range(len(windows)), [f"{value.replace(':', '–')}  (n={count})"
-                                          for value, count in zip(windows, counts)])
+                                          for value, count in zip(windows, counts, strict=True)])
     axis.invert_yaxis()
     axis.axvline(0, color="#666666", linewidth=1)
     axis.xaxis.set_major_formatter(PercentFormatter(1))
@@ -219,17 +218,17 @@ def write_prediction(result, study, settings, manifest, directory, config_path,
         provider = manifest.get("sources", {}).get("prices", {}).get("provider", "Unspecified provider")
         _figures(output, result, settings, provider)
         try:
-            commit = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
-            dirty = bool(subprocess.check_output(["git", "status", "--porcelain"], text=True).strip())
+            commit = git_head()
+            dirty = git_dirty()
         except (OSError, subprocess.CalledProcessError):
             commit, dirty = "unavailable", None
         module_dir = Path(__file__).parent
-        metadata = {"created_at_utc": datetime.now(timezone.utc).isoformat(),
+        metadata = {"created_at_utc": utc_now(),
                     "study": study.settings(), "prediction": settings.settings(),
                     "source_manifest": manifest, **result.metadata, **model_metadata,
                     "git_commit": commit, "git_dirty": dirty,
-                    "config_sha256": sha256(Path(config_path).read_bytes()).hexdigest(),
-                    "code_sha256": {path.name: sha256(path.read_bytes()).hexdigest()
+                    "config_sha256": file_digest(Path(config_path)),
+                    "code_sha256": {path.name: file_digest(path)
                                     for path in sorted(module_dir.glob("*.py"))},
                     "versions": {"python": platform.python_version(), **{name: version(name) for name in
                                  ("numpy", "pandas", "statsmodels", "matplotlib", "financial-economics")}},
@@ -240,7 +239,7 @@ def write_prediction(result, study, settings, manifest, directory, config_path,
                     "figure_sources": {"forecast_accuracy.png": "figure_forecast_accuracy.csv",
                                        "growth_drawdowns.png": "figure_growth_drawdowns.csv",
                                        "protection.png": "figure_protection.csv"},
-                    "files": {path.relative_to(output).as_posix(): sha256(path.read_bytes()).hexdigest()
+                    "files": {path.relative_to(output).as_posix(): file_digest(path)
                               for path in sorted(output.rglob("*")) if path.is_file()}}
         (output / "run.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
         if directory.exists():

@@ -27,13 +27,13 @@ def sample():
     observations = pd.DataFrame([
         [identifier, day, value, "NA"]
         for identifier, values in [(1, [.10, -.05, .02]), (2, [-.02, .03, 0])]
-        for day, value in zip(dates[1:], values)
+        for day, value in zip(dates[1:], values, strict=True)
     ], columns=wrds.RETURN_COLUMNS)
     return study, factors, history, observations
 
 
 def test_total_returns_recover_exactly_without_double_counting_distributions(sample):
-    study, factors, history, observations = sample
+    *_, observations = sample
     levels, mapping = wrds.build_return_index(*sample)
     assert mapping == {"AAA": 1, "BBB": 2}
     np.testing.assert_allclose(levels.AAA, [100, 110, 104.5, 106.59])

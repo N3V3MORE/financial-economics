@@ -254,7 +254,7 @@ def append_note(xml: bytes, row_number: int, note: str) -> bytes:
     cell = (
         f'<row r="{row_number}"><c r="A{row_number}" t="inlineStr"><is><t>'
         f'{escape(note)}</t></is></c></row>'
-    ).encode("utf-8")
+    ).encode()
     if b"</sheetData>" not in xml:
         raise ValueError("Worksheet is missing sheetData")
     updated = xml.replace(b"</sheetData>", cell + b"</sheetData>", 1)
@@ -337,7 +337,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--workbook", type=Path,
-        default=Path(__file__).resolve().parents[1] / "Data V2.xlsx",
+        default=Path(__file__).resolve().parents[1] / "supplement" / "Data V2.xlsx",
     )
     parser.add_argument("--in-place", action="store_true", help="replace the selected workbook")
     args = parser.parse_args()

@@ -5,27 +5,22 @@ Classical fits are CPU-native; GRU fits require CUDA:0 with no CPU fallback.
 """
 
 import argparse
-from datetime import datetime, timezone
-from hashlib import sha256
 from importlib.metadata import version
 import json
 from pathlib import Path
-import subprocess
 from tempfile import TemporaryDirectory
 import tomllib
 
 import pandas as pd
 
 from .paper_sources import load_sources, prepare_sources
+from .provenance import file_digest, git_branch, git_head, utc_now
 
 
 STAGES = ("classical", "gru_univar", "gru_multivar")
 # Post hoc, labelled log-BV fixes; the raw-BV stages above stay frozen.
 LOG_STAGES = ("gru_univar_log", "gru_multivar_log")
 
-
-def _digest(path):
-    return sha256(Path(path).read_bytes()).hexdigest()
 
 
 def _code_hashes(stage):
@@ -36,16 +31,16 @@ def _code_hashes(stage):
         names += ["paper_networks.py", "paper_networks_log.py", "paper_gru.py", "gru_forecasting.py"]
     else:
         names += ["paper_networks.py", "paper_gru.py", "gru_forecasting.py"]
-    return {name: _digest(Path(__file__).with_name(name)) for name in names}
+    return {name: file_digest(Path(__file__).with_name(name)) for name in names}
 
 
 def _input_identity(args):
-    return {"source_manifest": _digest(args.data_dir / "manifest.json"),
-            "oxford_archive": _digest(args.oxford_archive), "config": _digest(args.config)}
+    return {"source_manifest": file_digest(args.data_dir / "manifest.json"),
+            "oxford_archive": file_digest(args.oxford_archive), "config": file_digest(args.config)}
 
 
 def _write_metadata(output, metadata):
-    metadata["files"] = {str(path.relative_to(output)): _digest(path)
+    metadata["files"] = {str(path.relative_to(output)): file_digest(path)
                          for path in sorted(output.rglob("*")) if path.is_file()}
     (output / "run.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
 
@@ -60,7 +55,7 @@ def _read_stage(directory, identity, stage):
             or any(metadata["code"].get(name) != digest for name, digest in dependencies.items())):
         raise ValueError(f"Saved {stage} settings, inputs or model code changed; use a fresh run.")
     for name, digest in metadata["files"].items():
-        if _digest(directory / name) != digest:
+        if file_digest(directory / name) != digest:
             raise ValueError(f"Saved {stage} hash mismatch: {name}.")
     forecasts = pd.read_csv(directory / "forecasts.csv", index_col=0,
                             parse_dates=True, float_precision="round_trip")
@@ -106,12 +101,12 @@ def run(args):
     with TemporaryDirectory(prefix=f".{stage}-", dir=destination) as temporary:
         output = Path(temporary) / "run"
         output.mkdir()
-        metadata = {"created_at_utc": datetime.now(timezone.utc).isoformat(),
+        metadata = {"created_at_utc": utc_now(),
                     "study": "Public-data U.S. reconstruction; not an exact numerical replication",
                     "inputs": identity, "settings": settings, "source_quality": quality,
                     "calculation_versions": {name: version(name) for name in ("numpy", "pandas", "scipy", "statsmodels")},
-                    "branch": subprocess.check_output(["git", "branch", "--show-current"], text=True).strip(),
-                    "head": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()}
+                    "branch": git_branch(),
+                    "head": git_head()}
         if stage == "classical":
             from .paper_models import classical_forecasts
 
@@ -154,7 +149,7 @@ def run(args):
             else:
                 fx_rates, fx_metadata = load_sources(args.fx_dir)
                 returns, fx_quality = currency_returns(observations, returns, fx_rates)
-                metadata["evaluation_fx"] = {"manifest_sha256": _digest(args.fx_dir / "manifest.json"),
+                metadata["evaluation_fx"] = {"manifest_sha256": file_digest(args.fx_dir / "manifest.json"),
                                               "sources": fx_metadata["sources"],
                                               "unused_original_snapshot_series": list(fx_metadata["sources"])}
             quality.update(fx_quality)
@@ -172,7 +167,7 @@ def run(args):
                     if name not in forecasts:
                         forecasts[name] = saved[name]
                 metadata["model_runs"][saved_stage] = {
-                    "manifest_sha256": _digest(destination / saved_stage / "run.json"),
+                    "manifest_sha256": file_digest(destination / saved_stage / "run.json"),
                     "model": model_metadata["model"], "cache_reader": model_metadata["cache_reader"]}
             tables, assumptions = evaluate_paper(returns, forecasts, settings,
                                                  FIXED_MODELS if stage == "evaluate_fixed" else MODELS)
@@ -183,7 +178,7 @@ def run(args):
                              "limitations": source_metadata["limitations"] + fx_metadata["limitations"]})
         forecasts.to_csv(output / "forecasts.csv", index_label="forecast_date")
         metadata["code"] = (_code_hashes(stage) if stage in (*STAGES, *LOG_STAGES) else
-                            {name: _digest(Path(__file__).with_name(name))
+                            {name: file_digest(Path(__file__).with_name(name))
                              for name in ("paper_evaluation.py", "paper_reconstruction.py", "paper_fx.py",
                                           "paper_sources.py", "analysis.py", "costs.py", "prediction_inference.py")})
         _write_metadata(output, metadata)

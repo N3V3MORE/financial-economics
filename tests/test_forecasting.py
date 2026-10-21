@@ -86,6 +86,6 @@ def test_prediction_config_preserves_snapshot_identity_and_freezes_valid_setting
 
 def test_qlike_accepts_zero_observation_and_rejects_nonpositive_predictions():
     np.testing.assert_allclose(qlike([0, .04], [.01, .02]),
-                               np.log([.01, .02]) + [0, 2])
+                               np.log([.01, .02]) + np.array([0, 2]))
     with pytest.raises(ValueError, match="positive variances"):
         qlike([0], [0])

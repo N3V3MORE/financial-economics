@@ -80,7 +80,7 @@ def _allocations(rows, eligible, evaluation, calendar, settings, trading_days, d
         volatility = np.sqrt(trading_days * variance)
         stock = np.clip(settings.volatility_target / volatility, 0, 1)
         cutoffs = []
-        for year, asof in zip(years, asofs):
+        for year, asof in zip(years, asofs, strict=True):
             calibration = ((rows.index >= pd.Timestamp(settings.validation_start))
                            & (rows.index < asof))
             previous = rows.loc[calibration, f"{model}_variance"].dropna().to_numpy(dtype=float)

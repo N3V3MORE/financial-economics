@@ -105,7 +105,7 @@ def fund_contributions(returns: pd.DataFrame, weights: pd.DataFrame,
         mix_value = np.cumprod(1 + (held * daily).sum(axis=1))
         value_before = np.r_[1, mix_value[:-1]]
         gains = (value_before[:, None] * held * daily).sum(axis=0)
-        for asset, gain in zip(returns.columns, gains):
+        for asset, gain in zip(returns.columns, gains, strict=True):
             rows.append({"window": name, "start_date": start, "end_date": end,
                          "asset": asset, "contribution": gain})
     return pd.DataFrame(rows, columns=["window", "start_date", "end_date", "asset", "contribution"])

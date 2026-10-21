@@ -4,8 +4,7 @@ H.10 observations are noon New York quotes published in a weekly release.
 Their date identifies the valuation, not same-day public data availability.
 """
 
-from datetime import datetime, timezone
-from hashlib import sha256
+from datetime import datetime
 import json
 from pathlib import Path
 import re
@@ -16,6 +15,7 @@ import numpy as np
 import pandas as pd
 
 from .paper_sources import _past_values
+from .provenance import file_digest, utc_now
 
 
 FX_SOURCES = {"usd_chf": ("sz", "Swiss francs per U.S. dollar"),
@@ -57,10 +57,10 @@ def download_fx(destination):
                              "observations": len(columns[name]), "first": str(columns[name].index[0].date()),
                              "last": str(columns[name].index[-1].date())}
         pd.DataFrame(columns).rename_axis("Date").to_csv(output / "observations.csv")
-        metadata = {"created_at_utc": datetime.now(timezone.utc).isoformat(), "sources": sources,
+        metadata = {"created_at_utc": utc_now(), "sources": sources,
                     "limitations": ["Noon FX rather than close FX; original currency convention unspecified",
                                     "Weekly publication: used only for historical valuation, never model features"],
-                    "files": {path.name: sha256(path.read_bytes()).hexdigest() for path in output.iterdir()}}
+                    "files": {path.name: file_digest(path) for path in output.iterdir()}}
         (output / "manifest.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
         output.rename(destination)
 

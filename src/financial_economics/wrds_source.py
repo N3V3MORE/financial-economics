@@ -1,7 +1,7 @@
 """Bounded CRSP extracts; licensed observations stay in local snapshot files."""
 
 from contextlib import closing
-from datetime import date, datetime, timezone
+from datetime import date, datetime, UTC
 from importlib.metadata import version
 import json
 import os
@@ -331,7 +331,7 @@ def download_wrds_snapshot(study, directory, *, verify_monthly=False):
                                       "seed": str(seed.date()), "start": study.start, "end": study.end}}
             (staging / QUERY_FILE).write_text(json.dumps(queries, indent=2), encoding="utf-8")
         manifest = {
-            "schema_version": 2, "retrieved_at_utc": datetime.now(timezone.utc).isoformat(),
+            "schema_version": 2, "retrieved_at_utc": datetime.now(UTC).isoformat(),
             "settings": study.settings(),
             "sources": {
                 "prices": {"provider": "WRDS / CRSP CIZ", "table": "crsp.dsf_v2",

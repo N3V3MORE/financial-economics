@@ -1,9 +1,7 @@
-from dataclasses import replace
-import numpy as np
 import pandas as pd
 import pytest
 from financial_economics.config import Study
-from financial_economics.return_data import compound_months, load_returns
+from financial_economics.return_data import compound_months
 from financial_economics.wrds_source import validate_monthly_extract, WRDSError
 
 

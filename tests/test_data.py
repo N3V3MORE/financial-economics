@@ -128,7 +128,7 @@ def test_invalid_prices_never_create_a_snapshot(monkeypatch, tmp_path, study, pr
     prices.iloc[1, 0] = bad_value
     mock_sources(monkeypatch, prices)
     directory = tmp_path / "snapshot"
-    with pytest.raises(ValueError, match="positive|nonfinite"):
+    with pytest.raises(ValueError, match=r"positive|nonfinite"):
         data.download_snapshot(study, directory)
     assert not directory.exists()
     assert not list(tmp_path.glob(".snapshot-*"))
@@ -137,10 +137,10 @@ def test_invalid_prices_never_create_a_snapshot(monkeypatch, tmp_path, study, pr
 def test_calendar_mismatch_is_an_error_not_a_silent_inner_join(study, prices):
     returns = prices.pct_change(fill_method=None).iloc[1:]
     factors = data.parse_french_factors(french_zip())
-    with pytest.raises(ValueError, match="missing ETF dates.*2024-01-03"):
+    with pytest.raises(ValueError, match=r"missing ETF dates.*2024-01-03"):
         data.align_sample(returns.drop(index="2024-01-03"), factors, study)
     extra = pd.DataFrame([[0.01, 0.01]], columns=study.tickers, index=pd.to_datetime(["2024-01-01"]))
-    with pytest.raises(ValueError, match="unexpected ETF dates.*2024-01-01"):
+    with pytest.raises(ValueError, match=r"unexpected ETF dates.*2024-01-01"):
         data.align_sample(pd.concat([extra, returns]), factors, replace(study, start="2024-01-01"))
 
 
@@ -202,8 +202,8 @@ def test_seed_must_be_the_immediately_preceding_trading_close(monkeypatch, tmp_p
     manifest["files"][data.PRICE_FILE] = data._file_info(path, prices)
     manifest_path.write_text(json.dumps(manifest))
 
-    with pytest.raises(ValueError, match="immediately preceding.*2023-12-29"):
+    with pytest.raises(ValueError, match=r"immediately preceding.*2023-12-29"):
         data.load_snapshot(study, directory)
-    with pytest.raises(ValueError, match="immediately preceding.*2023-12-29"):
+    with pytest.raises(ValueError, match=r"immediately preceding.*2023-12-29"):
         data.download_snapshot(study, tmp_path / "bad-seed-snapshot")
     assert not (tmp_path / "bad-seed-snapshot").exists()

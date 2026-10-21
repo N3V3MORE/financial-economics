@@ -11,7 +11,6 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.ticker import PercentFormatter
 import numpy as np
-import pandas as pd
 
 from .config import Study
 from .explain import ExplainResult
@@ -38,7 +37,7 @@ def _write_figures(result: ExplainResult, output: Path) -> None:
              "figure.facecolor": "white", "axes.titleweight": "bold"}
     with plt.rc_context(style):
         figure, axes = plt.subplots(1, 2, figsize=(11.2, 3.6))
-        for axis, measure in zip(axes, ["sharpe", "cagr"]):
+        for axis, measure in zip(axes, ["sharpe", "cagr"], strict=True):
             rows = result.uncertainty.loc[result.uncertainty.measure.eq(measure)]
             positions = np.arange(len(rows))
             scale = 1 if measure == "sharpe" else 100
@@ -63,7 +62,8 @@ def _write_figures(result: ExplainResult, output: Path) -> None:
             axes[0, 0].text(.5, .5, f"No {benchmark} decline reached 10%.",
                             transform=axes[0, 0].transAxes, ha="center", va="center")
             axes[0, 0].set_axis_off()
-        for axis, window in zip(axes[0], windows):
+        # With no qualifying decline, one placeholder panel stays without a window.
+        for axis, window in zip(axes[0], windows, strict=False):
             rows = result.contributions.loc[result.contributions.window.eq(window)]
             values = rows.contribution.to_numpy()
             axis.barh(rows.asset, values, color=np.where(values < 0, LOSS, GAIN))

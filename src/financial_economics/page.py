@@ -95,7 +95,7 @@ def _growth_chart(returns: pd.DataFrame, seed: str, label: str) -> str:
             parts.append(f'<text class="tick" x="{x(day):.1f}" y="{bottom + 20}" text-anchor="middle">{year}</text>')
     ends = []
     for name in wealth:
-        points = " ".join(f"{x(day):.1f},{y(value):.1f}" for day, value in zip(days, wealth[name]))
+        points = " ".join(f"{x(day):.1f},{y(value):.1f}" for day, value in zip(days, wealth[name], strict=True))
         parts.append(f'<polyline class="line {CLASSES[name]}" points="{points}"/>')
         ends.append([y(wealth[name].iloc[-1]), name])
     # Spread the end labels so they never overlap.
@@ -143,7 +143,7 @@ def _loss_chart(episodes: pd.DataFrame, comparison: pd.DataFrame, names: list[st
         values = [losses.loc[episode.episode, name] for name in names]
         parts.append(f'<text class="row-label" x="0" y="{cy + 4:.1f}">{peak:%b %Y}</text>'
                      f'<line class="link" x1="{x(min(values)):.1f}" x2="{x(max(values)):.1f}" y1="{cy}" y2="{cy}"/>')
-        for name, value in zip(names, values):
+        for name, value in zip(names, values, strict=True):
             parts.append(f'<circle class="dot {CLASSES[name]}" cx="{x(value):.1f}" cy="{cy}" r="5">'
                          f'<title>{NAMES[name]}: lost {value:.1f}% from the {peak:%b %Y} SPY peak</title></circle>')
     return (f'<figure class="chart"><svg viewBox="0 -4 {WIDTH} {bottom + 26}" role="img" '
@@ -276,7 +276,7 @@ def _write_html(data: dict) -> str:
     fund_rows = [[fund, *[f"{100 * falls[window][fund]:+.1f}" for window in windows]]
                  for fund in falls[windows[0]].index] if windows else []
     fund_rows.append(["Mix", *[f"{100 * falls[window].sum():+.1f}" for window in windows]])
-    whole_name = [window for window in dict.fromkeys(contributions.window) if window not in windows][0]
+    whole_name = next(window for window in dict.fromkeys(contributions.window) if window not in windows)
     whole = contributions.loc[contributions.window.eq(whole_name)].set_index("asset").contribution
     correlation = data["correlation"]
     correlation.index = correlation.index.astype(str)

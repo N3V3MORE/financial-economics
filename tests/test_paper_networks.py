@@ -78,6 +78,6 @@ def test_network_pipeline_requires_cuda_without_creating_checkpoints(tmp_path, m
     fake_torch = SimpleNamespace(cuda=SimpleNamespace(is_available=lambda: False))
     monkeypatch.setattr("financial_economics.gru_forecasting.importlib.import_module", lambda name: fake_torch)
     prepared, calendar = _prepared()
-    with pytest.raises(RuntimeError, match="CUDA:0.*CPU fallback is disabled"):
+    with pytest.raises(RuntimeError, match=r"CUDA:0.*CPU fallback is disabled"):
         reconstruct_gru(prepared, calendar, tmp_path / "missing_cuda", model_name="gru_multivar", folds=2)
     assert not (tmp_path / "missing_cuda").exists()

@@ -72,7 +72,7 @@ def _episode_figures(returns: pd.DataFrame, episodes: pd.DataFrame,
     examples = examples.head(2)
     figure, axes = plt.subplots(len(examples), 1, figsize=(10, 4 * len(examples)), squeeze=False)
     wealth = _wealth(returns, seed_date)
-    for axis, episode in zip(axes.flat, examples.itertuples()):
+    for axis, episode in zip(axes.flat, examples.itertuples(), strict=True):
         rows = comparisons.loc[comparisons.episode.eq(episode.episode)
                                & comparisons.asset.isin(names)]
         end = (returns.index[-1] if rows.recovery_status.eq("not_recovered").any()

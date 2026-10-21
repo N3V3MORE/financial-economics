@@ -23,7 +23,10 @@ def verify(config, source, output):
     assert run["config_sha256"] == sha256(config.read_bytes()).hexdigest()
     for name, fingerprint in run["files"].items():
         assert sha256((output / name).read_bytes()).hexdigest() == fingerprint, name
-    read = lambda name: pd.read_csv(output / f"{name}.csv", float_precision="round_trip")
+
+    def read(name):
+        return pd.read_csv(output / f"{name}.csv", float_precision="round_trip")
+
     daily = data.daily.assign(RF=data.factors.RF)
     # Recompute each month from the source independently of the pipeline's groupby helper.
     months = pd.period_range(study.start, study.end, freq="M")
@@ -100,8 +103,9 @@ def verify(config, source, output):
     # Check plotted numbers against independently checked numerical tables.
     conditions = read("fund_conditions")
     full = f"{study.start[:4]}:{study.end[:4]}"
+    falling = conditions.loc[conditions.window.eq(full) & conditions.condition.eq("negative_spy")]
     for row in read("figure_protection").itertuples():
-        reference = conditions.query("fund == @row.fund and window == @full and condition == 'negative_spy'").iloc[0]
+        reference = falling.loc[falling.fund.eq(row.fund)].iloc[0]
         close(row.mean_minus_cash, reference.mean_minus_cash)
     perf = read("performance")
     for row in read("figure_tradeoffs").itertuples():

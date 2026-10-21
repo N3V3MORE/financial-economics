@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass
 from pathlib import Path
-import numpy as np
 import pandas as pd
 
 from .analysis import _check_returns, prices_to_returns
