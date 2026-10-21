@@ -1,0 +1,23 @@
+# Fixed before evaluating the public-data U.S. reconstruction.
+[reconstruction]
+lookback = 22
+training_end = "2009-12-31"
+evaluation_start = "2010-01-01"
+evaluation_end = "2020-12-31"
+window = "rolling"
+window_start = "2006-01-01"
+window_end = "2009-12-31"
+seeds = [11, 22, 33]
+folds = 5
+max_epochs = 60
+patience = 8
+learning_rate = 0.001
+# hidden layer 1, hidden layer 2, batch size, dropout, L2 on weights and biases
+profiles = [[16, 16, 64, 0.0, 0.0], [16, 32, 32, 0.1, 0.0001],
+            [32, 16, 64, 0.1, 0.0], [32, 32, 32, 0.0, 0.0001]]
+monthly_target = 0.10
+monthly_multiplier = 22
+quantiles = [0.90, 0.95, 0.99]
+caps = [0.10, 0.20, 0.30]
+trading_days = 252
+dm_hac_lags = 20

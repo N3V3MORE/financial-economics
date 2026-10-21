@@ -21,5 +21,5 @@ jobs:
         with:
           version: "0.11.15"
           python-version: "3.12"
-      - run: uv sync --frozen
-      - run: uv run --frozen pytest -q -W error
+      - run: uv sync --frozen --extra reconstruction
+      - run: uv run --frozen --extra reconstruction pytest -q -W error

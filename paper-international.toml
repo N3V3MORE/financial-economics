@@ -1,0 +1,36 @@
+# Fixed before running: the paper's international robustness markets, timing question only.
+# Oxford-Man supplies both each index's bipower variation and its local close price.
+[international]
+symbols = [".N225", ".NSEI", ".STOXX50E"]
+names = ["Nikkei 225", "Nifty 50", "EURO STOXX 50"]
+start = "2000-01-01"
+end = "2020-12-31"
+training_end = "2009-12-31"
+forecast_start = "2010-01-01"
+window_start = "2006-01-01"
+window_end = "2009-12-31"
+lookback = 22
+
+[realistic]
+benchmark = "INDEX"
+calibration_start = "2010-01-01"
+evaluation_start = "2011-01-01"
+evaluation_end = "2020-12-31"
+primary_models = ["arfima", "gru_univar"]
+secondary_models = ["garch", "gjr"]
+# No local safe-haven series are available: timing versus static only.
+primary_assets = []
+secondary_assets = []
+monthly_target = 0.10
+monthly_multiplier = 22
+stress_quantile = 0.90
+defensive_cap = 0.20
+costs_bps = [0, 10, 25]
+main_cost_bps = 10
+sharpe_hac_lags = 20
+monthly_hac_lags = 6
+alpha = 0.05
+resamples = 10000
+block_length = 21
+seed = 20261021
+windows = ["2011:2020", "2011:2015", "2016:2020"]

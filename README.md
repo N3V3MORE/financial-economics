@@ -6,6 +6,8 @@ Phase 1 builds the baseline: historical returns, risk, correlations, a monthly e
 
 For a plain-language account of what the study has found, read [Results explained](docs/results-explained.md).
 
+**Final research goal:** can a stock investor protect against market falls better than by simply holding less stock? The final stage adapts the target-volatility strategy of Kaczmarek et al. (2022) to answer it. Its question, methods, findings and limits are in [Final study](docs/final-study.md).
+
 ## Run the study
 
 Install [uv](https://docs.astral.sh/uv/getting-started/installation/), then run these commands from the project folder:
@@ -351,6 +353,111 @@ SHA-256 is `d59ed175760713b1ae7077df3f38cc894cab32bdbd46b56a67a5f765596aaac4`.
 The saved weekly and five-point runs remain fixed sensitivity comparisons.
 The final safe-haven check uses the existing `2010:2020` window, preserving
 the model configuration's 2021 endpoint and all original forecasts.
+
+## Reconstruct the paper's U.S. experiment
+
+`paper-reconstruction.toml` fixes the five published model families: ARFIMA,
+GARCH, GJR-GARCH, GRU-UNIVAR and GRU-MULTIVAR. The separate reconstruction
+uses 22-day histories, pre-2010 neural selection, annual GRU refits, daily
+classical refits and the 2010–2020 test period. Each model has a stock/cash
+strategy and 117 additions: 13 defensive assets, three stress thresholds and
+three caps. Fees and cash interest are zero, as in the paper. Thresholds use
+the full test period and therefore describe a retrospective comparison.
+
+The original paper and appendix are available in the
+[author's university dissertation](https://bip.ue.poznan.pl/download/attachment/1848/rozprawa-doktorska-mgr-t-kaczmarka.pdf#page=180).
+The licensed Datastream inputs are unavailable to this account. The new
+snapshot uses S&P price/total-return indices, public yield series, commodity
+price proxies and raw bond-ETF prices. Its manifest records every substitution,
+including Brent for WTI, AAA for AA three-year corporate yields and assumed
+USD conversion of Swiss/German bonds. A separate Federal Reserve H.10 snapshot
+supplies dated noon FX for those two valuations; its weekly publication makes
+it unsuitable as an assumed same-day released forecasting feature. Futures price changes are not investable
+futures total returns. International robustness is not reconstructed.
+
+Run the stages sequentially in PowerShell. Use new snapshot/output directories
+for a new data vintage; retain the existing Oxford archive described above.
+
+```powershell
+uv sync --frozen --extra prediction --extra reconstruction
+uv run --extra prediction --extra reconstruction python -c "from financial_economics.paper_sources import download_sources; download_sources('data/paper-public-new')"
+uv run --extra prediction --extra reconstruction python -c "from financial_economics.paper_fx import download_fx; download_fx('data/paper-fx-new')"
+$reconstructionArgs = @('--data-dir', 'data/paper-public-new', '--fx-dir', 'data/paper-fx-new', '--oxford-archive', 'data/paper-source-20261020/oxfordman-20220301.zip', '--output-dir', 'outputs/paper-public-new')
+foreach ($stage in @('classical', 'gru_univar', 'gru_multivar', 'evaluate')) {
+    uv run --extra prediction --extra reconstruction python -m financial_economics.paper_reconstruction $stage @reconstructionArgs
+    if ($LASTEXITCODE -ne 0) { break }
+}
+```
+
+Classical fits run on CPU. Both neural stages require CUDA:0 and never fall
+back to CPU. Evaluation reuses verified forecasts and does not retrain.
+Each stage rejects existing output directories. Saved results include the
+full strategy grid, forecasts, tuning, checkpoints, source/code hashes,
+forecast comparisons, five decline windows and rounded published references.
+Cache reuse verifies model inputs, settings, files and forecasting code. The
+execution wrapper's original hash is retained separately when a reader-only
+compatibility change permits reuse; calculation and valuation code is recorded
+with the evaluation.
+
+The paper omits its exact neural grid, seeds and several metric conventions;
+the fixed replacements and estimator choices are recorded in `run.json`.
+Results include conventional Sharpe and a separately labelled, inferred
+CAGR/volatility calculation. Modified decline scores also show both arithmetic
+and inferred geometric conventions. Do not treat either inference as a
+confirmed published formula. Calendar dates alone do not verify that every
+same-date external quote was available before the U.S. close.
+PyTorch uses reset-after GRU gates; the paper's displayed equation uses
+reset-before, while its executed Keras/TensorFlow settings are unpublished.
+
+### Fixed GRUs and the realistic trading test
+
+The raw-BV richer GRU predicted negative variance on 5.5% of days, almost all
+in the very calm years 2017–2018. Two extra stages learn **log BV** instead, so
+forecasts are always positive. They keep the same profiles, seeds, folds and
+epoch rule, select on log-scale pre-2010 MSE, and restore the mean level with a
+training-only smearing factor. The fix was added after the raw results were
+seen; it is labelled post hoc, and the raw runs stay unchanged and reported.
+`evaluate_fixed` scores all seven models paper-style in a separate directory.
+
+```powershell
+foreach ($stage in @('gru_univar_log', 'gru_multivar_log', 'evaluate_fixed')) {
+    uv run --extra prediction --extra reconstruction python -m financial_economics.paper_reconstruction $stage @reconstructionArgs
+    if ($LASTEXITCODE -ne 0) { break }
+}
+uv run python -m financial_economics.paper_realistic --data-dir data/protection-long-wrds-20261020 --forecast-run outputs/paper-public-new --output-dir outputs/paper-realistic-new
+```
+
+`paper-realistic.toml` was fixed before the realistic run. It reuses the saved
+forecasts with no refitting, on verified WRDS/CRSP SPY, TLT, GLD and DBC total
+returns with French daily cash income. A forecast issued at close t trades at
+close t+1 and earns the t+2 return; fees are 10 bps per ETF dollar traded
+(0 and 25 bps are sensitivities). Each year's 90th-percentile stress cutoff uses
+only that model's earlier forecasts, so 2010 is calibration and trading is
+scored over 2011–2020. A static SPY/cash control holds the model's mean 2010
+stock target, reset monthly, which answers "was timing better than simply
+holding less stock?". The primary family has six tests for ARFIMA and the
+simple GRU: timing minus static Sharpe (Ledoit–Wolf HAC) and TLT and GLD
+minus cash in negative-SPY months (HAC), with one Holm adjustment. Secondary
+models, DBC, subperiods, declines and bootstrap intervals are descriptive.
+
+### International robustness: timing versus a static mix
+
+`paper-international.toml` repeats the timing question in the paper's
+robustness markets: Nikkei 225, Nifty 50 and EURO STOXX 50. Each index uses its
+own Oxford-Man bipower variation and local close price from the same archive,
+so returns are price-only in local currency and cash earns zero. ARFIMA,
+GARCH, GJR and the one-input GRU are refitted per market with the U.S. rules;
+each market's last pre-2010 session ends the classical window and GRU
+tuning labels. The trading rules are the realistic ones above. There are no
+local safe-haven series, so only timing minus static Sharpe is tested: six
+primary tests (ARFIMA and GRU in three markets) under one Holm adjustment.
+
+```powershell
+foreach ($symbol in @('.N225', '.NSEI', '.STOXX50E')) {
+    uv run --extra prediction --extra reconstruction python -m financial_economics.paper_international forecasts --symbol $symbol --oxford-archive data/paper-source-20261020/oxfordman-20220301.zip --output-dir outputs/paper-international-new
+}
+uv run --extra reconstruction python -m financial_economics.paper_international evaluate --oxford-archive data/paper-source-20261020/oxfordman-20220301.zip --output-dir outputs/paper-international-new
+```
 
 ## See the original phase results
 

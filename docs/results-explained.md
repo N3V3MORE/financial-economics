@@ -1,5 +1,9 @@
 # What the project has found
 
+The project's final question and answer, which adapt Kaczmarek et al.
+(2022), are in [Final study](final-study.md). This page keeps the earlier
+ETF findings that motivate it.
+
 The expanded study is now complete on verified WRDS/CRSP data. Its main
 answer is that **none of the 13 additions demonstrated a reliably positive
 average contribution versus cash in negative-SPY months after the prescribed
