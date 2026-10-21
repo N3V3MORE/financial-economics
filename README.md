@@ -440,6 +440,76 @@ simple GRU: timing minus static Sharpe (Ledoit–Wolf HAC) and TLT and GLD
 minus cash in negative-SPY months (HAC), with one Holm adjustment. Secondary
 models, DBC, subperiods, declines and bootstrap intervals are descriptive.
 
+To compare trading schedules on these same saved forecasts, use separate runs:
+
+```powershell
+foreach ($frequency in @('daily', 'weekly', 'monthly')) {
+    uv run python -m financial_economics.paper_realistic --data-dir data/protection-long-wrds-20261020 --forecast-run outputs/paper-reconstruction-20261021 --output-dir "outputs/paper-cadence-new-$frequency" --rebalance-frequency $frequency --skip-bootstrap
+    if ($LASTEXITCODE -ne 0) { break }
+}
+```
+
+Weekly and monthly schedules trade at the first eligible execution close of
+each Monday–Sunday week or calendar month. The initial entry can belong to
+the preceding period; it is retained. Missing signals postpone a trade to the
+next eligible close, and periods without signals retain existing holdings.
+All daily returns remain present and holdings drift between trades. The
+2010 static-control calibration, annual stress cutoffs, monthly static
+rebalancing, fees and cash income remain unchanged. `decisions.csv` marks
+selected signals with `scheduled`; `run.json` records the effective schedule.
+
+These are retrospective trading-frequency comparisons, not month-ahead
+volatility forecasts. Weekly/monthly test results are descriptive and have
+no primary significance family. The existing daily primary tests are retained.
+`--skip-bootstrap` omits the optional descriptive bootstrap intervals and
+records that omission; the default command still produces them. All schedule
+comparisons run sequentially on CPU without refitting or importing PyTorch.
+
+### Redraw the paper's figures
+
+`paper_figures` redraws the paper's Figures 3–7 from a saved reconstruction
+run. It refits nothing, checks that the data snapshots and saved files are the
+ones that run used, and writes each PNG beside the `figure*.csv` it is drawn from:
+
+```powershell
+uv run python -m financial_economics.paper_figures --run-dir outputs/paper-reconstruction-20261021 --data-dir data/paper-reconstruction-public-20261021 --fx-dir data/paper-reconstruction-fx-20261021 --oxford-archive data/paper-source-20261020/oxfordman-20220301.zip --output-dir outputs/paper-figures-new
+```
+
+`figure6_paper_check.png` puts each proxy's correlation with the S&P 500 and
+its daily volatility beside the paper's printed values (its Figure 6, to one
+decimal, and Table A.2), so you can see which substitutes behave differently.
+Figures 4 and 7 show raw GRU-MULTIVAR under the paper's idealized rules;
+Figure 7 uses the paper's 90th-percentile, 30%-cap scenario.
+
+### Post hoc checks after the figure comparison
+
+Both checks were added after `figure6_paper_check.png` was seen. They are
+labelled post hoc, add nothing to any primary test, and leave the original runs
+unchanged beside them.
+
+**Swiss and German bonds in local currency.** The paper's printed volatilities
+and correlations for these two bonds match CHF/EUR returns, not USD-converted
+ones. `evaluate_local` scores the five paper models again with only those two
+proxies in local currency; it needs no FX snapshot. Add `--local-bonds` (and
+drop `--fx-dir`) to draw the figures from it.
+
+```powershell
+uv run python -m financial_economics.paper_reconstruction evaluate_local --data-dir data/paper-reconstruction-public-20261021 --oxford-archive data/paper-source-20261020/oxfordman-20220301.zip --output-dir outputs/paper-reconstruction-20261021
+uv run python -m financial_economics.paper_figures --local-bonds --run-dir outputs/paper-reconstruction-20261021 --data-dir data/paper-reconstruction-public-20261021 --oxford-archive data/paper-source-20261020/oxfordman-20220301.zip --output-dir outputs/paper-figures-local-new
+```
+
+**IEF in the realistic test.** IEF, the 7–10 year Treasury ETF, was the only
+proxy that helped all five models in the paper-style rebuild, but the frozen
+realistic test held only TLT, GLD and DBC. `paper-realistic-ief.toml` copies
+`paper-realistic.toml` and adds IEF as a descriptive secondary asset. Its WRDS
+snapshot reproduces the existing SPY, TLT, GLD and DBC returns exactly, and
+every existing portfolio and test in the new run matches the frozen run.
+
+```powershell
+uv run --extra wrds fecon --config paper-realistic-ief.toml download --source wrds --verify-monthly --data-dir data/protection-long-ief-wrds-20261021
+uv run python -m financial_economics.paper_realistic --config paper-realistic-ief.toml --data-dir data/protection-long-ief-wrds-20261021 --forecast-run outputs/paper-reconstruction-20261021 --output-dir outputs/paper-realistic-ief-20261021
+```
+
 ## See the original phase results
 
 After the four analysis commands, put the main findings on one page:

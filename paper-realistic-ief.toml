@@ -1,0 +1,43 @@
+# Post hoc descriptive check: paper-realistic.toml plus IEF, added after the
+# paper-style rebuild showed IEF helping all five models. Every other setting is
+# unchanged, IEF stays outside the primary Holm family, and the frozen
+# paper-realistic.toml run is retained as the reference.
+[study]
+name = "protection-core-ief-2007-2025"
+start = "2007-01-01"
+end = "2025-12-31"
+benchmark = "SPY"
+trading_days = 252
+hac_lags = 6
+
+[assets]
+SPY = "Broad US stock reference"
+TLT = "Other assets: long government bonds"
+GLD = "Other assets: gold"
+DBC = "Other assets: commodities"
+IEF = "Other assets: intermediate government bonds"
+
+[realistic]
+# 2010 forecasts only calibrate thresholds and the static control; trading is scored from 2011.
+calibration_start = "2010-01-01"
+evaluation_start = "2011-01-01"
+evaluation_end = "2020-12-31"
+# Primary models were fixed in the published comparison; the others are descriptive.
+primary_models = ["arfima", "gru_univar"]
+secondary_models = ["garch", "gjr", "gru_multivar", "gru_univar_log", "gru_multivar_log"]
+# Primary safe havens: the paper's Treasury result and our gold result. DBC and IEF are descriptive.
+primary_assets = ["TLT", "GLD"]
+secondary_assets = ["DBC", "IEF"]
+monthly_target = 0.10
+monthly_multiplier = 22
+stress_quantile = 0.90
+defensive_cap = 0.20
+costs_bps = [0, 10, 25]
+main_cost_bps = 10
+sharpe_hac_lags = 20
+monthly_hac_lags = 6
+alpha = 0.05
+resamples = 10000
+block_length = 21
+seed = 20261021
+windows = ["2011:2020", "2011:2015", "2016:2020"]

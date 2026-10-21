@@ -98,7 +98,8 @@ def run(args):
     eligible = eligible.loc[eligible.return_date.between(settings["evaluation_start"],
                                                         settings["evaluation_end"])]
     stage = args.stage
-    target = destination / {"evaluate": "evaluation", "evaluate_fixed": "evaluation_fixed"}.get(stage, stage)
+    target = destination / {"evaluate": "evaluation", "evaluate_fixed": "evaluation_fixed",
+                            "evaluate_local": "evaluation_local"}.get(stage, stage)
     if target.exists():
         raise ValueError(f"Existing results are never overwritten: {target}")
     destination.mkdir(parents=True, exist_ok=True)
@@ -141,17 +142,25 @@ def run(args):
             metadata["model"] = model
         else:
             from .paper_evaluation import FIXED_MODELS, MODELS, evaluate_paper
-            from .paper_fx import currency_returns
+            from .paper_fx import FX_SOURCES, currency_returns, local_currency_returns
 
-            fx_rates, fx_metadata = load_sources(args.fx_dir)
-            returns, fx_quality = currency_returns(observations, returns, fx_rates)
+            if stage == "evaluate_local":
+                returns, fx_quality = local_currency_returns(observations, returns)
+                fx_metadata = {"sources": {}, "limitations": [
+                    "Post hoc: Swiss and German bond proxies earn unhedged local-currency returns, as the paper's"
+                    " statistics imply; a USD investor would also bear currency risk"]}
+                metadata["post_hoc"] = ("Swiss/German bonds valued in CHF/EUR after the paper-figure check;"
+                                        " the USD evaluation is retained unchanged beside it")
+            else:
+                fx_rates, fx_metadata = load_sources(args.fx_dir)
+                returns, fx_quality = currency_returns(observations, returns, fx_rates)
+                metadata["evaluation_fx"] = {"manifest_sha256": _digest(args.fx_dir / "manifest.json"),
+                                              "sources": fx_metadata["sources"],
+                                              "unused_original_snapshot_series": list(fx_metadata["sources"])}
             quality.update(fx_quality)
             quality["portfolio_alignment_carries_including_seed"] = {
                 name: count for name, count in quality["portfolio_alignment_carries_including_seed"].items()
-                if name not in fx_metadata["sources"]}
-            metadata["evaluation_fx"] = {"manifest_sha256": _digest(args.fx_dir / "manifest.json"),
-                                          "sources": fx_metadata["sources"],
-                                          "unused_original_snapshot_series": list(fx_metadata["sources"])}
+                if name not in FX_SOURCES}
             forecasts = eligible.copy()
             metadata["model_runs"] = {}
             saved_stages = (*STAGES, *LOG_STAGES) if stage == "evaluate_fixed" else STAGES
@@ -184,7 +193,7 @@ def run(args):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("stage", choices=(*STAGES, *LOG_STAGES, "evaluate", "evaluate_fixed"))
+    parser.add_argument("stage", choices=(*STAGES, *LOG_STAGES, "evaluate", "evaluate_fixed", "evaluate_local"))
     parser.add_argument("--config", type=Path, default=Path("paper-reconstruction.toml"))
     parser.add_argument("--data-dir", type=Path, required=True)
     parser.add_argument("--fx-dir", type=Path, help="Official H.10 snapshot; required for evaluation only")

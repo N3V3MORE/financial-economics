@@ -25,6 +25,8 @@ Neural Network” ([paper](https://doi.org/10.1016/j.ribaf.2021.101610)).
 | Full rebuild | All five paper models, 13 defensive assets, nine settings, 2010–2020 | `outputs/paper-reconstruction-20261021/evaluation` |
 | Richer-GRU fix | Log-volatility version of both GRUs (post hoc) | `.../gru_*_log`, `.../evaluation_fixed` |
 | Realistic test | Rebuilt forecasts traded realistically against a static mix, 2011–2020 | `outputs/paper-realistic-20261021` |
+| Paper figures | Figures 3–7 redrawn, plus our data checked against the paper's printed statistics | `outputs/paper-figures-20261021`, `paper-figures-local-20261021` |
+| Post hoc checks | Swiss/German bonds in local currency; IEF added to the realistic test | `.../evaluation_local`, `outputs/paper-realistic-ief-20261021` |
 
 ## Datasets
 
@@ -37,6 +39,7 @@ Neural Network” ([paper](https://doi.org/10.1016/j.ribaf.2021.101610)).
 | `paper-source-20261020` | Archived Oxford-Man realized volatility (to Feb 2022) | Volatility targets and inputs for every paper stage |
 | `paper-reconstruction-public-20261021` | Yahoo and FRED: S&P 500, futures, bond ETFs, yields, Brent | Paper rebuild returns and richer-GRU inputs |
 | `paper-reconstruction-fx-20261021` | Federal Reserve H.10 dated FX | Correct CHF/EUR conversion of Swiss and German bonds |
+| `protection-long-ief-wrds-20261021` | WRDS/CRSP SPY/TLT/GLD/DBC/IEF, 2007–2025 (first four identical to the older snapshot) | IEF realistic check |
 
 WRDS data is licensed. Raw data and outputs stay local and are ignored by Git.
 
@@ -58,6 +61,10 @@ WRDS data is licensed. Raw data and outputs stay local and are ignored by Git.
 - **Richer-GRU fix labelled post hoc.** The raw version predicted negative
   variance on 5.5% of days (mostly in calm 2017–2018). The log version was
   added after seeing that, and is reported beside the raw version.
+- **Two more post hoc checks.** The figure comparison showed the paper's
+  Swiss/German bond statistics match local-currency returns, so
+  `evaluate_local` rescored them in CHF/EUR. IEF was added to the realistic
+  test as a descriptive asset. Both sit beside the original runs, which are unchanged.
 - **No data splicing.** Providers are never mixed within one return series;
   missing values are never filled.
 - **Scope.** An international robustness run was started, then removed as out of scope.
@@ -80,7 +87,9 @@ WRDS data is licensed. Raw data and outputs stay local and are ignored by Git.
 
 **Where we differ:**
 - Our richer GRU did not beat the simpler models.
-- Gold added the most Sharpe over the full period.
+- Gold ranked first on Sharpe gain (+0.015) rather than Treasuries, though the
+  paper's own gold figure is almost the same (+0.014); it rejected gold on
+  Calmar and COVID, where ours also falls short.
 - Treasuries stopped protecting in 2022–2025.
 
 ## Findings
@@ -127,4 +136,4 @@ including the paper's long Treasuries, stayed reliable over time.
 - **Frozen GRU study tag:** `frozen-gru-study-20261021`.
 - **Commands to rerun each stage:** README sections “Reconstruct the paper's
   U.S. experiment” and “Fixed GRUs and the realistic trading test”.
-- **Tests:** `uv run pytest -q` (226 pass; GPU tests skip without CUDA).
+- **Tests:** `uv run pytest -q` (236 pass; GPU tests skip without CUDA).

@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from financial_economics.paper_fx import _parse_rates, currency_returns
+from financial_economics.paper_fx import _parse_rates, currency_returns, local_currency_returns
 
 
 def test_official_rate_parser_keeps_dates_and_skips_missing_quotes():
@@ -32,3 +32,18 @@ def test_currency_conversion_uses_seed_and_correct_direction_without_affecting_o
     pd.testing.assert_series_equal(result.iloc[0], changed.iloc[0])
     with pytest.raises(ValueError, match="past observation"):
         currency_returns(observations, returns, rates.iloc[1:])
+
+
+def test_local_currency_returns_ignore_fx_and_leave_other_assets_alone():
+    dates = pd.to_datetime(["2009-12-31", "2010-01-04", "2010-01-05"])
+    observations = pd.DataFrame({"equity_price": [100., 101., 99.], "SWISS10": [100., 100., 105.],
+                                 "BUND10": [100., 102., np.nan]}, index=dates)
+    returns = pd.DataFrame({"EQUITY": [.01, -.02], "SWISS10": 9., "BUND10": 9.}, index=dates[1:])
+    result, quality = local_currency_returns(observations, returns)
+    np.testing.assert_allclose(result.SWISS10, [0., .05])
+    # A missing local close carries the last observed price, so the return is zero.
+    np.testing.assert_allclose(result.BUND10, [.02, 0.])
+    pd.testing.assert_series_equal(result.EQUITY, returns.EQUITY)
+    assert quality["local_price_carries_including_seed"] == {"SWISS10": 0, "BUND10": 1}
+    with pytest.raises(ValueError, match="seed close"):
+        local_currency_returns(observations, returns.set_axis(dates[:2]))

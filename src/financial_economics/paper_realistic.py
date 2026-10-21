@@ -33,6 +33,7 @@ from .return_data import compound_months, load_returns
 
 FORECAST_STAGES = {"evaluation": ("arfima", "garch", "gjr", "gru_univar", "gru_multivar"),
                    "gru_univar_log": ("gru_univar_log",), "gru_multivar_log": ("gru_multivar_log",)}
+REBALANCE_PERIODS = {"daily": None, "weekly": "W-SUN", "monthly": "M"}
 
 
 def _digest(path):
@@ -113,6 +114,9 @@ def realistic_portfolios(daily, calendar, forecasts, settings):
     The stock column is settings["benchmark"] (SPY by default)."""
     assets = [*settings["primary_assets"], *settings["secondary_assets"]]
     models = [*settings["primary_models"], *settings["secondary_models"]]
+    frequency = settings.get("rebalance_frequency", "daily")
+    if frequency not in REBALANCE_PERIODS:
+        raise ValueError("Rebalance frequency must be daily, weekly or monthly.")
     benchmark = settings.get("benchmark", "SPY")
     columns = [benchmark, *assets, "RF"]
     first, last = settings["evaluation_start"], settings["evaluation_end"]
@@ -125,6 +129,11 @@ def realistic_portfolios(daily, calendar, forecasts, settings):
     signals = rows.loc[rows.earn_date.isin(returns.index)]
     if signals.empty or signals.earn_date.duplicated().any():
         raise ValueError("Realistic evaluation needs unique delayed signal dates.")
+    period = REBALANCE_PERIODS[frequency]
+    scheduled = (np.ones(len(signals), dtype=bool) if period is None else
+                 ~signals.trade_date.dt.to_period(period).duplicated().to_numpy())
+    signal_dates = pd.DatetimeIndex(signals.earn_date)
+    rebalance = signal_dates[scheduled]
     years = sorted(returns.index.year.unique())
     month_starts = returns.index[~returns.index.to_period("M").duplicated()]
     definitions, thresholds, statics, decisions = {}, [], [], []
@@ -148,19 +157,19 @@ def realistic_portfolios(daily, calendar, forecasts, settings):
         stock = stock_all.loc[signals.index].to_numpy()
         cutoff = signals.earn_date.dt.year.map(cutoffs).to_numpy()
         stressed = signal_volatility > cutoff
-        rebalance = pd.DatetimeIndex(signals.earn_date)
         decisions.append(pd.DataFrame({"issue_date": signals.index, "trade_date": signals.trade_date.to_numpy(),
-                                       "earn_date": rebalance, "model": model, "volatility": signal_volatility,
-                                       "threshold": cutoff, "stock_target": stock, "stress": stressed}))
+                                       "earn_date": signal_dates, "model": model, "volatility": signal_volatility,
+                                       "threshold": cutoff, "stock_target": stock, "stress": stressed,
+                                       "scheduled": scheduled}))
         for asset in ("cash", *assets):
             targets = pd.DataFrame(np.nan, index=returns.index, columns=columns)
             targets.iloc[0] = [0.] * (len(columns) - 1) + [1.]
-            weights = pd.DataFrame(0., index=rebalance, columns=columns)
+            weights = pd.DataFrame(0., index=signal_dates, columns=columns)
             weights[benchmark] = stock
             if asset != "cash":
                 weights[asset] = np.where(stressed, np.minimum(1 - stock, settings["defensive_cap"]), 0.)
             weights["RF"] = 1 - weights.drop(columns="RF").sum(axis=1)
-            targets.loc[rebalance] = weights.to_numpy()
+            targets.loc[rebalance] = weights.loc[rebalance].to_numpy()
             definitions[f"{model}_{asset}"] = (targets.ffill(), rebalance.union(returns.index[:1]))
         static = pd.DataFrame(0., index=returns.index, columns=columns)
         static[benchmark], static["RF"] = static_weight, 1 - static_weight
@@ -177,6 +186,7 @@ def realistic_portfolios(daily, calendar, forecasts, settings):
     return {"paths": paths_by_cost, "accounting": accounting_by_cost, "returns": returns,
             "thresholds": pd.DataFrame(thresholds), "static_controls": pd.DataFrame(statics),
             "decisions": pd.concat(decisions, ignore_index=True), "models": models, "assets": assets,
+            "rebalance_frequency": frequency, "scheduled_signal_days": int(scheduled.sum()),
             "dropped_issue_dates": dropped,
             "missing_signal_days": int(len(returns) - signals.earn_date.isin(returns.index).sum())}
 
@@ -220,7 +230,8 @@ def _tests(result, calendar, settings):
     design = np.column_stack([down, 1 - down])
     rows = []
     for model in result["models"]:
-        family = "primary" if model in settings["primary_models"] else "descriptive"
+        family = ("primary" if model in settings["primary_models"]
+                  and result.get("rebalance_frequency", "daily") == "daily" else "descriptive")
         test = sharpe_difference_test(paths[f"{model}_cash"], paths[f"{model}_static"], rf,
                                       settings["sharpe_hac_lags"])
         rows.append({"family": family, "model": model, "comparison": "timing_minus_static",
@@ -238,7 +249,8 @@ def _tests(result, calendar, settings):
     tests = pd.DataFrame(rows)
     primary = tests.family.eq("primary") & tests.p_value.notna()
     tests["holm_p_value"] = np.nan
-    tests.loc[primary, "holm_p_value"] = multipletests(tests.loc[primary, "p_value"], method="holm")[1]
+    if primary.any():
+        tests.loc[primary, "holm_p_value"] = multipletests(tests.loc[primary, "p_value"], method="holm")[1]
     tests["holm_reject"] = tests.holm_p_value < settings["alpha"]
     return tests
 
@@ -288,6 +300,9 @@ def _load_forecasts(run_dir, models):
 
 def run(args):
     settings = load_realistic_settings(args.config)
+    if getattr(args, "rebalance_frequency", None) is not None:
+        settings["rebalance_frequency"] = args.rebalance_frequency
+    bootstrap_enabled = not getattr(args, "skip_bootstrap", False)
     study = load_study(args.config)
     destination = args.output_dir.resolve()
     protected = [args.data_dir.resolve(), args.forecast_run.resolve()]
@@ -302,10 +317,12 @@ def run(args):
     forecasts, forecast_provenance = _load_forecasts(args.forecast_run, models)
     result = realistic_portfolios(daily, calendar, forecasts, settings)
     tables = {"performance": _performance(result, settings), "tests": _tests(result, calendar, settings),
-              "bootstrap_intervals": _intervals(result, settings), "declines": _declines(result, settings),
+              "declines": _declines(result, settings),
               "thresholds": result["thresholds"], "static_controls": result["static_controls"],
               "decisions": result["decisions"],
               "daily_returns": result["paths"][settings["main_cost_bps"]]}
+    if bootstrap_enabled:
+        tables["bootstrap_intervals"] = _intervals(result, settings)
     destination.parent.mkdir(parents=True, exist_ok=True)
     with TemporaryDirectory(prefix=".paper-realistic-", dir=destination.parent) as temporary:
         output = Path(temporary) / "run"
@@ -323,18 +340,25 @@ def run(args):
                     "branch": subprocess.check_output(["git", "branch", "--show-current"], text=True).strip(),
                     "head": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
                     "code": code,
+                    "bootstrap_enabled": bootstrap_enabled,
                     "signals": {"dropped_issue_dates_not_on_etf_calendar": result["dropped_issue_dates"],
-                                "evaluation_days_without_new_signal": result["missing_signal_days"]},
+                                "evaluation_days_without_new_signal": result["missing_signal_days"],
+                                "scheduled_signal_days": result["scheduled_signal_days"],
+                                "rebalance_frequency": result["rebalance_frequency"]},
                     "assumptions": {
                         "execution": "issue at close t, trade at close t+1, earn t+2; one-step forecasts are one session stale",
+                        "schedule": "daily or first eligible execution close of each Monday-Sunday week/calendar month; seed entry retained; daily holdings drift between trades",
                         "allocation": "stock=min(target/(22*sqrt(BV)),1); defensive=stress*min(1-stock,cap); residual cash",
                         "thresholds": "each year's 90th percentile of the model's own forecasts issued since calibration start and before that year",
                         "static_control": "SPY/cash at the model's mean calibration-year stock target, reset monthly",
                         "returns": "WRDS/CRSP total returns for SPY, TLT, GLD and DBC; French daily RF earns cash income",
                         "fees": "per ETF dollar bought or sold, entry included, exit and taxes excluded; RF frictionless",
-                        "primary_family": "per primary model: timing minus static Sharpe, TLT and GLD minus cash in negative-SPY months; one Holm adjustment",
-                        "descriptive": "secondary models, DBC, subperiods, declines and bootstrap intervals",
+                        "primary_family": ("per primary model: timing minus static Sharpe, TLT and GLD minus cash in negative-SPY months; one Holm adjustment"
+                                           if result["rebalance_frequency"] == "daily" else
+                                           "none; weekly/monthly cadence comparisons are exploratory"),
+                        "descriptive": "secondary models, DBC, subperiods, declines, bootstrap intervals and all weekly/monthly tests",
                         "post_hoc": "log-BV GRUs were added after raw-BV results were inspected",
+                        "cadence_comparisons": "weekly/monthly runs are exploratory; daily forecast allocations held longer, not longer-horizon forecasts; no adjusted primary tests for these runs",
                         "history": "2011-2020 was inspected in earlier runs; this is retrospective, not untouched data"}}
         metadata["files"] = {path.name: _digest(path) for path in sorted(output.iterdir())}
         (output / "run.json").write_text(json.dumps(metadata, indent=2, default=str) + "\n", encoding="utf-8")
@@ -348,6 +372,10 @@ def main(argv=None):
     parser.add_argument("--data-dir", type=Path, required=True, help="Verified WRDS/CRSP ETF snapshot")
     parser.add_argument("--forecast-run", type=Path, required=True, help="Reconstruction output directory")
     parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--rebalance-frequency", choices=tuple(REBALANCE_PERIODS),
+                        help="Override trading cadence; daily remains the default")
+    parser.add_argument("--skip-bootstrap", action="store_true",
+                        help="Skip descriptive bootstrap intervals for saved-forecast sensitivity runs")
     run(parser.parse_args(argv))
     return 0
 

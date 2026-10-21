@@ -110,7 +110,13 @@ Realistic test, 2011–2020, 0.1% fees, cash earning interest:
 
 **Paper-style rebuild (2010–2020, 13 assets):**
 - Most "safe" assets made things worse: oil, silver, platinum, copper, cocoa,
-  corn, wheat and the Swiss and German bonds lowered Sharpe for every model.
+  corn and wheat lowered Sharpe for every model.
+- **Swiss and German bonds** were roughly neutral (about −0.004 Sharpe), as in
+  the paper, once valued in their own currencies. Our first run converted them
+  to dollars, which made them look worse (−0.02 to −0.06). The paper's printed
+  volatilities and correlations match the local-currency version, so it is the
+  closer copy. It was added after we saw this and is labelled post hoc; the
+  dollar run is kept.
 - **Gold** had the largest average gain (+0.015 Sharpe), helping with four of
   five models (+0.01 to +0.03; GARCH −0.01). It slightly worsened the COVID fall.
 - **U.S. Treasuries** added a little. The 10-year proxy (IEF) was the only
@@ -122,6 +128,13 @@ Realistic test, 2011–2020, 0.1% fees, cash earning interest:
 about 0.02–0.04, and TLT cut the COVID loss from 9.7% to 7.6%. None of the
 four safe-haven tests survived the multiple-testing adjustment: the effects
 are too small to separate from luck over ten years.
+
+**IEF check (descriptive, added later):** the 7–10 year Treasury ETF, which
+helped every model in the rebuild, added only about a third of TLT's gain
+under realistic trading: +0.005 to +0.014 Sharpe for six of seven models
+(TLT: +0.007 to +0.058 for all seven). It cut the ARFIMA COVID loss from 9.7%
+to 8.9% (TLT: 7.6%). In falling months it beat cash by 0.03–0.06 points a month,
+far from significant. Shorter bonds give a smaller, not a more reliable, cushion.
 
 **2022–2025: average return minus cash in months when SPY fell (fixed holdings):**
 

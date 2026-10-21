@@ -65,8 +65,7 @@ def download_fx(destination):
         output.rename(destination)
 
 
-def currency_returns(observations, returns, fx_rates):
-    """Replace only the two foreign bond returns using the dated noon quotes."""
+def _valuation_dates(observations, returns):
     calendar = observations.equity_price.dropna().index
     first, last = calendar.get_indexer([returns.index[0], returns.index[-1]])
     if first < 1 or last < first:
@@ -74,6 +73,12 @@ def currency_returns(observations, returns, fx_rates):
     dates = calendar[first - 1:last + 1]
     if not dates[1:].equals(returns.index):
         raise ValueError("FX valuation must retain the complete equity return calendar.")
+    return dates
+
+
+def currency_returns(observations, returns, fx_rates):
+    """Replace only the two foreign bond returns using the dated noon quotes."""
+    dates = _valuation_dates(observations, returns)
     result, carries = returns.copy(), {}
     for asset, name in (("SWISS10", "usd_chf"), ("BUND10", "eur_usd")):
         observed = fx_rates[name].dropna()
@@ -86,3 +91,19 @@ def currency_returns(observations, returns, fx_rates):
     return result, {"currency": "USD using official dated Federal Reserve noon NY FX; valuation only",
                     "fx_carries_including_seed": carries,
                     "reason": "Yahoo FX moved known Swiss currency shocks to the following date; primary quotes restore the correct valuation dates"}
+
+
+def local_currency_returns(observations, returns):
+    """Post hoc: value the two foreign bond proxies in CHF and EUR, with no FX.
+
+    The paper's printed volatilities and correlations for these bonds match
+    local-currency returns, not USD-converted ones.
+    """
+    dates = _valuation_dates(observations, returns)
+    result, carries = returns.copy(), {}
+    for asset in ("SWISS10", "BUND10"):
+        price, carries[asset] = _past_values(observations[asset], dates, asset)
+        result[asset] = price.pct_change(fill_method=None).iloc[1:]
+    return result, {"currency": "SWISS10 in CHF and BUND10 in EUR; all other assets in USD",
+                    "local_price_carries_including_seed": carries,
+                    "reason": "post hoc: the paper's Figure 6 correlations and Table A.2 volatilities match local-currency, not USD, bond returns"}
