@@ -71,24 +71,42 @@ def delayed_signals(forecasts, calendar):
 def sharpe_difference_test(first, second, risk_free, lags, trading_days=252):
     """Ledoit and Wolf (2008) HAC delta-method test of first minus second Sharpe ratio."""
     excess = np.column_stack([np.asarray(first) - risk_free, np.asarray(second) - risk_free])
-    mean, square = excess.mean(axis=0), (excess ** 2).mean(axis=0)
-    variance = square - mean ** 2
-    if len(excess) <= lags + 5 or (variance <= 0).any():
-        return {"estimate": np.nan, "se": np.nan, "z": np.nan, "p_value": np.nan, "status": "unavailable"}
-    difference = mean[0] / np.sqrt(variance[0]) - mean[1] / np.sqrt(variance[1])
-    gradient = np.array([square[0] / variance[0] ** 1.5, -square[1] / variance[1] ** 1.5,
-                         -mean[0] / (2 * variance[0] ** 1.5), mean[1] / (2 * variance[1] ** 1.5)])
-    moments = np.column_stack([excess - mean, excess ** 2 - square])
-    count = len(moments)
-    covariance = moments.T @ moments / count
+    unavailable = {"estimate": np.nan, "se": np.nan, "z": np.nan, "p_value": np.nan, "status": "unavailable"}
+    count = len(excess)
+    # A constant column can have a tiny positive computed variance because its
+    # floating-point mean is rounded. Check its range before any division.
+    if count <= lags + 5 or not np.isfinite(excess).all() or (np.ptp(excess, axis=0) == 0).any():
+        return unavailable
+    mean = excess.mean(axis=0)
+    centered = excess - mean
+    variance = (centered ** 2).mean(axis=0)
+    if not np.isfinite(variance).all() or (variance <= 0).any():
+        return unavailable
+    deviation = np.sqrt(variance)
+    sharpe = mean / deviation
+    difference = sharpe[0] - sharpe[1]
+    # Centered influence functions give the same four-moment delta method,
+    # without subtracting nearly equal covariance terms for similar portfolios.
+    standardized = centered / deviation
+    influence = standardized - .5 * sharpe * (standardized ** 2 - 1)
+    gap = influence[:, 0] - influence[:, 1]
+    gap -= gap.mean()
+    # Positive rescalings have the same Sharpe and influence function; avoid
+    # interpreting their floating-point roundoff as testable variation.
+    roundoff = 32 * np.finfo(float).eps * np.max(np.abs(influence))
+    long_run_variance = gap @ gap / count
     for lag in range(1, lags + 1):
         weight = 1 - lag / (lags + 1)
-        autocovariance = moments[lag:].T @ moments[:-lag] / count
-        covariance += weight * (autocovariance + autocovariance.T)
-    covariance *= count / (count - 4)
-    se = float(np.sqrt(gradient @ covariance @ gradient / count))
-    z = difference / se
+        long_run_variance += 2 * weight * (gap[lag:] @ gap[:-lag]) / count
+    sampling_variance = long_run_variance / (count - 4)
     scale = np.sqrt(trading_days)
+    if not np.isfinite(difference):
+        return unavailable
+    if (not np.isfinite(sampling_variance) or sampling_variance <= 0
+            or np.max(np.abs(gap)) <= roundoff):
+        return {**unavailable, "estimate": float(difference * scale), "status": "degenerate_variance"}
+    se = float(np.sqrt(sampling_variance))
+    z = difference / se
     return {"estimate": float(difference * scale), "se": se * scale, "z": float(z),
             "p_value": float(2 * norm.sf(abs(z))), "status": "available"}
 
@@ -233,12 +251,17 @@ def _tests(result, calendar, settings):
                          "model": model, "comparison": f"{asset}_minus_cash",
                          "measure": "mean monthly return difference in negative-SPY months (HAC)",
                          "n_obs": len(difference), "negative_months": int(down.sum()),
-                         "estimate": float(difference[down == 1].mean()), "se": inference["hac_se"],
+                         "estimate": float(difference[down == 1].mean()) if down.any() else np.nan,
+                         "se": inference["hac_se"],
                          "z": np.nan, "p_value": inference["p_value"], "status": inference["status"]})
     tests = pd.DataFrame(rows)
-    primary = tests.family.eq("primary") & tests.p_value.notna()
+    primary = tests.family.eq("primary")
+    primary_p_values = tests.loc[primary, "p_value"]
+    # Unavailable tests keep their place in the prespecified family, as in
+    # prediction/protection inference, but are never reported as significant.
+    adjusted = multipletests(primary_p_values.fillna(1), method="holm")[1]
     tests["holm_p_value"] = np.nan
-    tests.loc[primary, "holm_p_value"] = multipletests(tests.loc[primary, "p_value"], method="holm")[1]
+    tests.loc[primary, "holm_p_value"] = np.where(primary_p_values.notna(), adjusted, np.nan)
     tests["holm_reject"] = tests.holm_p_value < settings["alpha"]
     return tests
 
@@ -259,14 +282,30 @@ def _intervals(result, settings):
 
 
 def _load_forecasts(run_dir, models):
-    """Read saved forecasts only when their bytes match each stage's recorded hash."""
+    """Require verified forecast bytes and one shared reconstruction input identity."""
     frames, provenance = [], {}
+    identity_fields = ("source_manifest", "oxford_archive", "config")
+    canonical_inputs = None
     for stage, names in FORECAST_STAGES.items():
         wanted = [name for name in names if name in models]
         if not wanted:
             continue
         directory = run_dir / stage
         metadata = json.loads((directory / "run.json").read_text(encoding="utf-8"))
+        inputs = metadata.get("inputs")
+        if (not isinstance(inputs, dict)
+                or any(not isinstance(inputs.get(name), str) or len(inputs[name]) != 64
+                       or any(character not in "0123456789abcdefABCDEF" for character in inputs[name])
+                       for name in identity_fields)):
+            raise ValueError(f"Saved {stage} forecasts require valid SHA-256 input identities for "
+                             "source_manifest, oxford_archive and config.")
+        identity = {name: inputs[name].lower() for name in identity_fields}
+        if canonical_inputs is None:
+            canonical_inputs = identity
+        elif identity != canonical_inputs:
+            changed = ", ".join(name for name in identity_fields if identity[name] != canonical_inputs[name])
+            raise ValueError(f"Saved forecast stages have different input identities ({changed}); "
+                             "use stages from one reconstruction run.")
         if _digest(directory / "forecasts.csv") != metadata["files"]["forecasts.csv"]:
             raise ValueError(f"Saved {stage} forecasts do not match their provenance hash.")
         frame = pd.read_csv(directory / "forecasts.csv", index_col=0, parse_dates=True, float_precision="round_trip")
@@ -276,7 +315,8 @@ def _load_forecasts(run_dir, models):
             frame[f"{name}_refit_asof"] = pd.to_datetime(frame[f"{name}_refit_asof"])
         frames.append(frame)
         provenance[stage] = {"run_sha256": _digest(directory / "run.json"),
-                             "forecasts_sha256": metadata["files"]["forecasts.csv"]}
+                             "forecasts_sha256": metadata["files"]["forecasts.csv"],
+                             "inputs": identity}
     combined = pd.concat(frames, axis=1, join="inner")
     if any(len(frame) != len(combined) for frame in frames):
         raise ValueError("Saved forecast stages must cover identical issue dates.")

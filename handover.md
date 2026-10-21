@@ -50,8 +50,10 @@ WRDS data is licensed. Raw data and outputs stay local and are ignored by Git.
   cutoffs. The realistic test trades one day after each forecast, charges 10 bps
   per ETF dollar traded, earns French cash interest, and sets each year's
   cutoff from earlier forecasts only.
-- **The right comparison.** Timing is compared with a static SPY/cash mix
-  holding the model's average 2010 stock share, not only with SPY.
+- **Pre-calibrated comparison.** Timing is compared with a static SPY/cash
+  mix holding the model's mean 2010 stock target, reset monthly. It does
+  not ensure matching average 2011–2020 stock exposure or realized risk,
+  so differences can reflect exposure as well as timing.
 - **Fixed significance tests.** The realistic test has six primary tests
   (ARFIMA and the one-input GRU × timing vs static, TLT vs cash, GLD vs
   cash) under one Holm adjustment. Everything else is descriptive.
@@ -79,11 +81,29 @@ WRDS data is licensed. Raw data and outputs stay local and are ignored by Git.
 - Long Treasuries were the best crash protector to 2020.
 
 **Where we differ:**
-- Our richer GRU did not beat the simpler models.
+- Our richer GRU configuration did not establish lower forecast error
+  than ARFIMA or the one-input GRU. Its training span and validation folds
+  differ, so this does not isolate the effect of additional inputs.
 - Gold added the most Sharpe over the full period.
-- Treasuries stopped protecting in 2022–2025.
+- TLT lagged cash on average in falling-SPY months in 2022–2025.
 
 ## Findings
+
+The following numbers and significance statements are retained from the
+archived runs. The primary Holm correction now retains all six planned
+tests when one is unavailable, using p=1 internally while leaving its
+reported p-values unavailable and its rejection flag false. Sharpe HAC
+inference uses centered calculations and marks constant excess returns
+unavailable; identical or positively proportional excess returns retain
+their difference estimate with unavailable uncertainty and p-values when
+sampling variance is degenerate. Conditional return comparisons are
+unavailable when there are no months when stocks fall. Saved forecast stages
+must have matching, valid hashes for their source manifest, Oxford archive
+and reconstruction config, retained in the realistic run's provenance.
+The original archived inputs and model forecasts remain unavailable.
+Fresh WRDS returns and Yahoo/WRDS/EIA reconstruction inputs are verified.
+The AMD reconstruction was stopped at the user's request on October 21; model forecasts are not yet
+complete and historical results have not been regenerated with these fixes.
 
 **Statistically supported:**
 - 11 of 13 ETFs lagged cash in falling months, 2015–2025 (Holm-adjusted).
@@ -92,17 +112,23 @@ WRDS data is licensed. Raw data and outputs stay local and are ignored by Git.
 **Consistent but not significant:**
 - Timing cut the worst fall for every model (about −11% to −16%, against −15% to −23% for the static mix).
 - Timing roughly halved the COVID loss, but lost more in the slow 2015–16 fall.
-- After 10 bps fees, ARFIMA and one-input GRU timing tied the static mix on Sharpe (0.76–0.80 against 0.80); the other models trailed (0.71–0.75). Before fees, ARFIMA beat its mix (0.89 against 0.80); at 25 bps it lost (0.57).
+- After 10 bps fees, ARFIMA and one-input GRU timing had Sharpe estimates of 0.76–0.80 against 0.80 for the static mixes; their differences were not significant. This does not establish equivalence. The other models had estimates of 0.71–0.75. Before fees, ARFIMA had 0.89 against 0.80; at 25 bps it had 0.57.
 - In falling months, TLT beat cash by +1.7 to +3.6 points per period up to 2021, then lost 4.3 points in 2022–2025.
 - Gold was positive on average but inconsistent across models and crashes.
 
 **Not shown:**
-- No safe haven significantly improved the strategy.
-- No timing strategy significantly beat the static mix.
+- The archived primary TLT and GLD tests did not establish improvement
+  beyond cash.
+- The archived primary timing tests did not establish a Sharpe improvement
+  over the pre-calibrated static mixes.
 
-**Thesis:** volatility timing protects against big, fast crashes but does not
-earn more per unit of risk than holding less stock, and no safe haven,
-including the paper's long Treasuries, stayed reliable over time.
+**Thesis:** in these retrospective tests, timing reduced the worst
+observed falls without an established Sharpe improvement over the
+2010-calibrated static mixes after fees. Nonsignificance does not establish
+equivalence. The tested defensive assets' contributions varied by model
+and period, including a reversal for long Treasuries in 2022–2025; these
+results do not establish a universally reliable haven or rule out benefits
+in other settings.
 
 ## Limitations left
 
@@ -112,6 +138,11 @@ including the paper's long Treasuries, stayed reliable over time.
   clean prices. The realistic test uses total returns.
 - **Unpublished details.** The paper's code, seeds, tuning grid and some metric
   formulas are unpublished; our Sharpe formula and GRU details are inferred.
+- **Different GRU histories.** The one-input model uses BV history from
+  2000, while the richer feature table starts on April 11, 2002, before
+  the 22-observation lookback. Training samples and validation-fold dates
+  differ. A matched-history study is needed to attribute differences to
+  the additional inputs.
 - **ARFIMA bound.** ARFIMA's memory parameter hit its upper bound on 38% of days.
 - **History already seen.** 2010–2020 was examined repeatedly, so results are
   retrospective, not out of sample.
@@ -123,8 +154,37 @@ including the paper's long Treasuries, stayed reliable over time.
 
 ## Where things are
 
-- **Branch:** `volatility-prediction`. It is not pushed; `main` is unchanged.
+- **Branch:** `volatility-prediction`.
 - **Frozen GRU study tag:** `frozen-gru-study-20261021`.
+- **Fresh local snapshot:** `data/protection-long-wrds-20261021` contains
+  verified SPY/TLT/GLD/DBC returns for 4,780 sessions from January 3, 2007
+  through December 31, 2025; all 912 fund-month comparisons passed.
+  Model forecast reconstruction was stopped at the user's request; new results are not yet complete.
+- **Other recovered inputs:** `data/paper-oxford-20261021/oxfordman-20220301.zip`
+  matches the recorded archive hash; `data/paper-fx-20261021` passes dated H.10
+  coverage checks. FRED maintenance was resolved using WRDS DGS3/DAAA and
+  direct EIA Brent in `data/paper-macro-wrds-eia-20261021`. The combined
+  `data/paper-wrds-eia-20261021` snapshot has 19 series and 5,284 equity
+  sessions; hashes, prior-only alignment, and official FX conversion passed.
+  All 5,253 WRDS DGS3 observations match the official Fed export exactly.
+  The 4,197 overlapping AAA observations match too; later WRDS AAA values
+  lack independent current-FRED comparison. All actual source identities
+  and the fresh vintage are retained in the manifests.
+- **AMD training:** Radeon 8060S on Windows runs PyTorch 2.11.0 + ROCm 7.14.1.
+  Native HIP GRU probes passed forward/backward, Adam updates, exact same-seed
+  repetition and checkpoint reload. MIOpen's Windows RNN compiler failed on
+  a missing `type_traits` header, so ROCm uses the native GPU RNN path.
+  Run and checkpoint metadata now identify ROCm and its HIP version.
+  The main `.venv` now includes the locked `prediction-rocm`, `reconstruction`
+  and `wrds` extras; use `prediction-rocm` in AMD training commands.
 - **Commands to rerun each stage:** README sections “Reconstruct the paper's
   U.S. experiment” and “Fixed GRUs and the realistic trading test”.
-- **Tests:** `uv run pytest -q` (226 pass; GPU tests skip without CUDA).
+- **Stopped full rebuild:** `outputs/paper-wrds-eia-rocm-20261021/status.json`
+  records the interrupted stage and original process ID; `logs/run.stdout.log` and
+  `logs/run.stderr.log` retain progress and errors. The process tree was terminated during the first GRU stage because no
+  meaningful results-preserving speedup had been validated. No stages were
+  completed. Downloaded inputs and logs are retained. Final output was planned
+  at `outputs/paper-realistic-wrds-eia-rocm-20261021`.
+- **Tests after the inference, provenance, Windows login, AMD and source fixes:**
+  335 passed with warnings treated as errors in the main ROCm environment,
+  including all seven actual GPU tests; none skipped.

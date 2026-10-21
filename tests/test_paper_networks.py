@@ -38,7 +38,7 @@ def test_tiny_cuda_raw_bv_refits_use_past_labels_and_save_independent_layers(tmp
     try:
         torch, _ = _require_cuda()
     except RuntimeError as error:
-        if "no CUDA GPU" in str(error) or "prediction extra" in str(error):
+        if "no compatible GPU" in str(error) or "prediction extra" in str(error):
             pytest.skip(str(error))
         raise
     prepared, calendar = _prepared(channels)
@@ -57,6 +57,8 @@ def test_tiny_cuda_raw_bv_refits_use_past_labels_and_save_independent_layers(tmp
     assert forecasts.loc["2009-12-31", f"{name}_refit_asof"] == pd.Timestamp("2009-12-31")
     assert np.isfinite(forecasts.iloc[-1][f"{name}_bv"])
     assert metadata["device"] == "cuda:0" and metadata["refit_epochs"] == 1
+    assert metadata["backend"] == ("ROCm-required PyTorch" if torch.version.hip else "CUDA-required PyTorch")
+    assert metadata["hip_version"] == torch.version.hip
     assert metadata["input_channels"] == channels
     assert len(metadata["checkpoints"]) == 2
     for fold in metadata["folds"]:
@@ -68,7 +70,9 @@ def test_tiny_cuda_raw_bv_refits_use_past_labels_and_save_independent_layers(tmp
         assert saved["state_dict"]["first.weight_ih_l0"].shape == (6, channels)
         assert saved["state_dict"]["second.weight_ih_l0"].shape == (9, 2)
         assert saved["train_last_target"] <= saved["refit_asof"]
-        assert saved["rnn_backend"] == "native CUDA; cuDNN disabled"
+        expected_backend = "native ROCm/HIP; MIOpen disabled" if torch.version.hip else "native CUDA; cuDNN disabled"
+        assert saved["rnn_backend"] == metadata["rnn_backend"] == expected_backend
+        assert saved["hip_version"] == metadata["hip_version"]
         assert all(tensor.device == torch.device("cuda:0") for tensor in saved["state_dict"].values())
     with pytest.raises(ValueError, match="never replaced"):
         reconstruct_gru(prepared, calendar, tmp_path / name, **options)

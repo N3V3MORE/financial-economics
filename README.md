@@ -106,9 +106,25 @@ uv run python scripts/verify_protection.py --config protection-long.toml --data-
 
 Skip downloads when those snapshots already exist. Downloads and protection
 outputs refuse existing destinations; choose new names for a later vintage or
-rerun. WRDS uses an existing local PostgreSQL password file and optional
-`WRDS_USERNAME`; passwords and raw provider errors are never printed. There
-is no automatic fallback. If verified WRDS coverage is unavailable, explicitly
+rerun. On Windows, save the WRDS username and password through the local
+Windows sign-in dialog once:
+
+```powershell
+uv run --extra wrds python -m financial_economics.wrds_credentials
+```
+
+This stores a generic credential named `financial-economics:wrds` in Windows
+Credential Manager for the current user on this computer. Subsequent WRDS
+downloads read it directly into memory. Running the command again updates
+the saved login. Passwords are never written to the repository or printed.
+When no Windows credential exists, the existing PostgreSQL password file
+and optional `WRDS_USERNAME` are used. If `WRDS_USERNAME` is set, it must
+match the saved Windows login. Provider errors are sanitized.
+
+[WRDS PostgreSQL access requires Duo Mobile push approval](https://wrds-www.wharton.upenn.edu/pages/about/log-in-to-wrds-using-two-factor-authentication/).
+Connections allow up to two minutes for authentication and are not retried
+automatically. A saved password does not bypass MFA.
+There is no automatic data-provider fallback. If verified WRDS coverage is unavailable, explicitly
 use `download --source public` into a separately named directory and carry that
 provider label through the entire run. Never combine the providers' returns.
 
@@ -174,12 +190,38 @@ uv run fecon --config prediction.toml predict --forecast-run outputs/prediction-
 ```
 
 Skip downloads when the retained snapshot exists. Default `predict` trains
-on **CUDA:0**, verifies effective device placement, and stops if CUDA is
-unavailable; it never retries training on CPU. `--ewma-only` and verified
+on **cuda:0** through NVIDIA CUDA or AMD ROCm, verifies effective device
+placement, and stops if a compatible GPU is unavailable; it never retries
+training on CPU. PyTorch uses the same `cuda` device API for ROCm.
+`--ewma-only` and verified
 `--forecast-run` reuse run without importing PyTorch. They are mutually
 exclusive. Saved forecasts must match settings, snapshot provenance, and
 file hashes. A saved baseline stays a baseline. Portfolio accounting and
 bootstrap calculations are CPU-native; substantial runs stay sequential.
+
+For Windows x64 with Radeon 8060S (`gfx1151`), use the separate AMD extra:
+
+```powershell
+uv sync --frozen --extra prediction-rocm --extra reconstruction --extra wrds
+uv run --frozen --extra prediction-rocm --extra reconstruction --extra wrds python -m pytest -q -W error --basetemp=.venv/pytest-amd-check
+```
+
+`prediction-rocm` pins PyTorch 2.11.0 + ROCm 7.14.1 and the matching device
+runtime from AMD's official package index. The NVIDIA `prediction` and AMD
+`prediction-rocm` extras are mutually exclusive. For AMD, replace
+`--extra prediction` with `--extra prediction-rocm` in the training commands
+below and retain the other extras needed by that command. This extra targets
+Windows `gfx1151`; other AMD devices need their matching runtime packages.
+See [AMD's compatibility matrix](https://rocm.docs.amd.com/en/docs-7.14.1/compatibility/compatibility-matrix.html)
+and [PyTorch's HIP device semantics](https://docs.pytorch.org/docs/2.11/notes/hip.html).
+
+The October 21 local validation passed all 335 tests, including seven GPU
+tests, with warnings treated as errors. Separate model probes verified
+forward/backward computation, Adam updates, exact same-seed repetition and
+checkpoint reload on Radeon 8060S. ROCm GRUs use native HIP operations to
+avoid the observed Windows MIOpen compiler failure. Run and checkpoint
+metadata record the actual runtime and HIP version. Deterministic training
+does not imply identical forecasts across different GPU runtimes.
 
 A/B use EWMA/GRU to divide SPY and cash. C/D keep the same respective SPY
 targets and add up to 20% defensive ETF from available cash during predicted
@@ -238,9 +280,9 @@ uv run fecon --config paper.toml paper --baseline-only --oxford-archive data/pap
 uv run --extra prediction fecon --config paper.toml paper --oxford-archive data/paper-source-20261020/oxfordman-20220301.zip --data-dir data/protection-long-wrds-20261020 --output-dir outputs/paper-gru
 ```
 
-Training requires verified CUDA:0; no CPU fallback. This small GRU uses native
-CUDA kernels because cuDNN reproducibly crashes at process shutdown on the
-current Windows installation. The EWMA baseline,
+Training requires verified `cuda:0` through CUDA or ROCm; no CPU fallback.
+This small GRU uses native GPU kernels to avoid the observed Windows cuDNN
+shutdown and MIOpen compilation failures. The EWMA baseline,
 calendar preparation, and portfolio accounting are CPU-native. SPY, TLT,
 and GLD total returns substitute for the paper's Datastream indices. Each
 model runs a stock/cash portfolio and nine threshold/cap combinations per
@@ -279,8 +321,8 @@ uv run --extra prediction fecon --config paper-extension.toml paper-extension --
 `--selection-run` verifies the saved pre-2010 tuning evidence, then reuses its
 32 hidden units and 17 epochs with three seeds. It performs no new search.
 New annual models learn the two-session target: issue at Monday close, trade
-Tuesday close, earn Wednesday's close-to-close return. Training stays on CUDA:0
-with native CUDA kernels. A reconstructed 2009 forecast history calibrates
+Tuesday close, earn Wednesday's close-to-close return. Training stays on `cuda:0`
+with native CUDA or HIP kernels. A reconstructed 2009 forecast history calibrates
 the initial threshold; its fitted weights use pre-2009 labels, while the reused
 architecture was selected through 2009. That calibration is known before
 2010 evaluation and is not presented as a traded 2009 test. The first 2010
@@ -364,6 +406,14 @@ strategy and 117 additions: 13 defensive assets, three stress thresholds and
 three caps. Fees and cash interest are zero, as in the paper. Thresholds use
 the full test period and therefore describe a retrospective comparison.
 
+The GRUs share evaluation dates, but their training histories differ. The
+one-input model uses BV history from 2000; the richer feature table starts
+on April 11, 2002, with its first usable issue after the 22-observation
+lookback. Their pre-2010 validation folds therefore cover different dates.
+These results compare complete model configurations; isolating the value
+of extra inputs requires a separate study with matched training histories
+and validation folds. The existing settings and forecasts are preserved.
+
 The original paper and appendix are available in the
 [author's university dissertation](https://bip.ue.poznan.pl/download/attachment/1848/rozprawa-doktorska-mgr-t-kaczmarka.pdf#page=180).
 The licensed Datastream inputs are unavailable to this account. The new
@@ -389,7 +439,26 @@ foreach ($stage in @('classical', 'gru_univar', 'gru_multivar', 'evaluate')) {
 }
 ```
 
-Classical fits run on CPU. Both neural stages require CUDA:0 and never fall
+When FRED is unavailable, the same requested yield series can be retained
+from the licensed WRDS `frb_all.rates_daily` table, with Brent spot prices
+downloaded directly from EIA. Use a new macro snapshot and a new combined
+source directory:
+
+```powershell
+uv run --frozen --extra prediction-rocm --extra reconstruction --extra wrds python -m financial_economics.paper_macro_sources --output-dir data/paper-macro-wrds-eia-20261021
+uv run --frozen --extra prediction-rocm --extra reconstruction --extra wrds python -c "from financial_economics.paper_sources import download_sources; download_sources('data/paper-wrds-eia-20261021', macro_dir='data/paper-macro-wrds-eia-20261021')"
+```
+
+Pass the combined directory as `--data-dir` to every reconstruction stage.
+Skip these download commands when those immutable directories already exist.
+This retains WRDS DGS3/DAAA and EIA RBRTE as the counterparts of FRED
+DGS3/DAAA/DCOILBRENTEU, with their actual provider identities and units in
+the manifest. Raw responses, the WRDS query, and the upstream macro manifest
+are copied and hashed. WRDS observations remain private and local.
+The current FRED vintage cannot be compared during its outage; this is a
+fresh source vintage, with the study's economic series definitions unchanged.
+
+Classical fits run on CPU. Both neural stages require `cuda:0` through CUDA or ROCm and never fall
 back to CPU. Evaluation reuses verified forecasts and does not retrain.
 Each stage rejects existing output directories. Saved results include the
 full strategy grid, forecasts, tuning, checkpoints, source/code hashes,
@@ -413,10 +482,11 @@ reset-before, while its executed Keras/TensorFlow settings are unpublished.
 
 The raw-BV richer GRU predicted negative variance on 5.5% of days, almost all
 in the very calm years 2017–2018. Two extra stages learn **log BV** instead, so
-forecasts are always positive. They keep the same profiles, seeds, folds and
-epoch rule, select on log-scale pre-2010 MSE, and restore the mean level with a
-training-only smearing factor. The fix was added after the raw results were
-seen; it is labelled post hoc, and the raw runs stay unchanged and reported.
+forecasts are always positive. Each keeps its raw counterpart's profiles,
+seeds, fold dates and epoch rule, selects on log-scale pre-2010 MSE, and
+restores the mean level with a training-only smearing factor. The fix was
+added after the raw results were seen; it is labelled post hoc, and the raw
+runs stay unchanged and reported.
 `evaluate_fixed` scores all seven models paper-style in a separate directory.
 
 ```powershell
@@ -429,16 +499,42 @@ uv run python -m financial_economics.paper_realistic --data-dir data/protection-
 
 `paper-realistic.toml` was fixed before the realistic run. It reuses the saved
 forecasts with no refitting, on verified WRDS/CRSP SPY, TLT, GLD and DBC total
-returns with French daily cash income. A forecast issued at close t trades at
-close t+1 and earns the t+2 return; fees are 10 bps per ETF dollar traded
+returns with French daily cash income. Reuse requires every selected forecast
+stage to record matching, valid SHA-256 hashes for its source manifest,
+Oxford archive and reconstruction config, in addition to verified forecast
+bytes. The realistic run retains those input identities in its provenance.
+A forecast issued at close t trades at close t+1 and earns the t+2 return;
+fees are 10 bps per ETF dollar traded
 (0 and 25 bps are sensitivities). Each year's 90th-percentile stress cutoff uses
 only that model's earlier forecasts, so 2010 is calibration and trading is
 scored over 2011–2020. A static SPY/cash control holds the model's mean 2010
-stock target, reset monthly, which answers "was timing better than simply
-holding less stock?". The primary family has six tests for ARFIMA and the
-simple GRU: timing minus static Sharpe (Ledoit–Wolf HAC) and TLT and GLD
-minus cash in negative-SPY months (HAC), with one Holm adjustment. Secondary
-models, DBC, subperiods, declines and bootstrap intervals are descriptive.
+stock target, reset monthly. This is a comparison with a static allocation
+chosen before evaluation; it is not calibrated to match the timing strategy's
+average 2011–2020 stock exposure or realized risk. Differences can therefore
+reflect exposure as well as timing. The primary family has six tests for
+ARFIMA and the simple GRU: timing minus static Sharpe (Ledoit–Wolf HAC),
+and TLT and GLD minus cash in negative-SPY months (HAC), with one Holm
+adjustment. Secondary models, DBC, subperiods, declines and bootstrap
+intervals are descriptive.
+
+The primary Holm adjustment retains all six prespecified tests when an
+individual test is unavailable: it uses p=1 internally for that test and
+keeps its reported p-value and adjusted p-value unavailable, with no
+rejection. Sharpe HAC inference uses centered calculations and marks
+constant excess return series unavailable. Identical or positively
+proportional excess return series retain their Sharpe difference estimate
+but have unavailable uncertainty and p-values when the sampling variance
+is degenerate. If there are no months when the benchmark falls, the
+conditional return difference estimate and test are unavailable.
+
+The archived research results have not been regenerated after these
+inference fixes because the original archived inputs and model forecasts
+remain unavailable. Fresh WRDS returns and a combined Yahoo/WRDS/EIA source
+snapshot are now verified; an AMD reconstruction was stopped at the user's request on October 21 in
+`outputs/paper-wrds-eia-rocm-20261021`. Its `status.json` and `logs/` record
+progress and failures. Rebuilt forecasts and results are not yet complete.
+Numerical findings in the documentation
+remain the archived values; they are not a recalculation with the fixes.
 
 ## See the original phase results
 
