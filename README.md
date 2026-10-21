@@ -146,6 +146,68 @@ Raw licensed observations and generated detailed paths stay local in ignored
 `data/` and `outputs/`. Do not redistribute them.
 Repository documentation contains aggregate findings, not licensed observations.
 
+## Predict volatility, then compare ETF protection with cash
+
+`prediction.toml` extends the retained 2007–2025 SPY/TLT/GLD/DBC snapshot.
+It adapts Kaczmarek, Będowska-Sójka, Grobelny and Perez (2022), “False Safe
+Haven Assets: Evidence From the Target Volatility Strategy Based on Recurrent
+Neural Network” ([paper](https://doi.org/10.1016/j.ribaf.2021.101610)).
+Our forecast target is a future squared **daily** SPY return,
+a noisy variance proxy under a zero-daily-mean approximation; it differs from
+the paper's intraday-derived measure. This is an attributed adaptation.
+
+Both models receive the previous 22 daily SPY returns and their squares.
+EWMA selects one decay; the one-layer GRU selects hidden size and learning
+rate from the frozen small grid and averages five fixed seeds. Training ends
+in 2014, validation covers 2015–2016, and historical evaluation covers
+2017–2025. Annual refits use available targets only. GRU epochs are frozen
+after validation. All settings are explicit in `prediction.toml`.
+
+```sh
+uv run fecon --config prediction.toml predict --ewma-only --data-dir data/protection-long-wrds-20261020 --output-dir outputs/prediction-ewma
+uv sync --frozen --extra prediction
+uv run --extra prediction fecon --config prediction.toml predict --data-dir data/protection-long-wrds-20261020 --output-dir outputs/prediction-core
+uv run fecon --config prediction.toml predict --forecast-run outputs/prediction-core --defensive-asset GLD --data-dir data/protection-long-wrds-20261020 --output-dir outputs/prediction-gold
+uv run fecon --config prediction.toml predict --forecast-run outputs/prediction-core --defensive-asset DBC --data-dir data/protection-long-wrds-20261020 --output-dir outputs/prediction-commodities
+```
+
+Skip downloads when the retained snapshot exists. Default `predict` trains
+on **CUDA:0**, verifies effective device placement, and stops if CUDA is
+unavailable; it never retries training on CPU. `--ewma-only` and verified
+`--forecast-run` reuse run without importing PyTorch. They are mutually
+exclusive. Saved forecasts must match settings, snapshot provenance, and
+file hashes. A saved baseline stays a baseline. Portfolio accounting and
+bootstrap calculations are CPU-native; substantial runs stay sequential.
+
+A/B use EWMA/GRU to divide SPY and cash. C/D keep the same respective SPY
+targets and add up to 20% defensive ETF from available cash during predicted
+stress. SPY targets a 10% annual volatility level without borrowing; adding
+the ETF adds risk. Annual stress thresholds use preceding issued forecasts
+from a common validation-start history, initially calibrated with the selected
+models' archived validation forecasts. A forecast at Monday close trades
+Tuesday close and earns Wednesday's daily return. Settings freeze at the
+last 2016 trading close, so January 3, 2017 remains in cash and the first
+forecast-directed return ends January 4.
+
+Main results earn observed cash income and charge 10 bps per ETF dollar
+bought or sold, including entry; 0/25 bps and zero cash income are separate
+sensitivities. Exit fees and taxes are excluded. Output directories contain
+return/allocation/fee tables, tuning evidence, model checkpoints when copied,
+three PNG figures with their exact `figure_*.csv` sources, and hashed
+`run.json` provenance. Existing destinations and paths inside source snapshots
+or reused forecast runs are refused. No Markdown report is generated.
+
+Only full TLT results have the three-test primary family: paired forecast
+QLIKE, D−C protection, and D−B ETF-versus-cash protection. Bartlett HAC uses
+20 daily or six monthly lags, small-sample correction, two-sided tests, and
+one Holm adjustment. Monthly tests retain the full calendar with down/other
+SPY indicators. Paired 10,000-draw stationary-bootstrap intervals use mean
+blocks of six months, with three/twelve-month sensitivities. They condition
+on fitted models and omit model-selection uncertainty. Secondary assets,
+subperiods, and severe declines are descriptive. Better forecasts, better
+portfolios, and an ETF improving on cash are **three separate claims**.
+Previously inspected histories remain retrospective evidence, not unseen data.
+
 ## See the original phase results
 
 After the four analysis commands, put the main findings on one page:

@@ -1,0 +1,39 @@
+# Preserve the retained snapshot identity; only prediction settings are new.
+[study]
+name = "protection-core-2007-2025"
+start = "2007-01-01"
+end = "2025-12-31"
+benchmark = "SPY"
+trading_days = 252
+hac_lags = 6
+
+[assets]
+SPY = "Broad US stock reference"
+TLT = "Other assets: long government bonds"
+GLD = "Other assets: gold"
+DBC = "Other assets: commodities"
+
+[prediction]
+training_end = "2014-12-31"
+validation_start = "2015-01-01"
+validation_end = "2016-12-31"
+evaluation_start = "2017-01-01"
+lookback = 22
+ewma_decays = [0.90, 0.94, 0.97]
+hidden_sizes = [16, 32]
+learning_rates = [0.001, 0.0003]
+seeds = [11, 22, 33, 44, 55]
+batch_size = 64
+max_epochs = 100
+patience = 10
+volatility_target = 0.10
+defensive_cap = 0.20
+stress_quantile = 0.90
+costs_bps = [0, 10, 25]
+resamples = 10000
+block_lengths = [6, 3, 12]
+seed = 20260101
+forecast_hac_lags = 20
+monthly_hac_lags = 6
+alpha = 0.05
+windows = ["2017:2019", "2020:2021", "2022:2025"]

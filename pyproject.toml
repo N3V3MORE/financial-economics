@@ -14,6 +14,15 @@ dependencies = [
 
 [project.optional-dependencies]
 wrds = ["psycopg2-binary==2.9.13"]
+prediction = ["torch==2.11.0"]
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu130", extra = "prediction" }
+
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true
 
 [project.scripts]
 fecon = "financial_economics.cli:main"

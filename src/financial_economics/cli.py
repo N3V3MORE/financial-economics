@@ -11,6 +11,61 @@ from .report import write_outputs
 from .stress import compare_episodes, drawdown_episodes, rolling_correlations
 
 
+def _predict(args, study):
+    from tempfile import TemporaryDirectory
+
+    from .forecasting import ewma_forecasts, prepare_forecasts
+    from .prediction import run_prediction
+    from .prediction_config import load_prediction
+    from .prediction_report import load_forecast_run, write_prediction
+    from .return_data import load_returns
+
+    destination = args.output_dir.resolve()
+    if destination.exists() or destination.is_relative_to(args.data_dir.resolve()):
+        raise ValueError("Use a new output directory outside the source snapshot.")
+    if args.forecast_run and destination.is_relative_to(args.forecast_run.resolve()):
+        raise ValueError("Keep prediction outputs outside the saved forecast source.")
+    settings = load_prediction(args.config, study)
+    data = load_returns(study, args.data_dir, verified_monthly=True)
+    extra_tables, model_metadata = {}, {}
+
+    def finish(forecasts, checkpoints=None):
+        result = run_prediction(data, study, settings, forecasts, args.defensive_asset)
+        dates = result.tables["daily_returns"].index
+        extra_tables["evaluation_inputs"] = data.daily.loc[dates, ["SPY", args.defensive_asset]].assign(
+            RF=data.factors.loc[dates, "RF"])
+        write_prediction(result, study, settings, data.provenance, destination, args.config,
+                         extra_tables, model_metadata, checkpoints)
+        print(f"Prediction stage: {result.metadata['stage']}; defensive ETF: {args.defensive_asset}; "
+              f"{result.metadata['forecast_observations']} forecasts; "
+              f"{result.metadata['warmup_cash_days']} initial cash-only trading day(s).")
+        print(f"Results: {destination}")
+
+    if args.forecast_run:
+        forecasts, extra_tables, model_metadata = load_forecast_run(
+            args.forecast_run, study, settings, data.provenance)
+        checkpoints = args.forecast_run / "checkpoints"
+        finish(forecasts, checkpoints if args.defensive_asset == "TLT" and checkpoints.exists() else None)
+    else:
+        prepared = prepare_forecasts(data.daily.SPY, data.daily.index, settings.lookback)
+        forecasts, tuning = ewma_forecasts(prepared, settings)
+        extra_tables["ewma_tuning"] = tuning
+        if args.ewma_only:
+            finish(forecasts)
+        else:
+            from .gru_forecasting import gru_forecasts
+
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            with TemporaryDirectory(prefix=".prediction-models-", dir=destination.parent) as temporary:
+                checkpoints = Path(temporary) / "checkpoints"
+                gru, tuning, metadata = gru_forecasts(prepared, settings, data.daily.index, checkpoints)
+                forecasts["gru_variance"] = gru.gru_variance
+                forecasts["gru_refit_asof"] = gru.gru_refit_asof
+                extra_tables["gru_tuning"] = tuning
+                model_metadata["gru"] = metadata
+                finish(forecasts, checkpoints)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, default=Path("study.toml"))
@@ -48,6 +103,13 @@ def main(argv: list[str] | None = None) -> int:
     protection = commands.add_parser("protection", help="Run the frozen ETF-versus-cash study offline")
     protection.add_argument("--data-dir", type=Path, required=True)
     protection.add_argument("--output-dir", type=Path, required=True)
+    predict = commands.add_parser("predict", help="Evaluate daily volatility forecasts and ETF/cash protection")
+    predict.add_argument("--data-dir", type=Path, required=True)
+    predict.add_argument("--output-dir", type=Path, required=True)
+    predict.add_argument("--defensive-asset", choices=["TLT", "GLD", "DBC"], default="TLT")
+    prediction_source = predict.add_mutually_exclusive_group()
+    prediction_source.add_argument("--ewma-only", action="store_true", help="Run the CPU-only EWMA baseline")
+    prediction_source.add_argument("--forecast-run", type=Path, help="Reuse verified saved forecasts without training")
     page = commands.add_parser("page", help="Write one HTML page from the saved phase outputs")
     page.add_argument("--outputs-dir", type=Path, default=Path("outputs"))
     page.add_argument("--output", type=Path, default=Path("outputs/page/index.html"))
@@ -70,6 +132,8 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 download_snapshot(study, args.data_dir)
             print(f"Saved source snapshot: {args.data_dir.resolve()}")
+        elif args.command == "predict":
+            _predict(args, study)
         elif args.command == "protection":
             from .protection_config import load_protection
             from .return_data import load_returns
