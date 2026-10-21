@@ -119,6 +119,11 @@ def main(argv: list[str] | None = None) -> int:
     extension.add_argument("--data-dir", type=Path, required=True)
     extension.add_argument("--oxford-archive", type=Path, required=True)
     extension.add_argument("--output-dir", type=Path, required=True)
+    extension.add_argument("--rebalance-frequency", choices=["daily", "weekly"],
+                           help="Override the configured trading schedule (default: daily)")
+    extension.add_argument("--cash-only", action="store_true", help="Compare SPY/cash without defensive ETFs")
+    extension.add_argument("--min-allocation-change", type=float,
+                           help="Minimum change from last traded stock target; 0.05 = five percentage points (SPY/cash only)")
     extension_source = extension.add_mutually_exclusive_group(required=True)
     extension_source.add_argument("--baseline-only", action="store_true")
     extension_source.add_argument("--selection-run", type=Path, help="Reuse pre-evaluation model settings; fit new delayed models")

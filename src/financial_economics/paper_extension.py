@@ -1,6 +1,6 @@
 """CPU-native realistic portfolios for frozen, delayed Oxford-BV forecasts."""
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import datetime, timezone
 from hashlib import sha256
 import json
@@ -30,6 +30,8 @@ class ExtensionSettings:
     annual_target: float = .10
     risk_modes: tuple[str, ...] = ("paper", "annual10")
     windows: tuple[str, ...] = ("2010:2020", "2021:2021", "2017:2021")
+    rebalance_frequency: str = "daily"
+    min_allocation_change: float = 0.0
 
     def validate(self, paper):
         start, calibration, end = map(pd.Timestamp, (self.evaluation_start, self.calibration_start,
@@ -39,9 +41,16 @@ class ExtensionSettings:
                 or not pd.Timestamp(paper.evaluation_start) <= calibration < start < end
                 or start.day != 1 or end != end + pd.offsets.MonthEnd(0)):
             raise ValueError("Extension needs past calibration and complete evaluation months.")
-        if (not self.defensive_assets or len(set(self.defensive_assets)) != len(self.defensive_assets)
+        if (len(set(self.defensive_assets)) != len(self.defensive_assets)
                 or not set(self.defensive_assets) <= {"TLT", "GLD", "DBC"}):
             raise ValueError("Choose unique TLT/GLD/DBC defensive substitutes.")
+        if self.rebalance_frequency not in ("daily", "weekly"):
+            raise ValueError("Rebalance frequency must be daily or weekly.")
+        if (isinstance(self.min_allocation_change, bool) or not np.isfinite(self.min_allocation_change)
+                or not 0 <= self.min_allocation_change <= 1):
+            raise ValueError("Minimum allocation change must be a finite fraction from 0 to 1.")
+        if self.min_allocation_change > 0 and self.defensive_assets:
+            raise ValueError("Minimum allocation changes currently require SPY/cash only.")
         if (not self.risk_modes or len(set(self.risk_modes)) != len(self.risk_modes)
                 or not set(self.risk_modes) <= {"paper", "annual10"}):
             raise ValueError("Risk modes must be unique paper/annual10 values.")
@@ -103,6 +112,20 @@ def load_frozen_selection(directory, paper, freeze, archive_digest):
         "selection_last_target": max(fold["validation_last_target"] for fold in model["folds"])}
 
 
+def _allocation_change_signals(stock, scheduled, minimum_change):
+    """Filter target changes against the last accepted target, never live holdings."""
+    if minimum_change == 0:
+        return scheduled.copy()
+    accepted = np.zeros(len(stock), dtype=bool)
+    previous = None
+    for position in np.flatnonzero(scheduled):
+        current = stock[position]
+        if previous is None or abs(current - previous) >= minimum_change - 1e-12:
+            accepted[position] = True
+            previous = current
+    return accepted
+
+
 def extension_portfolios(data, forecasts, calendar, paper, settings):
     """Keep complete calendars; do not rebalance without a new delayed signal."""
     settings.validate(paper)
@@ -124,6 +147,10 @@ def extension_portfolios(data, forecasts, calendar, paper, settings):
     eligible = rows.loc[(rows.index >= freeze) & rows.return_date.isin(daily.index)].copy()
     if eligible.empty or eligible.return_date.duplicated().any():
         raise ValueError("Extension evaluation needs unique delayed forecast return dates.")
+    scheduled = np.ones(len(eligible), dtype=bool)
+    if settings.rebalance_frequency == "weekly":
+        # Schedule by execution close, not by the following session's return.
+        scheduled = ~eligible.trade_date.dt.to_period("W-SUN").duplicated().to_numpy()
     models = [name for name in ("ewma", "gru") if f"{name}_bv" in rows]
     if "ewma" not in models:
         raise ValueError("Extension requires an EWMA baseline.")
@@ -148,6 +175,7 @@ def extension_portfolios(data, forecasts, calendar, paper, settings):
     scenarios = [(f"cash_{cost:g}bps", cost, True) for cost in settings.costs_bps]
     scenarios.append(("zero_cash_10bps", 10, False))
     paths_saved, months_saved = {"SPY": daily.SPY}, {}
+    rebalance_counts = {}
     metrics, decisions, thresholds, targets_saved, fees_saved, conditions, scores = [], [], [], [], [], [], []
     for first_last in windows:
         first, last = first_last.split(":")
@@ -163,10 +191,12 @@ def extension_portfolios(data, forecasts, calendar, paper, settings):
         multiplier = paper.monthly_multiplier if mode == "paper" else np.sqrt(252)
         target_level = paper.monthly_target if mode == "paper" else settings.annual_target
         definitions = {}
-        rebalance = pd.DatetimeIndex([daily.index[0], *eligible.return_date]).unique().sort_values()
         for model in models:
             predicted = multiplier * np.sqrt(eligible[f"{model}_bv"].to_numpy())
             stock = np.minimum(target_level / predicted, 1.)
+            accepted = _allocation_change_signals(stock, scheduled, settings.min_allocation_change)
+            rebalance = pd.DatetimeIndex([daily.index[0], *eligible.loc[accepted, "return_date"]]).unique().sort_values()
+            rebalance_counts[f"{model} | {mode}"] = int(accepted.sum())
             cutoffs = np.empty(len(eligible))
             for year in sorted(daily.index.year.unique()):
                 asof = calendar[calendar < pd.Timestamp(year=year, month=1, day=1)][-1]
@@ -183,7 +213,7 @@ def extension_portfolios(data, forecasts, calendar, paper, settings):
             stressed = predicted > cutoffs
             decisions.append(eligible[["trade_date", "return_date"]].reset_index().assign(
                 model=model, risk_mode=mode, volatility=predicted, threshold=cutoffs,
-                stock_target=stock, stress=stressed))
+                stock_target=stock, stress=stressed, scheduled=scheduled, rebalance=accepted))
             for asset in ("cash", *settings.defensive_assets):
                 name = f"{model}_{asset}"
                 targets = pd.DataFrame(np.nan, index=daily.index, columns=assets)
@@ -193,9 +223,10 @@ def extension_portfolios(data, forecasts, calendar, paper, settings):
                 if asset != "cash":
                     weights[asset] = np.where(stressed, np.minimum(1 - stock, settings.defensive_cap), 0.)
                 weights["RF"] = 1 - weights.drop(columns="RF").sum(axis=1)
+                weights = weights.loc[weights.index.isin(rebalance)]
                 targets.loc[weights.index] = weights.to_numpy()
                 targets = targets.ffill()
-                definitions[name] = targets
+                definitions[name] = (targets, rebalance)
                 targets_saved.append(targets.reset_index(names="Date").assign(
                     portfolio=name, risk_mode=mode, rebalance=targets.index.isin(rebalance)))
         for scenario, cost, cash_income in scenarios:
@@ -203,7 +234,7 @@ def extension_portfolios(data, forecasts, calendar, paper, settings):
             if not cash_income:
                 inputs["RF"] = 0.
             paths, accounting = {}, {}
-            for name, targets in definitions.items():
+            for name, (targets, rebalance) in definitions.items():
                 path = dynamic_costed_path(inputs, targets, cost, rebalance)
                 paths[name] = path["return"]
                 before = (1 + path["return"]).cumprod().shift(1, fill_value=1.)
@@ -241,9 +272,14 @@ def extension_portfolios(data, forecasts, calendar, paper, settings):
             "decisions": pd.concat(decisions, ignore_index=True), "annual_thresholds": pd.DataFrame(thresholds),
             "target_weights": pd.concat(targets_saved, ignore_index=True), "fees": pd.concat(fees_saved, ignore_index=True),
             "daily_returns": pd.DataFrame(paths_saved), "monthly_returns": pd.DataFrame(months_saved),
-            "portfolio_conditions": pd.DataFrame(conditions)}, {
+            "portfolio_conditions": pd.DataFrame(conditions, columns=[
+                "window", "risk_mode", "scenario", "model", "asset", "negative_months",
+                "mean_down_month_advantage"])}, {
                 "freeze_asof": str(freeze.date()), "portfolio_days": len(daily),
                 "signal_days": len(eligible), "initial_cash_days": int((daily.index < eligible.return_date.min()).sum()),
+                "cadence_signal_days": int(scheduled.sum()),
+                "rebalance_signal_days": int(scheduled.sum()) if settings.min_allocation_change == 0 else None,
+                "rebalance_signal_days_by_strategy": rebalance_counts,
                 "missing_signal_days": int((daily.index >= eligible.return_date.min()).sum() - len(eligible))}
 
 
@@ -251,6 +287,13 @@ def run_extension_command(args, study):
     """Run the original BV measure through 2021 with frozen delayed models."""
     paper = load_paper_settings(args.config)
     settings = load_extension_settings(args.config, paper)
+    if args.rebalance_frequency:
+        settings = replace(settings, rebalance_frequency=args.rebalance_frequency)
+    if args.cash_only:
+        settings = replace(settings, defensive_assets=())
+    if args.min_allocation_change is not None:
+        settings = replace(settings, min_allocation_change=args.min_allocation_change)
+    settings.validate(paper)
     destination = args.output_dir.resolve()
     protected = [args.data_dir.resolve(), args.oxford_archive.resolve()]
     protected += [path.resolve() for path in (args.selection_run, args.forecast_run) if path]
@@ -311,6 +354,9 @@ def run_extension_command(args, study):
                     "source_manifest": data.provenance, "oxford_archive_sha256": archive_digest,
                     "gru": model, "model_parent": parent, "forecast_horizon": 2, **counts,
                     "execution": "issue t close; trade t+1 close; earn daily return ending t+2",
+                    "rebalance_schedule": ("every eligible execution close" if settings.rebalance_frequency == "daily"
+                                           else "first eligible execution close per Monday-Sunday week; holdings drift between trades"),
+                    "allocation_change_rule": "0 disables filtering; otherwise first scheduled entry always trades, then absolute SPY target change from last accepted target must meet the minimum (1e-12 tolerance); full target reset; actual holdings drift does not trigger trades",
                     "thresholds": "annual; model forecasts since calibration_start issued strictly before the preceding annual close",
                     "calibration": "2009 forecasts reconstructed with pre-2009 fitted weights and architecture selected through 2009; all calibration known before 2010 evaluation",
                     "missing_data": "missing BV labels unscored; missing signals retain holdings and drift; no return day dropped",

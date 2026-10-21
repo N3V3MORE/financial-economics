@@ -34,8 +34,11 @@ monthly_target = 0.10
 monthly_multiplier = 22
 
 [extension]
+# Frozen baseline: reuse outputs/paper-extension-gru-20261020; no new tuning.
 evaluation_start = "2010-01-01"
 calibration_start = "2009-01-01"
+rebalance_frequency = "daily"
+min_allocation_change = 0.0
 defensive_assets = ["TLT", "GLD", "DBC"]
 costs_bps = [0, 10, 25]
 stress_quantile = 0.90

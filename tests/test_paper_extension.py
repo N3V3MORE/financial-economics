@@ -11,7 +11,9 @@ import pytest
 
 from financial_economics import cli
 from financial_economics.paper import PaperSettings, prepare_paper_forecasts
-from financial_economics.paper_extension import ExtensionSettings, extension_portfolios, load_frozen_selection
+from financial_economics.paper_extension import (
+    ExtensionSettings, _allocation_change_signals, extension_portfolios, load_frozen_selection,
+)
 from financial_economics.return_data import ReturnData
 
 
@@ -99,6 +101,103 @@ def test_misaligned_forecast_and_unavailable_refit_fail():
         extension_portfolios(data, bad, calendar, paper, settings)
 
 
+def test_weekly_schedule_uses_execution_weeks_and_holds_between_trades():
+    data, rows, calendar, paper, settings = extension_fixture()
+    settings = replace(settings, defensive_assets=(), rebalance_frequency="weekly")
+    # An unavailable Monday execution waits for Tuesday's eligible signal.
+    rows = rows.loc[rows.trade_date.ne(pd.Timestamp("2010-01-11"))]
+    tables, counts = extension_portfolios(data, rows, calendar, paper, settings)
+    assert tables["daily_returns"].index.equals(data.daily.loc["2010":].index)
+    assert tables["portfolio_conditions"].empty and "asset" in tables["portfolio_conditions"]
+    choices = tables["decisions"].loc[lambda x: x.model.eq("ewma") & x.risk_mode.eq("paper")]
+    trades = choices.loc[choices.rebalance, "trade_date"]
+    assert not trades.dt.to_period("W-SUN").duplicated().any()
+    # This business-day fixture includes New Year's Day: its Friday execution
+    # and the following Monday belong to different execution weeks.
+    assert trades.iloc[:3].tolist() == list(pd.to_datetime(["2010-01-01", "2010-01-04", "2010-01-12"]))
+    assert counts["rebalance_signal_days"] == len(trades)
+    fees = tables["fees"].loc[lambda x: x.portfolio.eq("ewma_cash") & x.risk_mode.eq("paper")
+                             & x.scenario.eq("cash_10bps")].set_index("Date")
+    weights = tables["target_weights"].loc[lambda x: x.portfolio.eq("ewma_cash")
+                                          & x.risk_mode.eq("paper")].set_index("Date")
+    assert fees.loc[~weights.rebalance, ["traded_fraction", "fee_fraction"]].eq(0).all().all()
+    # Directly compound two days after a reset: actual holdings drift.
+    entry, following = pd.to_datetime(["2010-01-05", "2010-01-06"])
+    w = weights.loc[entry, "SPY"]
+    stock_value = w * (1 + data.daily.loc[entry, "SPY"])
+    cash_value = (1 - w) * (1 + data.factors.loc[entry, "RF"])
+    expected = (stock_value * data.daily.loc[following, "SPY"]
+                + cash_value * data.factors.loc[following, "RF"]) / (stock_value + cash_value)
+    assert tables["daily_returns"].loc[following, "ewma_cash | paper | cash_0bps"] == pytest.approx(expected)
+
+
+def test_weekly_ignores_unused_forecasts_and_future_changes():
+    data, rows, calendar, paper, settings = extension_fixture()
+    settings = replace(settings, defensive_assets=(), rebalance_frequency="weekly")
+    original, _ = extension_portfolios(data, rows, calendar, paper, settings)
+    decisions = original["decisions"].loc[lambda x: x.model.eq("ewma") & x.risk_mode.eq("paper")]
+    unused = decisions.loc[~decisions.rebalance, "forecast_date"]
+    changed = rows.copy()
+    changed.loc[unused, ["ewma_bv", "gru_bv"]] *= 8
+    altered, _ = extension_portfolios(data, changed, calendar, paper, settings)
+    pd.testing.assert_frame_equal(original["daily_returns"], altered["daily_returns"])
+    changed = rows.copy()
+    changed.loc[changed.index >= "2011-01-03", ["ewma_bv", "gru_bv"]] *= 8
+    altered, _ = extension_portfolios(data, changed, calendar, paper, settings)
+    pd.testing.assert_frame_equal(original["daily_returns"].loc[:"2010"], altered["daily_returns"].loc[:"2010"])
+
+
+def test_allocation_change_filter_uses_last_accepted_target_and_includes_boundary():
+    scheduled = np.ones(4, dtype=bool)
+    np.testing.assert_array_equal(_allocation_change_signals([.5, .52, .54, .56], scheduled, .05),
+                                  [True, False, False, True])
+    np.testing.assert_array_equal(_allocation_change_signals([.5, .54, .46, .45], scheduled, .05),
+                                  [True, False, False, True])
+    np.testing.assert_array_equal(_allocation_change_signals([.6, .65, .6, .6], scheduled, .05),
+                                  [True, True, True, False])
+    np.testing.assert_array_equal(_allocation_change_signals([.01, .01, .01, .01], scheduled, .05),
+                                  [True, False, False, False])
+    cadence = np.array([False, True, False, True])
+    np.testing.assert_array_equal(_allocation_change_signals([.5, .5, .7, .54], cadence, .05),
+                                  [False, True, False, False])
+    np.testing.assert_array_equal(_allocation_change_signals([.5] * 4, cadence, 0), cadence)
+
+
+def test_minimum_change_schedules_are_independent_and_skipped_dates_do_not_trade():
+    data, rows, calendar, paper, settings = extension_fixture()
+    settings = replace(settings, defensive_assets=(), min_allocation_change=.05)
+    freeze = calendar[calendar < settings.evaluation_start][-1]
+    dates = rows.index[(rows.index >= freeze) & rows.return_date.between(
+        pd.Timestamp(settings.evaluation_start), pd.Timestamp(paper.evaluation_end))]
+    for model, stock in (("ewma", [.5, .52, .54, .56]), ("gru", [.5, .56, .52, .5])):
+        rows.loc[dates, f"{model}_bv"] = (paper.monthly_target / (paper.monthly_multiplier * .5)) ** 2
+        rows.loc[dates[:4], f"{model}_bv"] = (paper.monthly_target / (paper.monthly_multiplier * np.array(stock))) ** 2
+    tables, counts = extension_portfolios(data, rows, calendar, paper, settings)
+    assert counts["rebalance_signal_days"] is None
+    decisions = tables["decisions"].loc[lambda x: x.risk_mode.eq("paper")]
+    assert decisions.loc[decisions.model.eq("ewma"), "rebalance"].iloc[:4].tolist() == [True, False, False, True]
+    assert decisions.loc[decisions.model.eq("gru"), "rebalance"].iloc[:4].tolist() == [True, True, False, True]
+    for (mode, portfolio), weights in tables["target_weights"].groupby(["risk_mode", "portfolio"]):
+        weights = weights.set_index("Date")
+        assert counts["rebalance_signal_days_by_strategy"][f"{portfolio.split('_')[0]} | {mode}"] == weights.rebalance.sum() - 1
+        fees = tables["fees"].loc[lambda x: x.portfolio.eq(portfolio) & x.risk_mode.eq(mode)
+                                  & x.scenario.eq("cash_10bps")].set_index("Date")
+        assert fees.loc[~weights.rebalance, ["traded_fraction", "fee_fraction"]].eq(0).all().all()
+    changed = rows.copy()
+    changed.loc[changed.index >= "2011-01-03", ["ewma_bv", "gru_bv"]] *= 8
+    altered, _ = extension_portfolios(data, changed, calendar, paper, settings)
+    pd.testing.assert_frame_equal(tables["daily_returns"].loc[:"2010"], altered["daily_returns"].loc[:"2010"])
+
+
+def test_minimum_allocation_change_rejects_invalid_values_and_defensive_assets():
+    _, _, _, paper, settings = extension_fixture()
+    for value in (-.1, 1.1, np.nan, np.inf, True):
+        with pytest.raises(ValueError, match="finite fraction"):
+            replace(settings, min_allocation_change=value).validate(paper)
+    with pytest.raises(ValueError, match="SPY/cash only"):
+        replace(settings, min_allocation_change=.05).validate(paper)
+
+
 def test_frozen_selection_checks_dates_and_tuning_bytes(tmp_path):
     _, _, _, paper, _ = extension_fixture()
     tuning = tmp_path / "gru_tuning.csv"
@@ -166,3 +265,18 @@ windows = ["2010:2010", "2011:2011"]
                   "--data-dir", str(source), "--oxford-archive", str(archive), "--output-dir", str(second)]
     assert cli.main(reuse_args) == 0
     pd.testing.assert_frame_equal(pd.read_csv(output / "performance.csv"), pd.read_csv(second / "performance.csv"))
+    weekly = tmp_path / "weekly"
+    reuse_args[reuse_args.index(str(second))] = str(weekly)
+    assert cli.main([*reuse_args, "--rebalance-frequency", "weekly", "--cash-only"]) == 0
+    metadata = json.loads((weekly / "run.json").read_text())
+    assert metadata["extension"]["rebalance_frequency"] == "weekly"
+    assert metadata["extension"]["defensive_assets"] == []
+    assert metadata["rebalance_signal_days"] < metadata["signal_days"]
+    assert metadata["files"]["forecasts.csv"] == json.loads((output / "run.json").read_text())["files"]["forecasts.csv"]
+    filtered = tmp_path / "filtered"
+    reuse_args[reuse_args.index(str(weekly))] = str(filtered)
+    assert cli.main([*reuse_args, "--cash-only", "--min-allocation-change", "0.05"]) == 0
+    metadata = json.loads((filtered / "run.json").read_text())
+    assert metadata["extension"]["min_allocation_change"] == .05
+    assert metadata["rebalance_signal_days_by_strategy"] == {"ewma | paper": 1}
+    assert metadata["files"]["forecasts.csv"] == json.loads((output / "run.json").read_text())["files"]["forecasts.csv"]

@@ -303,6 +303,55 @@ These are descriptive historical results; 2021 is an additional
 historical year, not untouched evidence. The original `paper` command and
 archived replication results remain available separately.
 
+To compare daily and weekly SPY/cash trading with the same saved forecasts,
+run each schedule into a new directory:
+
+```sh
+uv run fecon --config paper-extension.toml paper-extension --forecast-run outputs/paper-extension-gru-20261020 --oxford-archive data/paper-source-20261020/oxfordman-20220301.zip --data-dir data/protection-long-wrds-20261020 --cash-only --rebalance-frequency daily --output-dir outputs/paper-frequency-daily-20261021
+uv run fecon --config paper-extension.toml paper-extension --forecast-run outputs/paper-extension-gru-20261020 --oxford-archive data/paper-source-20261020/oxfordman-20220301.zip --data-dir data/protection-long-wrds-20261020 --cash-only --rebalance-frequency weekly --output-dir outputs/paper-frequency-weekly-20261021
+```
+
+Daily remains the default; `[extension].rebalance_frequency` can also set it.
+Weekly uses the first eligible execution close of each Monday–Sunday week,
+then earns returns from the following session. If a signal is unavailable,
+the next eligible close is used; weeks without signals retain holdings.
+Holdings drift between trades, every daily return remains present, and costs
+apply only when trading. Forecasts, cash interest, risk rules, cost scenarios
+and evaluation dates stay the same. `decisions.csv` flags selected signals;
+`target_weights.csv` carries the last selected target, not drifting holdings.
+`run.json` records the schedule and source forecast hash. These commands use
+CPU-native portfolio accounting and do not import PyTorch or retrain models.
+
+To skip small target changes, use the fixed five-percentage-point experiment:
+
+```sh
+uv run fecon --config paper-extension.toml paper-extension --forecast-run outputs/paper-extension-gru-20261020 --oxford-archive data/paper-source-20261020/oxfordman-20220301.zip --data-dir data/protection-long-wrds-20261020 --cash-only --rebalance-frequency daily --min-allocation-change 0.05 --output-dir outputs/paper-allocation-change-5pp-20261021
+```
+
+After the first eligible entry, trade to the full new stock target only when
+it differs from the last accepted target by at least five percentage points.
+For example, 50% to 53% waits; a later 56% trades. Holdings drift does not
+trigger trades. Decisions are separate for each model and risk rule and
+continue across years. The same decisions apply to every fee/cash scenario.
+`[extension].min_allocation_change` can also set the fractional threshold;
+its default of zero preserves daily/weekly results. Positive values require
+SPY/cash only. Combined with weekly, the filter checks only the first eligible
+execution date each week. `decisions.csv` separates cadence candidates
+(`scheduled`) from accepted resets (`rebalance`); metadata reports accepted
+counts per strategy. The common `rebalance_signal_days` count is null when
+filtering is enabled. Five points is an illustrative fixed choice, not an
+optimized threshold; these previously examined years are not fresh validation.
+
+The research settings are frozen at local tag `frozen-gru-study-20261021`.
+The baseline is the explicit daily, zero-filter rule in `paper-extension.toml`:
+90th-percentile past-only stress threshold, 20% defensive cap and the existing
+risk/cost/cash scenarios. Reuse `outputs/paper-extension-gru-20261020`, with
+two GRU layers, 32 hidden units, 17 epochs and seeds 11/22/33. Its forecast
+SHA-256 is `d59ed175760713b1ae7077df3f38cc894cab32bdbd46b56a67a5f765596aaac4`.
+The saved weekly and five-point runs remain fixed sensitivity comparisons.
+The final safe-haven check uses the existing `2010:2020` window, preserving
+the model configuration's 2021 endpoint and all original forecasts.
+
 ## See the original phase results
 
 After the four analysis commands, put the main findings on one page:
