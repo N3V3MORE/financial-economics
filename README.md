@@ -440,25 +440,6 @@ simple GRU: timing minus static Sharpe (Ledoit–Wolf HAC) and TLT and GLD
 minus cash in negative-SPY months (HAC), with one Holm adjustment. Secondary
 models, DBC, subperiods, declines and bootstrap intervals are descriptive.
 
-### International robustness: timing versus a static mix
-
-`paper-international.toml` repeats the timing question in the paper's
-robustness markets: Nikkei 225, Nifty 50 and EURO STOXX 50. Each index uses its
-own Oxford-Man bipower variation and local close price from the same archive,
-so returns are price-only in local currency and cash earns zero. ARFIMA,
-GARCH, GJR and the one-input GRU are refitted per market with the U.S. rules;
-each market's last pre-2010 session ends the classical window and GRU
-tuning labels. The trading rules are the realistic ones above. There are no
-local safe-haven series, so only timing minus static Sharpe is tested: six
-primary tests (ARFIMA and GRU in three markets) under one Holm adjustment.
-
-```powershell
-foreach ($symbol in @('.N225', '.NSEI', '.STOXX50E')) {
-    uv run --extra prediction --extra reconstruction python -m financial_economics.paper_international forecasts --symbol $symbol --oxford-archive data/paper-source-20261020/oxfordman-20220301.zip --output-dir outputs/paper-international-new
-}
-uv run --extra reconstruction python -m financial_economics.paper_international evaluate --oxford-archive data/paper-source-20261020/oxfordman-20220301.zip --output-dir outputs/paper-international-new
-```
-
 ## See the original phase results
 
 After the four analysis commands, put the main findings on one page:

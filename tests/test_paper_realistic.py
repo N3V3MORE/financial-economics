@@ -67,3 +67,22 @@ def test_defensive_asset_is_held_only_on_stress_signals_and_cash_otherwise():
     np.testing.assert_allclose(paths.loc[both, "arfima_TLT"], paths.loc[both, "arfima_cash"], atol=1e-12)
     assert (result["accounting"][10]["arfima_cash"].fee_fraction >= 0).all()
     assert result["paths"][10]["arfima_cash"].sum() < result["paths"][0]["arfima_cash"].sum()
+
+
+def test_realistic_portfolios_accept_a_named_index_benchmark_with_zero_cash():
+    calendar = pd.bdate_range("2009-12-01", "2012-01-31")
+    rng = np.random.default_rng(5)
+    daily = pd.DataFrame({"INDEX": rng.normal(.0003, .012, len(calendar)), "RF": 0.}, index=calendar)
+    issues = calendar[(calendar >= "2009-12-31") & (calendar <= "2011-12-28")]
+    forecasts = pd.DataFrame({"arfima_bv": 1e-4 * (1.5 + np.sin(np.arange(len(issues)) / 9)),
+                              "arfima_refit_asof": issues}, index=issues)
+    settings = {"benchmark": "INDEX", "calibration_start": "2010-01-01", "evaluation_start": "2011-01-01",
+                "evaluation_end": "2011-12-31", "primary_models": ["arfima"], "secondary_models": [],
+                "primary_assets": [], "secondary_assets": [], "monthly_target": .10, "monthly_multiplier": 22,
+                "stress_quantile": .90, "defensive_cap": .20, "costs_bps": [0, 10], "main_cost_bps": 10}
+    result = realistic_portfolios(daily, calendar, forecasts, settings)
+    assert set(result["paths"][10]) == {"INDEX", "arfima_cash", "arfima_static"}
+    weight = result["static_controls"].static_spy_weight.iloc[0]
+    returns = daily.loc["2011-01-01":"2011-12-31", "INDEX"]
+    # With zero cash and no fees, the static mix's first-day return is its fixed weight times the index return.
+    assert result["paths"][0]["arfima_static"].iloc[0] == pytest.approx(weight * returns.iloc[0])
