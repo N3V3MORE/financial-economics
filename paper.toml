@@ -1,0 +1,36 @@
+# Retain the existing ETF snapshot identity; the paper sample is set below.
+[study]
+name = "protection-core-2007-2025"
+start = "2007-01-01"
+end = "2025-12-31"
+benchmark = "SPY"
+trading_days = 252
+hac_lags = 6
+
+[assets]
+SPY = "Broad US stock reference"
+TLT = "Other assets: long government bonds"
+GLD = "Other assets: gold"
+DBC = "Other assets: commodities"
+
+[paper]
+training_start = "2000-01-01"
+training_end = "2009-12-31"
+evaluation_start = "2010-01-01"
+evaluation_end = "2020-12-31"
+lookback = 22
+hidden_sizes = [16, 32]
+seeds = [11, 22, 33]
+folds = 5
+batch_size = 64
+max_epochs = 60
+patience = 8
+learning_rate = 0.001
+dropout = 0.10
+weight_decay = 0.0001
+ewma_decay = 0.94
+monthly_target = 0.10
+monthly_multiplier = 22
+quantiles = [0.90, 0.95, 0.99]
+caps = [0.10, 0.20, 0.30]
+defensive_assets = ["TLT", "GLD"]

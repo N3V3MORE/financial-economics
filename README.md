@@ -208,6 +208,60 @@ subperiods, and severe declines are descriptive. Better forecasts, better
 portfolios, and an ETF improving on cash are **three separate claims**.
 Previously inspected histories remain retrospective evidence, not unseen data.
 
+## Closer replication of the paper's simpler GRU
+
+`paper.toml` and `fecon paper` keep the existing `predict` experiment intact.
+This is a **partial GRU-UNIVAR replication with ETF substitutes**, not a claim
+to reproduce the paper's multivariate model or all thirteen assets.
+
+Use the [archived Oxford-Man ZIP](https://web.archive.org/web/20220301022212id_/https://realized.oxford-man.ox.ac.uk/images/oxfordmanrealizedvolatilityindices.zip)
+as `--oxford-archive`. The recovered SPX `bv` series has exactly 5,265
+observations for 2000–2020. `22 * sqrt(bv)` gives mean 0.169511864 and sample
+standard deviation 0.124568826, matching Table 1 of the
+[original paper](https://doi.org/10.1016/j.ribaf.2021.101610).
+This supports that interpretation of its unusual monthly scaling; it is
+different from conventional square-root-of-time scaling and our 10% annual target.
+
+The new model predicts next-session daily volatility from 22 previous observed
+daily volatilities, each calculated as `sqrt(bv)`. This is our interpretation
+of the paper's forecast units, supported by the Table 1 match. The model
+uses two stacked GRU layers, MSE, dropout/L2 regularization, five expanding
+chronological validation folds inside 2000–2009, and three fixed seeds.
+Only two hidden sizes are compared. Validation freezes the training duration
+before annual expanding refits for 2010–2020. This explicit small search is
+our choice because the authors' exact tuning settings/code are unavailable.
+
+```sh
+uv run fecon --config paper.toml paper --baseline-only --oxford-archive data/paper-source-20261020/oxfordman-20220301.zip --data-dir data/protection-long-wrds-20261020 --output-dir outputs/paper-baseline
+uv run --extra prediction fecon --config paper.toml paper --oxford-archive data/paper-source-20261020/oxfordman-20220301.zip --data-dir data/protection-long-wrds-20261020 --output-dir outputs/paper-gru
+```
+
+Training requires verified CUDA:0; no CPU fallback. This small GRU uses native
+CUDA kernels because cuDNN reproducibly crashes at process shutdown on the
+current Windows installation. The EWMA baseline,
+calendar preparation, and portfolio accounting are CPU-native. SPY, TLT,
+and GLD total returns substitute for the paper's Datastream indices. Each
+model runs a stock/cash portfolio and nine threshold/cap combinations per
+defensive ETF: quantiles 90/95/99%, caps 10/20/30%, cash income zero, fees zero.
+EWMA is an additional baseline, not the paper's ARFIMA/GARCH comparator.
+
+To follow the paper closely, stress thresholds use the **full test-period**
+forecast distribution. These thresholds are retrospective. Next-day returns
+also assume idealized execution at the forecast issue close; this is not an
+implementable trading-performance claim. Nineteen source BV dates are absent
+over 2000–2020, including nine evaluation dates. Missing BV targets are never
+filled or scored. Histories use the last 22 observed BVs; when a close has no
+BV observation, no new allocation is issued and holdings drift. Every ETF
+return day remains in the portfolio calculation.
+
+New output directories contain CSV results, saved annual checkpoints, and
+hashed `run.json` provenance. `paper_comparison.csv` places published
+GRU-UNIVAR MSE/MAPE and clean Sharpe/Calmar beside this implementation;
+`protection_by_quantile.csv` averages the three caps within each threshold.
+The original scores use transformed monthly volatility; our training loss
+differs only by the constant scaling factor. Differences in data, model selection, and execution limit any direct
+numerical comparison. No statistical superiority claim or new report is generated.
+
 ## See the original phase results
 
 After the four analysis commands, put the main findings on one page:

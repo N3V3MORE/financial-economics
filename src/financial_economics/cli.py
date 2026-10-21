@@ -110,6 +110,11 @@ def main(argv: list[str] | None = None) -> int:
     prediction_source = predict.add_mutually_exclusive_group()
     prediction_source.add_argument("--ewma-only", action="store_true", help="Run the CPU-only EWMA baseline")
     prediction_source.add_argument("--forecast-run", type=Path, help="Reuse verified saved forecasts without training")
+    paper = commands.add_parser("paper", help="Run a closer GRU-UNIVAR paper replication with ETF substitutes")
+    paper.add_argument("--data-dir", type=Path, required=True)
+    paper.add_argument("--oxford-archive", type=Path, required=True)
+    paper.add_argument("--output-dir", type=Path, required=True)
+    paper.add_argument("--baseline-only", action="store_true", help="Run only the CPU-native BV/EWMA baseline")
     page = commands.add_parser("page", help="Write one HTML page from the saved phase outputs")
     page.add_argument("--outputs-dir", type=Path, default=Path("outputs"))
     page.add_argument("--output", type=Path, default=Path("outputs/page/index.html"))
@@ -132,6 +137,10 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 download_snapshot(study, args.data_dir)
             print(f"Saved source snapshot: {args.data_dir.resolve()}")
+        elif args.command == "paper":
+            from .paper import run_paper_command
+
+            run_paper_command(args, study)
         elif args.command == "predict":
             _predict(args, study)
         elif args.command == "protection":
