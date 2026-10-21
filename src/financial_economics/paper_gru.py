@@ -108,11 +108,13 @@ def _fit(torch, prepared, training, validation, scaling, hidden_size, seed, epoc
     return model, best_epoch
 
 
-def paper_gru_forecasts(prepared, settings, calendar, checkpoint_dir, progress=print):
+def paper_gru_forecasts(prepared, settings, calendar, checkpoint_dir, progress=print,
+                        frozen_selection=None):
     """Predict sqrt(BV), select by its MSE, and freeze annual-fit epochs.
 
     This interpretation matches the paper's Table 1 scaling, 22 * sqrt(BV).
     Seed forecasts are averaged in volatility space before squaring for storage.
+    A supplied frozen selection skips validation and only runs annual fits.
     """
     checkpoint_dir = Path(checkpoint_dir)
     if checkpoint_dir.exists():
@@ -127,7 +129,16 @@ def paper_gru_forecasts(prepared, settings, calendar, checkpoint_dir, progress=p
         raise ValueError("BV labels must be nonnegative finite values or missing.")
     initial_training = ((rows.return_date <= pd.Timestamp(settings.training_end)).to_numpy()
                         & available)
-    folds = _cv_folds(rows, initial_training, settings.folds)
+    if frozen_selection is not None:
+        if (not isinstance(frozen_selection, dict)
+                or set(frozen_selection) != {"hidden_size", "epochs"}
+                or any(type(value) is not int or value < 1 for value in frozen_selection.values())
+                or frozen_selection["hidden_size"] not in settings.hidden_sizes
+                or frozen_selection["epochs"] > settings.max_epochs):
+            raise ValueError("Frozen GRU selection needs an allowed hidden_size and positive epochs within max_epochs.")
+        folds = []
+    else:
+        folds = _cv_folds(rows, initial_training, settings.folds)
     splits = _annual_splits(rows, calendar, settings.evaluation_start)
     if not settings.hidden_sizes or not settings.seeds:
         raise ValueError("Paper GRU needs at least one hidden size and one seed.")
@@ -140,7 +151,7 @@ def paper_gru_forecasts(prepared, settings, calendar, checkpoint_dir, progress=p
                       "validation_observations": int(validation.sum())}
                      for number, (training, validation) in enumerate(folds, 1)]
     records = []
-    for hidden_size in settings.hidden_sizes:
+    for hidden_size in settings.hidden_sizes if frozen_selection is None else ():
         squared_error, observations, best_epochs = 0., 0, []
         for number, (training, validation) in enumerate(folds, 1):
             scaling = _training_scale(prepared, training)
@@ -157,11 +168,24 @@ def paper_gru_forecasts(prepared, settings, calendar, checkpoint_dir, progress=p
             observations += len(errors)
         records.append({"hidden_size": hidden_size, "mse": squared_error / observations,
                         "validation_observations": observations, "best_epochs": best_epochs})
-    tuning = pd.DataFrame(records)
-    selected = int(tuning.mse.argmin())
-    tuning["selected"] = np.arange(len(tuning)) == selected
-    hidden_size = int(tuning.iloc[selected].hidden_size)
-    epochs = max(1, int(np.median(tuning.iloc[selected].best_epochs)))
+    tuning = pd.DataFrame(records, columns=["hidden_size", "mse", "validation_observations", "best_epochs"])
+    if frozen_selection is None:
+        selected = int(tuning.mse.argmin())
+        tuning["selected"] = np.arange(len(tuning)) == selected
+        hidden_size = int(tuning.iloc[selected].hidden_size)
+        epochs = max(1, int(np.median(tuning.iloc[selected].best_epochs)))
+        selection_metadata = {
+            "validation_mse": float(tuning.iloc[selected].mse),
+            "selected_best_epochs": tuning.iloc[selected].best_epochs,
+            "selection_rule": "pooled daily-volatility MSE of seed-mean forecasts across expanding folds",
+            "epoch_rule": "median selected-grid fold/seed best epoch, rounded down"}
+    else:
+        tuning["selected"] = pd.Series(dtype=bool)
+        hidden_size, epochs = frozen_selection["hidden_size"], frozen_selection["epochs"]
+        selection_metadata = {"validation_mse": None, "selected_best_epochs": [],
+                              "selection_rule": "supplied frozen selection; no fresh validation or tuning",
+                              "epoch_rule": "supplied frozen epochs",
+                              "frozen_selection": dict(frozen_selection)}
     result = rows.copy()
     result["gru_bv"], result["gru_refit_asof"] = np.nan, pd.NaT
     checkpoint_dir.mkdir(parents=True, exist_ok=False)
@@ -205,10 +229,7 @@ def paper_gru_forecasts(prepared, settings, calendar, checkpoint_dir, progress=p
                 "rnn_backend": "native CUDA; cuDNN disabled to avoid Windows shutdown failure",
                 "selected_hidden_size": hidden_size, "learning_rate": settings.learning_rate,
                 "dropout": settings.dropout, "weight_decay": settings.weight_decay,
-                "seeds": list(settings.seeds), "validation_mse": float(tuning.iloc[selected].mse),
-                "selected_best_epochs": tuning.iloc[selected].best_epochs, "refit_epochs": epochs,
-                "selection_rule": "pooled daily-volatility MSE of seed-mean forecasts across expanding folds",
-                "epoch_rule": "median selected-grid fold/seed best epoch, rounded down",
+                "seeds": list(settings.seeds), "refit_epochs": epochs, **selection_metadata,
                 "training_loss": "sqrt(BV) MSE divided by squared training-mean sqrt(BV)",
                 "forecast_units": "seed-mean sqrt(BV) squared for gru_bv storage",
                 "folds": fold_metadata, "annual_refits": annual_metadata, "checkpoints": checkpoints,

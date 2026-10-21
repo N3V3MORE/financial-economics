@@ -81,3 +81,48 @@ def test_tiny_cuda_refits_save_checkpoints_and_ignore_future_targets(tmp_path):
         assert all(tensor.device == torch.device("cuda:0") for tensor in saved["state_dict"].values())
     with pytest.raises(ValueError, match="never replaced"):
         paper_gru_forecasts(prepared, settings, calendar, tmp_path / "original")
+
+
+def test_frozen_two_session_cuda_refits_skip_tuning_and_preserve_causality(tmp_path, monkeypatch):
+    from financial_economics.paper import prepare_paper_forecasts
+
+    try:
+        torch, _ = _require_cuda()
+    except RuntimeError as error:
+        if "no CUDA GPU" in str(error) or "prediction extra" in str(error):
+            pytest.skip(str(error))
+        raise
+    _, calendar = _prepared()
+    bv = pd.Series(.0001 * (2 + np.sin(np.arange(len(calendar)) / 7)), index=calendar)
+    prepared = prepare_paper_forecasts(bv, calendar, lookback=3, horizon=2)
+    settings, frozen = _settings(), {"hidden_size": 2, "epochs": 1}
+    monkeypatch.setattr("financial_economics.paper_gru._cv_folds",
+                        lambda *args: pytest.fail("Frozen selection must not run cross-validation"))
+    forecasts, tuning, metadata = paper_gru_forecasts(
+        prepared, settings, calendar, tmp_path / "frozen", progress=lambda message: None,
+        frozen_selection=frozen)
+    changed = SimpleNamespace(rows=prepared.rows.copy(), inputs=prepared.inputs.copy())
+    later = changed.rows.index >= "2010-06-01"
+    changed.rows.loc[later, "realized_bv"] *= 5
+    changed.inputs[later] *= 5
+    altered, _, _ = paper_gru_forecasts(
+        changed, settings, calendar, tmp_path / "changed", progress=lambda message: None,
+        frozen_selection=frozen)
+    earlier = forecasts.index < "2010-06-01"
+    np.testing.assert_array_equal(forecasts.loc[earlier, "gru_bv"], altered.loc[earlier, "gru_bv"])
+    assert tuning.empty and metadata["folds"] == []
+    assert metadata["validation_mse"] is None
+    assert metadata["frozen_selection"] == frozen
+    assert metadata["refit_epochs"] == 1 and metadata["device"] == "cuda:0"
+    assert len(metadata["checkpoints"]) == 2
+    for relative_path in metadata["checkpoints"]:
+        saved = torch.load(tmp_path / "frozen" / relative_path,
+                           map_location="cuda:0", weights_only=True)
+        assert saved["train_last_target"] <= saved["refit_asof"]
+        assert saved["epochs"] == 1 and saved["hidden_size"] == 2
+        assert all(value.device == torch.device("cuda:0") for value in saved["state_dict"].values())
+    for invalid in ({}, {"hidden_size": 3, "epochs": 1}, {"hidden_size": 2, "epochs": True},
+                    {"hidden_size": 2, "epochs": 2}):
+        with pytest.raises(ValueError, match="Frozen GRU selection"):
+            paper_gru_forecasts(prepared, settings, calendar, tmp_path / "invalid",
+                                frozen_selection=invalid)

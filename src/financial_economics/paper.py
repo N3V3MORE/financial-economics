@@ -125,8 +125,8 @@ def load_bipower(archive, start, end):
     return result.loc[start:end]
 
 
-def prepare_paper_forecasts(bipower, calendar, lookback=22):
-    """Use 22 latest observed BVs; target the next actual market session.
+def prepare_paper_forecasts(bipower, calendar, lookback=22, horizon=1):
+    """Use latest observed BVs; target the requested actual market session.
 
     Missing BV targets stay missing. No return days or target values are filled.
     Missing issue dates produce no new signal; portfolio holdings then drift.
@@ -135,6 +135,8 @@ def prepare_paper_forecasts(bipower, calendar, lookback=22):
             or not calendar.is_unique or not calendar.is_monotonic_increasing
             or calendar.tz is not None or not calendar.equals(calendar.normalize())):
         raise ValueError("Paper forecasts need a sorted unique daily market calendar.")
+    if type(horizon) is not int or horizon < 1:
+        raise ValueError("Paper forecast horizon must be a positive integer.")
     if (type(lookback) is not int or lookback < 1 or len(bipower) <= lookback
             or not isinstance(bipower.index, pd.DatetimeIndex)
             or bipower.index.has_duplicates or not bipower.index.is_monotonic_increasing
@@ -143,11 +145,13 @@ def prepare_paper_forecasts(bipower, calendar, lookback=22):
         raise ValueError("Paper inputs require positive observed BV on known market dates.")
     issues = bipower.index[lookback - 1:]
     positions = calendar.get_indexer(issues)
-    usable = positions + 1 < len(calendar)
-    returns = calendar[positions[usable] + 1]
+    usable = positions + horizon < len(calendar)
+    returns = calendar[positions[usable] + horizon]
     inputs = np.lib.stride_tricks.sliding_window_view(bipower.to_numpy(), lookback)[usable, :, None]
     rows = pd.DataFrame({"return_date": returns, "realized_bv": bipower.reindex(returns).to_numpy()},
                         index=issues[usable].rename("forecast_date"))
+    if horizon > 1:
+        rows["trade_date"] = calendar[positions[usable] + 1]
     return ForecastData(rows, inputs)
 
 

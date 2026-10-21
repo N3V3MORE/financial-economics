@@ -262,6 +262,47 @@ The original scores use transformed monthly volatility; our training loss
 differs only by the constant scaling factor. Differences in data, model selection, and execution limit any direct
 numerical comparison. No statistical superiority claim or new report is generated.
 
+## Extend the original volatility measure through 2021
+
+`paper-extension.toml` keeps Oxford SPX bipower variation and adds realistic
+trading assumptions. Evaluation covers 2010–2021; outputs also separate
+2010–2020, 2021, and the earlier experiment's overlapping 2017–2021 dates.
+The archive ends in February 2022, so this version makes no full 2022–2025 claim.
+
+```sh
+uv run fecon --config paper-extension.toml paper-extension --baseline-only --oxford-archive data/paper-source-20261020/oxfordman-20220301.zip --data-dir data/protection-long-wrds-20261020 --output-dir outputs/paper-extension-baseline
+uv run --extra prediction fecon --config paper-extension.toml paper-extension --selection-run outputs/paper-gru-20261020 --oxford-archive data/paper-source-20261020/oxfordman-20220301.zip --data-dir data/protection-long-wrds-20261020 --output-dir outputs/paper-extension
+```
+
+`--selection-run` verifies the saved pre-2010 tuning evidence, then reuses its
+32 hidden units and 17 epochs with three seeds. It performs no new search.
+New annual models learn the two-session target: issue at Monday close, trade
+Tuesday close, earn Wednesday's close-to-close return. Training stays on CUDA:0
+with native CUDA kernels. A reconstructed 2009 forecast history calibrates
+the initial threshold; its fitted weights use pre-2009 labels, while the reused
+architecture was selected through 2009. That calibration is known before
+2010 evaluation and is not presented as a traded 2009 test. The first 2010
+evaluation session stays in cash. Later annual thresholds use forecasts
+issued strictly before the preceding annual close, with no test-period quantiles.
+
+The main comparison retains the paper's scaling, earns observed cash interest,
+and charges 10 bps per ETF dollar bought or sold. Fixed sensitivities use
+0/25 bps, zero cash income at 10 bps, and the earlier 10% annual risk target.
+Each model runs stock/cash plus separate TLT, GLD, and DBC variants at one
+90th-percentile stress threshold and a 20% cap funded from available cash.
+Entry costs are included; exit and taxes are excluded. Missing signals leave
+holdings to drift; every ETF return date remains present.
+
+Use `--forecast-run` instead of `--selection-run` to reuse a verified extension
+run without importing PyTorch or retraining. Saved model settings, source
+hashes, and forecast bytes must agree. The CSV outputs include period metrics,
+turnover/fees, monthly returns, and defensive-asset comparisons in negative-SPY
+months. `benchmark_performance.csv` gives SPY's gross buy-and-hold comparison.
+Subperiod fee totals retain the original full-run capital denominator.
+These are descriptive historical results; 2021 is an additional
+historical year, not untouched evidence. The original `paper` command and
+archived replication results remain available separately.
+
 ## See the original phase results
 
 After the four analysis commands, put the main findings on one page:

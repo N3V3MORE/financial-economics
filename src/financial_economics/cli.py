@@ -115,6 +115,14 @@ def main(argv: list[str] | None = None) -> int:
     paper.add_argument("--oxford-archive", type=Path, required=True)
     paper.add_argument("--output-dir", type=Path, required=True)
     paper.add_argument("--baseline-only", action="store_true", help="Run only the CPU-native BV/EWMA baseline")
+    extension = commands.add_parser("paper-extension", help="Add realistic trading assumptions to original BV forecasts")
+    extension.add_argument("--data-dir", type=Path, required=True)
+    extension.add_argument("--oxford-archive", type=Path, required=True)
+    extension.add_argument("--output-dir", type=Path, required=True)
+    extension_source = extension.add_mutually_exclusive_group(required=True)
+    extension_source.add_argument("--baseline-only", action="store_true")
+    extension_source.add_argument("--selection-run", type=Path, help="Reuse pre-evaluation model settings; fit new delayed models")
+    extension_source.add_argument("--forecast-run", type=Path, help="Reuse verified extension forecasts without training")
     page = commands.add_parser("page", help="Write one HTML page from the saved phase outputs")
     page.add_argument("--outputs-dir", type=Path, default=Path("outputs"))
     page.add_argument("--output", type=Path, default=Path("outputs/page/index.html"))
@@ -137,6 +145,10 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 download_snapshot(study, args.data_dir)
             print(f"Saved source snapshot: {args.data_dir.resolve()}")
+        elif args.command == "paper-extension":
+            from .paper_extension import run_extension_command
+
+            run_extension_command(args, study)
         elif args.command == "paper":
             from .paper import run_paper_command
 

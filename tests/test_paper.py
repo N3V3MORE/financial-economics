@@ -149,3 +149,22 @@ lookback = 3
     assert not list(destination.glob("*.md"))
     assert cli.main(args) == 1
     assert load_paper_settings(config).lookback == 3
+
+
+def test_two_session_horizon_keeps_calendar_delay_and_missing_targets():
+    dates = pd.bdate_range("2009-12-21", periods=14)
+    observed = dates.delete(6)
+    bv = pd.Series(np.arange(1, len(observed) + 1) * .0001, index=observed)
+    prepared = prepare_paper_forecasts(bv, dates, lookback=3, horizon=2)
+    row = prepared.rows.loc[dates[4]]
+    assert row.trade_date == dates[5]
+    assert row.return_date == dates[6]
+    assert np.isnan(row.realized_bv)
+    assert dates[6] not in prepared.rows.index
+    np.testing.assert_array_equal(prepared.inputs[2, :, 0], bv.loc[dates[2]:dates[4]])
+    original = prepare_paper_forecasts(bv, dates, lookback=3)
+    assert "trade_date" not in original.rows
+    assert (original.rows.return_date == dates[dates.get_indexer(original.rows.index) + 1]).all()
+    for horizon in (0, -1, 1.5, True):
+        with pytest.raises(ValueError, match="positive integer"):
+            prepare_paper_forecasts(bv, dates, lookback=3, horizon=horizon)
