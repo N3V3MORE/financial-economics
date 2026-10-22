@@ -1,7 +1,8 @@
-"""CUDA-only GRU variance forecasts, frozen validation settings, and annual refits."""
+"""CUDA/ROCm GRU variance forecasts, frozen validation settings, and annual refits."""
 
 import importlib
 import os
+from contextlib import contextmanager, nullcontext
 from pathlib import Path
 
 import numpy as np
@@ -17,9 +18,11 @@ def _require_cuda():
     try:
         torch = importlib.import_module("torch")
     except ImportError as error:
-        raise RuntimeError("GRU requires the prediction extra: uv sync --extra prediction.") from error
+        raise RuntimeError("GRU requires GPU-enabled PyTorch: use the prediction extra for NVIDIA CUDA "
+                           "or an AMD ROCm PyTorch environment.") from error
     if not torch.cuda.is_available():
-        raise RuntimeError("GRU requires CUDA:0; no CUDA GPU is available. CPU fallback is disabled.")
+        raise RuntimeError("GRU requires CUDA:0 through NVIDIA CUDA or AMD ROCm; "
+                           "no compatible GPU is available. CPU fallback is disabled.")
     torch.cuda.set_device(0)
     device = torch.device("cuda:0")
     if torch.empty(1, device=device).device != device:
@@ -28,6 +31,32 @@ def _require_cuda():
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
     return torch, device
+
+
+def _gpu_metadata(torch, *, native_rnn=False):
+    """Record the actual runtime; ROCm intentionally uses PyTorch's cuda device API."""
+    hip = getattr(torch.version, "hip", None)
+    cuda = getattr(torch.version, "cuda", None)
+    runtime = "ROCm" if hip else "CUDA"
+    metadata = {"backend": f"{runtime}-required PyTorch", "device": "cuda:0",
+                "gpu": torch.cuda.get_device_name(0), "torch_version": str(torch.__version__),
+                "cuda_version": str(cuda) if cuda is not None else None,
+                "hip_version": str(hip) if hip is not None else None}
+    if native_rnn:
+        metadata["rnn_backend"] = ("native ROCm/HIP; MIOpen disabled" if hip
+                                   else "native CUDA; cuDNN disabled")
+    return metadata
+
+
+@contextmanager
+def _native_rnn(torch):
+    """Disable vendor RNN kernels without touching unrelated cuDNN/MIOpen flags."""
+    previous = torch.backends.cudnn.enabled
+    torch.backends.cudnn.enabled = False
+    try:
+        yield
+    finally:
+        torch.backends.cudnn.enabled = previous
 
 
 def _annual_splits(rows, calendar, evaluation_start):
@@ -82,7 +111,11 @@ def _make_model(torch, hidden_size, target_scale, device):
             self.register_buffer("target_scale", torch.tensor(target_scale, dtype=torch.float32))
 
         def forward(self, inputs):
-            _, hidden = self.gru(inputs)
+            # Native HIP avoids MIOpen's runtime compiler dependency on Windows.
+            # Preserve the existing vendor-RNN path for NVIDIA CUDA.
+            context = _native_rnn(torch) if getattr(torch.version, "hip", None) else nullcontext()
+            with context:
+                _, hidden = self.gru(inputs)
             return torch.nn.functional.softplus(self.output(hidden[-1]).squeeze(-1)) * self.target_scale + 1e-12
 
     model = VarianceGRU().to(device)
@@ -154,8 +187,8 @@ def _save_checkpoint(torch, model, path, scaling, prepared, training,
                "lookback": prepared.inputs.shape[1], "seed": seed, "epochs": epochs,
                "batch_size": batch_size, "refit_asof": str(asof.date()),
                "train_last_target": str(prepared.rows.loc[training, "return_date"].max().date()),
-               "training_observations": int(np.sum(training)), "device": "cuda:0",
-               "torch_version": str(torch.__version__)}
+               "training_observations": int(np.sum(training)),
+               **_gpu_metadata(torch, native_rnn=bool(getattr(torch.version, "hip", None)))}
     with path.open("xb") as destination:
         torch.save(payload, destination)
 
@@ -253,9 +286,8 @@ def gru_forecasts(prepared: ForecastData, settings, calendar: pd.DatetimeIndex,
         annual_metadata.append({"evaluation_year": year, "refit_asof": str(asof.date()),
                                 "train_last_target": str(rows.loc[training, "return_date"].max().date()),
                                 "training_observations": int(training.sum()), "checkpoints": paths})
-    metadata = {"backend": "CUDA-required PyTorch", "device": str(device),
-                "gpu": torch.cuda.get_device_name(0), "torch_version": str(torch.__version__),
-                "cuda_version": str(torch.version.cuda), "seeds": list(settings.seeds),
+    metadata = {**_gpu_metadata(torch, native_rnn=bool(getattr(torch.version, "hip", None))),
+                "seeds": list(settings.seeds),
                 "selected_hidden_size": int(selected_row.hidden_size),
                 "selected_learning_rate": float(selected_row.learning_rate),
                 "validation_qlike": float(selected_row.qlike), "refit_epochs": refit_epochs,

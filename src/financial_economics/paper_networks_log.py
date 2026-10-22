@@ -1,4 +1,4 @@
-"""CUDA-only log-BV GRUs: a labelled fix for negative raw-BV forecasts.
+"""CUDA/ROCm log-BV GRUs: a labelled fix for negative raw-BV forecasts.
 
 The frozen raw-BV runs in paper_networks.py let a linear output fall below zero
 in very calm markets. These GRUs learn standardized log BV, so every forecast
@@ -11,7 +11,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from .gru_forecasting import _annual_splits, _gpu_inputs, _require_cuda
+from .gru_forecasting import _annual_splits, _gpu_inputs, _gpu_metadata, _require_cuda
 from .paper_gru import _cv_folds
 from .paper_networks import DEFAULT_PROFILES, _model, _profiles
 
@@ -191,10 +191,10 @@ def reconstruct_log_gru(prepared, calendar, checkpoint_dir, *, model_name, profi
                        "seed": seed, "epochs": epochs, "learning_rate": learning_rate,
                        "smearing": smearing, "refit_asof": str(asof.date()),
                        "train_last_target": str(rows.loc[training, "return_date"].max().date()),
-                       "training_observations": int(training.sum()), "device": str(device),
+                       "training_observations": int(training.sum()),
                        "input_units": "log BV and signed explanatory changes; train-only channel standardization",
                        "target_units": "standardized log BV; exp(forecast) times training smearing factor",
-                       "torch_version": str(torch.__version__), "rnn_backend": "native CUDA; cuDNN disabled"}
+                       **_gpu_metadata(torch, native_rnn=True)}
             with path.open("xb") as destination:
                 torch.save(payload, destination)
             paths.append(str(path.relative_to(checkpoint_dir)))
@@ -209,10 +209,7 @@ def reconstruct_log_gru(prepared, calendar, checkpoint_dir, *, model_name, profi
                                 "training_observations": int(training.sum()),
                                 "forecast_observations": int(issued.sum()),
                                 "smearing": smearings, "scaling": scaling, "checkpoints": paths})
-    metadata = {"model_name": model_name, "backend": "CUDA-required PyTorch",
-                "device": str(device), "gpu": torch.cuda.get_device_name(0),
-                "torch_version": str(torch.__version__), "cuda_version": str(torch.version.cuda),
-                "rnn_backend": "native CUDA; cuDNN disabled", "num_layers": 2,
+    metadata = {"model_name": model_name, **_gpu_metadata(torch, native_rnn=True), "num_layers": 2,
                 "input_channels": inputs.shape[2], "lookback": inputs.shape[1],
                 "profiles": candidates, "selected_profile": dict(profile), "seeds": list(seeds),
                 "learning_rate": learning_rate, "max_epochs": max_epochs, "patience": patience,

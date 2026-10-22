@@ -1,11 +1,11 @@
-"""CUDA-only two-layer GRU for a closer, univariate paper replication."""
+"""CUDA/ROCm two-layer GRU for a closer, univariate paper replication."""
 
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-from .gru_forecasting import _annual_splits, _gpu_inputs, _predict, _require_cuda
+from .gru_forecasting import _annual_splits, _gpu_inputs, _gpu_metadata, _native_rnn, _predict, _require_cuda
 
 
 def _cv_folds(rows, initial_training, folds):
@@ -48,9 +48,9 @@ def _model(torch, hidden_size, target_scale, dropout, device):
             self.register_buffer("target_scale", torch.tensor(target_scale, dtype=torch.float32))
 
         def forward(self, inputs):
-            # Native CUDA avoids a reproducible Windows cuDNN shutdown crash.
+            # Native GPU kernels avoid a reproducible Windows cuDNN shutdown crash.
             # Parameters, activations, and gradients still reside on CUDA:0.
-            with torch.backends.cudnn.flags(enabled=False):
+            with _native_rnn(torch):
                 _, hidden = self.gru(inputs)
             return (torch.nn.functional.softplus(self.output(hidden[-1]).squeeze(-1))
                     * self.target_scale + 1e-12)
@@ -211,9 +211,9 @@ def paper_gru_forecasts(prepared, settings, calendar, checkpoint_dir, progress=p
                        "learning_rate": settings.learning_rate, "batch_size": settings.batch_size,
                        "refit_asof": str(asof.date()),
                        "train_last_target": str(rows.loc[training, "return_date"].max().date()),
-                       "training_observations": int(training.sum()), "device": str(device),
+                       "training_observations": int(training.sum()),
                        "input_units": "sqrt(raw daily BV)", "target_units": "sqrt(raw daily BV)",
-                       "torch_version": str(torch.__version__), "rnn_backend": "native CUDA; cuDNN disabled"}
+                       **_gpu_metadata(torch, native_rnn=True)}
             with path.open("xb") as destination:
                 torch.save(payload, destination)
             paths.append(str(path.relative_to(checkpoint_dir)))
@@ -223,10 +223,7 @@ def paper_gru_forecasts(prepared, settings, calendar, checkpoint_dir, progress=p
         annual_metadata.append({"evaluation_year": year, "refit_asof": str(asof.date()),
                                 "train_last_target": payload["train_last_target"],
                                 "training_observations": int(training.sum()), "checkpoints": paths})
-    metadata = {"backend": "CUDA-required PyTorch", "device": str(device),
-                "gpu": torch.cuda.get_device_name(0), "torch_version": str(torch.__version__),
-                "cuda_version": str(torch.version.cuda), "num_layers": 2,
-                "rnn_backend": "native CUDA; cuDNN disabled to avoid Windows shutdown failure",
+    metadata = {**_gpu_metadata(torch, native_rnn=True), "num_layers": 2,
                 "selected_hidden_size": hidden_size, "learning_rate": settings.learning_rate,
                 "dropout": settings.dropout, "weight_decay": settings.weight_decay,
                 "seeds": list(settings.seeds), "refit_epochs": epochs, **selection_metadata,
@@ -234,4 +231,6 @@ def paper_gru_forecasts(prepared, settings, calendar, checkpoint_dir, progress=p
                 "forecast_units": "seed-mean sqrt(BV) squared for gru_bv storage",
                 "folds": fold_metadata, "annual_refits": annual_metadata, "checkpoints": checkpoints,
                 "deterministic_algorithms": True}
+    if not getattr(torch.version, "hip", None):
+        metadata["rnn_backend"] += " to avoid Windows shutdown failure"
     return result, tuning, metadata

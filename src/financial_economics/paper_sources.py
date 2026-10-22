@@ -1,4 +1,4 @@
-"""Public, labelled substitutes for the paper's licensed U.S. series.
+"""Labelled price substitutes and optional verified macro inputs for the paper.
 
 Downloads and alignment are CPU-native. Forecast training and defensive-asset
 evaluation remain separate so short ETF histories cannot truncate training.
@@ -64,17 +64,57 @@ def _yahoo_close(raw):
     return series, result["meta"]
 
 
-def download_sources(destination):
+def _load_macro_snapshot(directory):
+    """Verify the three unchanged economic series before fetching any prices."""
+    directory = Path(directory).resolve()
+    manifest_raw = (directory / "manifest.json").read_bytes()
+    metadata = json.loads(manifest_raw)
+    retained = {"manifest.json": manifest_raw}
+    for name, digest in metadata["files"].items():
+        if Path(name).is_absolute() or ".." in Path(name).parts or name == "manifest.json":
+            raise ValueError("Macro snapshot files must use relative paths within their source directory.")
+        source = (directory / name).resolve()
+        if not source.is_relative_to(directory) or source == directory:
+            raise ValueError("Macro snapshot files must stay within their source directory.")
+        raw = source.read_bytes()
+        if sha256(raw).hexdigest() != digest:
+            raise ValueError(f"Macro source hash mismatch: {name}.")
+        retained[name] = raw
+    if "observations.csv" not in metadata["files"]:
+        raise ValueError("Macro snapshot must hash observations.csv.")
+    frame = pd.read_csv(StringIO(retained["observations.csv"].decode("utf-8")),
+                        index_col="Date", parse_dates=True, float_precision="round_trip")
+    if (set(frame.columns) != set(FRED) or not isinstance(frame.index, pd.DatetimeIndex)
+            or frame.index.hasnans or frame.index.tz is not None
+            or not frame.index.equals(frame.index.normalize())
+            or not frame.index.is_unique or not frame.index.is_monotonic_increasing):
+        raise ValueError("Macro snapshot needs three exact series and unique ordered dates.")
+    for name, (symbol, _, _) in FRED.items():
+        details = metadata["sources"][name]
+        units = "USD per barrel" if name == "OIL" else "percent per year"
+        if details.get("fred_series") != symbol or details.get("units") != units:
+            raise ValueError(f"Macro series identity or units do not match {symbol}.")
+        observed = frame[name].dropna()
+        if (observed.empty or not np.isfinite(observed).all() or (observed <= 0).any()
+                or observed.index[0] > pd.Timestamp("2000-01-10")
+                or observed.index[-1] < pd.Timestamp("2020-12-24")):
+            raise ValueError(f"Macro series {symbol} lacks valid 2000-2020 coverage.")
+    return frame, metadata, retained
+
+
+def download_sources(destination, *, macro_dir=None):
     """Save immutable raw responses, series identities, coverage and hashes."""
     destination = Path(destination).resolve()
     if destination.exists():
         raise ValueError("Use a new public-source directory; snapshots are never overwritten.")
+    macro = None if macro_dir is None else _load_macro_snapshot(macro_dir)
     destination.parent.mkdir(parents=True, exist_ok=True)
     with TemporaryDirectory(prefix=".paper-sources-", dir=destination.parent) as temporary:
         output = Path(temporary) / "snapshot"
         output.mkdir()
         columns, descriptions = {}, {}
-        for provider, definitions in (("yahoo", YAHOO), ("fred", FRED)):
+        providers = (("yahoo", YAHOO), ("fred", FRED)) if macro is None else (("yahoo", YAHOO),)
+        for provider, definitions in providers:
             for name, (symbol, original, difference) in definitions.items():
                 if provider == "yahoo":
                     query = urlencode({"period1": 946684800, "period2": 1609545600, "interval": "1d"})
@@ -105,15 +145,28 @@ def download_sources(destination):
                                       "first": str(series.index[0].date()), "last": str(series.index[-1].date()),
                                       "currency": details.get("currency"), "name": details.get("longName", details.get("shortName"))}
                 print(f"Public source {name}: {len(series)} observations", flush=True)
+        if macro is not None:
+            frame, macro_metadata, retained = macro
+            for name in FRED:
+                columns[name] = frame[name].dropna()
+                descriptions[name] = dict(macro_metadata["sources"][name])
+            for name, raw in retained.items():
+                copy = output / "macro_snapshot" / name
+                copy.parent.mkdir(parents=True, exist_ok=True)
+                copy.write_bytes(raw)
         pd.DataFrame(columns).rename_axis("Date").to_csv(output / "observations.csv")
         metadata = {"created_at_utc": datetime.now(timezone.utc).isoformat(), "sources": descriptions,
-                    "limitations": ["Public-source reconstruction, not the original licensed dataset",
+                    "limitations": ["Reconstruction using substitute sources, not the original paper dataset",
                                     "Futures price changes are not investable futures total returns",
                                     "Bond ETF prices are not constant-maturity clean-price indices",
                                     "DAAA has different credit quality and maturity from TRUCBYC",
                                     "Contemporary historical data are not point-in-time vintages",
                                     "CHF/EUR bond prices converted to USD; original FX treatment unspecified"],
-                    "files": {path.name: sha256(path.read_bytes()).hexdigest() for path in output.iterdir()}}
+                    "files": {path.relative_to(output).as_posix(): sha256(path.read_bytes()).hexdigest()
+                              for path in output.rglob("*") if path.is_file()}}
+        if macro is not None:
+            metadata["macro_snapshot_sha256"] = sha256(retained["manifest.json"]).hexdigest()
+            metadata["limitations"] += macro_metadata.get("limitations", [])
         (output / "manifest.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
         output.rename(destination)
 

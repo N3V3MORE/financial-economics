@@ -41,7 +41,7 @@ def test_tiny_cuda_log_refits_are_positive_and_use_past_labels(tmp_path, channel
     try:
         torch, _ = _require_cuda()
     except RuntimeError as error:
-        if "no CUDA GPU" in str(error) or "prediction extra" in str(error):
+        if "no compatible GPU" in str(error) or "prediction extra" in str(error):
             pytest.skip(str(error))
         raise
     prepared, calendar = _prepared(channels)
@@ -60,10 +60,15 @@ def test_tiny_cuda_log_refits_are_positive_and_use_past_labels(tmp_path, channel
     np.testing.assert_array_equal(forecasts.loc[earlier, f"{name}_bv"], altered.loc[earlier, f"{name}_bv"])
     pd.testing.assert_frame_equal(tuning, changed_tuning)
     assert metadata["floor_events"] == 0 and metadata["input_channels"] == channels
+    assert metadata["backend"] == ("ROCm-required PyTorch" if torch.version.hip else "CUDA-required PyTorch")
+    assert metadata["hip_version"] == torch.version.hip
     for fold in metadata["folds"]:
         assert fold["train_last_target"] <= fold["validation_first_issue"]
     for relative_path in metadata["checkpoints"]:
         saved = torch.load(tmp_path / name / relative_path, map_location="cuda:0", weights_only=True)
         assert saved["smearing"] > 0 and saved["train_last_target"] <= saved["refit_asof"]
+        expected_backend = "native ROCm/HIP; MIOpen disabled" if torch.version.hip else "native CUDA; cuDNN disabled"
+        assert saved["rnn_backend"] == metadata["rnn_backend"] == expected_backend
+        assert saved["hip_version"] == metadata["hip_version"]
     with pytest.raises(ValueError, match="never replaced"):
         reconstruct_log_gru(prepared, calendar, tmp_path / name, **options)

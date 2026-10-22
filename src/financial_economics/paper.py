@@ -1,7 +1,7 @@
 """Small GRU-UNIVAR paper replication with explicit ETF and execution substitutes.
 
 Calendar preparation, EWMA, and portfolio accounting are CPU-native. Neural
-training is CUDA-required. The paper's full-test quantiles are retrospective.
+training requires CUDA or ROCm. The paper's full-test quantiles are retrospective.
 """
 
 from dataclasses import asdict, dataclass

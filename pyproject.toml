@@ -15,14 +15,44 @@ dependencies = [
 [project.optional-dependencies]
 wrds = ["psycopg2-binary==2.9.13"]
 prediction = ["torch==2.11.0"]
+prediction-rocm = [
+    "torch[device-gfx1151]==2.11.0+rocm7.14.1; sys_platform == 'win32' and (platform_machine == 'AMD64' or platform_machine == 'x86_64')",
+    # Declare AMD runtime packages directly so uv's explicit index applies to them.
+    "rocm[libraries,device-gfx1151]==7.14.1; sys_platform == 'win32' and (platform_machine == 'AMD64' or platform_machine == 'x86_64')",
+    "rocm-bootstrap==0.1.0; sys_platform == 'win32' and (platform_machine == 'AMD64' or platform_machine == 'x86_64')",
+    "rocm-sdk-core==7.14.1; sys_platform == 'win32' and (platform_machine == 'AMD64' or platform_machine == 'x86_64')",
+    "rocm-sdk-libraries==7.14.1; sys_platform == 'win32' and (platform_machine == 'AMD64' or platform_machine == 'x86_64')",
+    "rocm-sdk-device-gfx1151==7.14.1; sys_platform == 'win32' and (platform_machine == 'AMD64' or platform_machine == 'x86_64')",
+    "amd-torch-device-gfx1151==2.11.0+rocm7.14.1; sys_platform == 'win32' and (platform_machine == 'AMD64' or platform_machine == 'x86_64')",
+    "amd-torch-device-gfx115x==2.11.0+rocm7.14.1; sys_platform == 'win32' and (platform_machine == 'AMD64' or platform_machine == 'x86_64')",
+]
 reconstruction = ["arch==8.0.0"]
 
+[tool.uv]
+conflicts = [[{ extra = "prediction" }, { extra = "prediction-rocm" }]]
+
 [tool.uv.sources]
-torch = { index = "pytorch-cu130", extra = "prediction" }
+torch = [
+    { index = "pytorch-cu130", extra = "prediction" },
+    # Select Windows metadata explicitly; the AMD Linux wheel requires Triton.
+    { url = "https://repo.amd.com/rocm/whl-multi-arch/torch-2.11.0%2Brocm7.14.1-cp312-cp312-win_amd64.whl", extra = "prediction-rocm", marker = "sys_platform == 'win32' and (platform_machine == 'AMD64' or platform_machine == 'x86_64')" },
+]
+rocm = { index = "amd-rocm", marker = "sys_platform == 'win32' and (platform_machine == 'AMD64' or platform_machine == 'x86_64')" }
+rocm-bootstrap = { index = "amd-rocm", marker = "sys_platform == 'win32' and (platform_machine == 'AMD64' or platform_machine == 'x86_64')" }
+rocm-sdk-core = { index = "amd-rocm", marker = "sys_platform == 'win32' and (platform_machine == 'AMD64' or platform_machine == 'x86_64')" }
+rocm-sdk-libraries = { index = "amd-rocm", marker = "sys_platform == 'win32' and (platform_machine == 'AMD64' or platform_machine == 'x86_64')" }
+rocm-sdk-device-gfx1151 = { index = "amd-rocm", marker = "sys_platform == 'win32' and (platform_machine == 'AMD64' or platform_machine == 'x86_64')" }
+amd-torch-device-gfx1151 = { index = "amd-rocm", marker = "sys_platform == 'win32' and (platform_machine == 'AMD64' or platform_machine == 'x86_64')" }
+amd-torch-device-gfx115x = { index = "amd-rocm", marker = "sys_platform == 'win32' and (platform_machine == 'AMD64' or platform_machine == 'x86_64')" }
 
 [[tool.uv.index]]
 name = "pytorch-cu130"
 url = "https://download.pytorch.org/whl/cu130"
+explicit = true
+
+[[tool.uv.index]]
+name = "amd-rocm"
+url = "https://repo.amd.com/rocm/whl-multi-arch/"
 explicit = true
 
 [project.scripts]
@@ -54,6 +84,8 @@ ignore = ["RUF001", "RUF002", "RUF003"]
 # Matplotlib must select its non-interactive backend before pyplot is imported.
 "src/financial_economics/*_report.py" = ["E402"]
 "src/financial_economics/paper_figures.py" = ["E402"]
+# ctypes structures must declare _fields_ as plain class-level lists.
+"src/financial_economics/wrds_credentials.py" = ["RUF012"]
 # Saved reconstruction caches are reused only while these forecasting files keep
 # their recorded hashes (paper_reconstruction._code_hashes), so they stay as frozen.
 "src/financial_economics/{paper_sources,paper,forecasting,paper_models,paper_networks,paper_networks_log,paper_gru,gru_forecasting}.py" = ["B905", "UP017", "RUF"]

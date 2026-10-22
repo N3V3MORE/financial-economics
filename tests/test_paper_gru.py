@@ -48,7 +48,7 @@ def test_tiny_cuda_refits_save_checkpoints_and_ignore_future_targets(tmp_path):
     try:
         torch, _ = _require_cuda()
     except RuntimeError as error:
-        if "no CUDA GPU" in str(error) or "prediction extra" in str(error):
+        if "no compatible GPU" in str(error) or "prediction extra" in str(error):
             pytest.skip(str(error))
         raise
     prepared, calendar = _prepared()
@@ -69,6 +69,8 @@ def test_tiny_cuda_refits_save_checkpoints_and_ignore_future_targets(tmp_path):
     assert forecasts.loc["2009-12-31", "gru_refit_asof"] == pd.Timestamp("2009-12-31")
     assert np.isfinite(forecasts.iloc[-1].gru_bv)
     assert metadata["device"] == "cuda:0" and metadata["refit_epochs"] == 1
+    assert metadata["backend"] == ("ROCm-required PyTorch" if torch.version.hip else "CUDA-required PyTorch")
+    assert metadata["hip_version"] == torch.version.hip
     assert len(metadata["checkpoints"]) == 2
     for relative_path in metadata["checkpoints"]:
         saved = torch.load(tmp_path / "original" / relative_path,
@@ -76,7 +78,9 @@ def test_tiny_cuda_refits_save_checkpoints_and_ignore_future_targets(tmp_path):
         assert saved["num_layers"] == 2
         assert saved["input_units"] == "sqrt(raw daily BV)"
         assert saved["target_units"] == "sqrt(raw daily BV)"
-        assert saved["rnn_backend"] == "native CUDA; cuDNN disabled"
+        expected_backend = "native ROCm/HIP; MIOpen disabled" if torch.version.hip else "native CUDA; cuDNN disabled"
+        assert saved["rnn_backend"] == expected_backend
+        assert saved["hip_version"] == torch.version.hip
         assert saved["train_last_target"] <= saved["refit_asof"]
         assert all(tensor.device == torch.device("cuda:0") for tensor in saved["state_dict"].values())
     with pytest.raises(ValueError, match="never replaced"):
@@ -89,7 +93,7 @@ def test_frozen_two_session_cuda_refits_skip_tuning_and_preserve_causality(tmp_p
     try:
         torch, _ = _require_cuda()
     except RuntimeError as error:
-        if "no CUDA GPU" in str(error) or "prediction extra" in str(error):
+        if "no compatible GPU" in str(error) or "prediction extra" in str(error):
             pytest.skip(str(error))
         raise
     _, calendar = _prepared()

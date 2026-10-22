@@ -102,7 +102,8 @@ def _saved_username():
     try:
         lines = path.read_text(encoding="utf-8").splitlines()
     except OSError:
-        raise WRDSError("WRDS_SAVED_LOGIN_REQUIRED: configure pgpass and WRDS_USERNAME.") from None
+        raise WRDSError("WRDS_SAVED_LOGIN_REQUIRED: on Windows run python -m "
+                        "financial_economics.wrds_credentials; otherwise configure pgpass and WRDS_USERNAME.") from None
     users = set()
     for line in lines:
         if not line.strip() or line.lstrip().startswith("#"):
@@ -130,24 +131,40 @@ def _saved_username():
 
 
 def connect_wrds():
-    """One noninteractive read-only connection; libpq reads the saved password."""
+    """One read-only connection using Windows Credential Manager or libpq's password file."""
     try:
         import psycopg2
     except ImportError:
         raise WRDSError("WRDS_DRIVER_REQUIRED: run uv sync --extra wrds --frozen.") from None
-    username = _saved_username()
+    from .wrds_credentials import CredentialError, get_saved_login
+
+    try:
+        login = get_saved_login()
+    except CredentialError:
+        raise WRDSError("WRDS_SAVED_LOGIN_FAILED: Windows Credential Manager could not read the WRDS login.") from None
+    if login is None:
+        credentials = {"user": _saved_username()}
+    else:
+        username, password = login
+        if os.environ.get("WRDS_USERNAME", username) != username:
+            raise WRDSError("WRDS_SAVED_LOGIN_MISMATCH: WRDS_USERNAME differs from the saved Windows login.")
+        credentials = {"user": username, "password": password}
     connection = None
     try:
         connection = psycopg2.connect(
-            host=HOST, port=PORT, dbname="wrds", user=username, sslmode="require",
-            connect_timeout=15, application_name="financial-economics",
-            options="-c statement_timeout=60000",
+            host=HOST, port=PORT, dbname="wrds", sslmode="require",
+            # Leave time for the WRDS Duo Mobile push before authentication times out.
+            connect_timeout=120, application_name="financial-economics",
+            options="-c statement_timeout=60000", **credentials,
         )
         connection.set_session(readonly=True, isolation_level="REPEATABLE READ")
         return connection
     except Exception:
         if connection is not None:
-            connection.close()
+            try:
+                connection.close()
+            except Exception:
+                pass
         raise WRDSError("WRDS_CONNECTION_FAILED: check saved login, network, and Duo status.") from None
 
 

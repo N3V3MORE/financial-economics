@@ -1,4 +1,4 @@
-"""CUDA-only raw-BV GRUs for the public-data paper reconstruction.
+"""CUDA/ROCm raw-BV GRUs for the public-data paper reconstruction.
 
 The paper publishes tuning categories, not its grid or seeds. These small,
 predeclared profiles are reconstruction choices, frozen before evaluation.
@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from .gru_forecasting import _annual_splits, _gpu_inputs, _require_cuda
+from .gru_forecasting import _annual_splits, _gpu_inputs, _gpu_metadata, _native_rnn, _require_cuda
 from .paper_gru import _cv_folds
 
 
@@ -55,8 +55,9 @@ def _model(torch, channels, profile, device):
             self.output = torch.nn.Linear(profile["hidden_2"], 1)
 
         def forward(self, inputs):
-            # Native CUDA retains GPU execution and avoids the known Windows cuDNN crash.
-            with torch.backends.cudnn.flags(enabled=False):
+            # Native GPU kernels avoid the known Windows cuDNN crash; this flag
+            # also disables MIOpen's RNN path in a ROCm build of PyTorch.
+            with _native_rnn(torch):
                 sequence, _ = self.first(inputs)
                 _, hidden = self.second(self.dropout(sequence))
             return self.output(hidden[-1]).squeeze(-1)
@@ -210,10 +211,10 @@ def reconstruct_gru(prepared, calendar, checkpoint_dir, *, model_name, profiles=
                        "seed": seed, "epochs": epochs, "learning_rate": learning_rate,
                        "refit_asof": str(asof.date()),
                        "train_last_target": str(rows.loc[training, "return_date"].max().date()),
-                       "training_observations": int(training.sum()), "device": str(device),
+                       "training_observations": int(training.sum()),
                        "input_units": "raw BV and signed explanatory changes; train-only channel standardization",
                        "target_units": "raw BV divided by training-mean BV; linear output",
-                       "torch_version": str(torch.__version__), "rnn_backend": "native CUDA; cuDNN disabled"}
+                       **_gpu_metadata(torch, native_rnn=True)}
             with path.open("xb") as destination:
                 torch.save(payload, destination)
             paths.append(str(path.relative_to(checkpoint_dir)))
@@ -228,10 +229,7 @@ def reconstruct_gru(prepared, calendar, checkpoint_dir, *, model_name, profiles=
                                 "training_observations": int(training.sum()),
                                 "forecast_observations": int(issued.sum()),
                                 "floor_events": floored, "scaling": scaling, "checkpoints": paths})
-    metadata = {"model_name": model_name, "backend": "CUDA-required PyTorch",
-                "device": str(device), "gpu": torch.cuda.get_device_name(0),
-                "torch_version": str(torch.__version__), "cuda_version": str(torch.version.cuda),
-                "rnn_backend": "native CUDA; cuDNN disabled", "num_layers": 2,
+    metadata = {"model_name": model_name, **_gpu_metadata(torch, native_rnn=True), "num_layers": 2,
                 "input_channels": inputs.shape[2], "lookback": inputs.shape[1],
                 "profiles": candidates, "selected_profile": dict(profile), "seeds": list(seeds),
                 "learning_rate": learning_rate, "max_epochs": max_epochs, "patience": patience,
