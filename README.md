@@ -66,7 +66,7 @@ exclusive. Full setup, archived and recent study commands, forecast reuse,
 trading schedules, figures and post hoc checks remain in
 [Commands and study reference](docs/commands.md).
 
-The later-year Risk Lab trial retains its separate staged entrypoint. Inspect its
+The later-year Risk Lab trial runs as its own staged `fecon` subcommand. Inspect its
 existing flags before running it against local sources:
 
 ```sh

@@ -4,13 +4,23 @@ A short record of what this project did, what it found, what was decided
 and what is left. Full detail: [Final study](docs/final-study.md),
 [Results explained](docs/results-explained.md), [README](README.md).
 
-**Latest (October 22, later session):** AMD GRU training now uses MIOpen,
+**Latest (October 22, code layout):** `main` (`5db250c`) now holds all of the
+October 22 work below. The package is grouped into `datasets`, `settings`,
+`models`, `portfolio`, `evaluation`, `studies` and `reporting`; the former flat
+modules are gone, and staged studies run as `fecon` subcommands with their
+original options (`fecon paper-revised`, `fecon risklab-study`,
+`fecon paper-reconstruction`, …). Calculations are unchanged. Saved classical and
+GRU reconstruction stages remain reusable; saved matched-revision, proxy and
+Risk Lab runs need a fresh run because their whole-package code hash changed.
+See [Project structure](docs/structure.md).
+
+**Earlier (October 22, later session):** AMD GRU training now uses MIOpen,
 GPU training runs with TF32 off, and a trial on branch
 `risklab-volatility-trial` replaced Oxford-Man with Risk Lab SPY
 volatility. Over 2011–2020 Risk Lab reproduced every Oxford conclusion; in
 2022–2025 timing again cut the worst fall without beating its static mix,
-and long Treasuries made stress-period timing worse. None of this is
-merged into `main`. See [October 22: GPU, data access and the Risk Lab
+and long Treasuries made stress-period timing worse. This is now merged
+into `main`. See [October 22: GPU, data access and the Risk Lab
 trial](#october-22-gpu-data-access-and-the-risk-lab-trial).
 
 The methodology audit now has a separate matched implementation:
@@ -374,20 +384,22 @@ the richer GRU's macro inputs end in 2020, so it was not extended.
 
 ## Where things are
 
-- **Branches (October 22, all on GitHub; none merged into `main`):**
-  - `main` and `volatility-prediction`: `56824dc`, unchanged.
-  - `volatility-project-checkpoint`: checkpoint `5503ea0`, then the
-    NVIDIA session's README/handover refresh and its GRU backend benchmark
-    (`scripts/compare_gru_backends.py`, `benchmarks/gru/*.json`), ending `eceb1cf`.
-  - `miopen-gru-training`: from `5503ea0`; MIOpen default (`38772b1`),
-    the cleanup session's shared provenance helpers and move of run configs
-    into `configs/` (`7066349`, logged in `docs/archive/cleanup-log.md`), the
-    cross-machine comparison script (`9fb9959`) and TF32 off (`52c9745`).
-  - `risklab-volatility-trial`: from `miopen-gru-training`; the
-    Risk Lab trial (`ea3b4f1`, `60e5b36`) and this handover update.
-  - The checkpoint branch and the MIOpen/trial branches have diverged and
-    both edit `README.md` and `handover.md`; merge them before any pull request.
-- **Frozen GRU study tag:** `frozen-gru-study-20261021`.
+- **Branches (October 22, on GitHub):** `main` is `5db250c` and contains the
+  MIOpen default (`38772b1`), shared provenance helpers and the move of run
+  configs into `configs/` (`7066349`, logged in `docs/archive/cleanup-log.md`),
+  the cross-machine comparison script (`9fb9959`), TF32 off (`52c9745`), the
+  Risk Lab trial (`ea3b4f1`, `60e5b36`), the Risk Lab main study (`ebedece`) and
+  the grouped code layout (`971ca91`…`5db250c`). `miopen-gru-training`,
+  `risklab-volatility-trial` and `volatility-prediction` are fully
+  merged. Still unmerged:
+  - `volatility-project-checkpoint` (`eceb1cf`): checkpoint `5503ea0`, then
+    the NVIDIA session's README/handover refresh and its GRU backend benchmark
+    (`scripts/compare_gru_backends.py`, `benchmarks/gru/*.json`). It edits
+    `README.md`, `handover.md` and modules under their former flat names, so
+    port it onto the grouped layout rather than merging it directly.
+  - `Possible-Future-Ideas-for-Depth` (`5d3c16a`).
+- **Frozen GRU study tag:** `frozen-gru-study-20261021`, a local tag on the
+  machine that made it; it is not on GitHub or on this machine.
 - **Fresh snapshot recorded on the AMD machine:** `data/protection-long-wrds-20261021` contained
   verified SPY/TLT/GLD/DBC returns for 4,780 sessions from January 3, 2007
   through December 31, 2025; all 912 fund-month comparisons passed.
