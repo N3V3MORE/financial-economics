@@ -4,23 +4,29 @@ A short record of what this project did, what it found, what was decided
 and what is left. Full detail: [Final study](docs/final-study.md),
 [Results explained](docs/results-explained.md), [README](README.md).
 
-**Latest (October 22, code layout):** `main` (`5db250c`) now holds all of the
-October 22 work below. The package is grouped into `datasets`, `settings`,
-`models`, `portfolio`, `evaluation`, `studies` and `reporting`; the former flat
-modules are gone, and staged studies run as `fecon` subcommands with their
-original options (`fecon paper-revised`, `fecon risklab-study`,
-`fecon paper-reconstruction`, …). Calculations are unchanged. Saved classical and
-GRU reconstruction stages remain reusable; saved matched-revision, proxy and
-Risk Lab runs need a fresh run because their whole-package code hash changed.
-See [Project structure](docs/structure.md).
+**Latest (October 22, code layout):** `main` now holds all of the October 22
+work below, including the Risk Lab findings. The package is grouped into
+`datasets`, `settings`, `models`, `portfolio`, `evaluation`, `studies` and
+`reporting`; the former flat modules are gone, and staged studies run as `fecon`
+subcommands with their original options (`fecon paper-revised`,
+`fecon risklab-study`, `fecon paper-reconstruction`, …). Calculations are
+unchanged. Saved classical and GRU reconstruction stages remain reusable; saved
+matched-revision, proxy and Risk Lab runs need a fresh run because their
+whole-package code hash changed. See [Project structure](docs/structure.md).
 
 **Earlier (October 22, later session):** AMD GRU training now uses MIOpen,
-GPU training runs with TF32 off, and a trial on branch
-`risklab-volatility-trial` replaced Oxford-Man with Risk Lab SPY
-volatility. Over 2011–2020 Risk Lab reproduced every Oxford conclusion; in
-2022–2025 timing again cut the worst fall without beating its static mix,
-and long Treasuries made stress-period timing worse. This is now merged
-into `main`. See [October 22: GPU, data access and the Risk Lab
+GPU training runs with TF32 off, and the main study (`fecon paper-revised`)
+takes its volatility only from Risk Lab SPY 5-minute realized variance;
+archived Oxford-based modules are unchanged. The forecast-evaluation review was
+addressed: gap-aware histories and ARFIMA, intraday and close-to-close targets
+with a pre-2010 Hansen–Lunde scale, variance-MSE and QLIKE beside volatility
+MSE, and an exact EWMA definition.
+**Results and all figures: [docs/findings-risklab.md](docs/findings-risklab.md).**
+In short: timing roughly halved crash losses, no portfolio test is
+significant, the one-input GRU has the lowest QLIKE, and long Treasuries were
+the worst storm-day asset in 2022–2025. The sign of timing's 2022–2025 Sharpe
+edge over the fixed mix depends on missing-date handling, so it is not a
+finding. Background: [October 22: GPU, data access and the Risk Lab
 trial](#october-22-gpu-data-access-and-the-risk-lab-trial).
 
 The methodology audit now has a separate matched implementation:
@@ -272,7 +278,7 @@ Work done on the AMD machine (Radeon 8060S) with a parallel NVIDIA session
   proxy had to imitate Oxford within 15% on every day so the two could be
   spliced. Using Risk Lab for the whole history removes the splice.
 
-### Risk Lab trial (branch `risklab-volatility-trial`)
+### Risk Lab trial (branch `risklab-volatility-trial`, now merged)
 
 **Design.** Risk Lab's `trade_rv5` (5-minute realized volatility from trades)
 was converted to daily variance in Oxford units (vol²/252) and used for every

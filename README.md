@@ -14,7 +14,8 @@ over static stock/cash mixes; long Treasuries worsened its stress-period results
 The estimated Oxford-like substitute failed the required daily accuracy floor
 and remains diagnostic only. These results do not establish a reliable safe haven
 or a profitable forecasting edge. Read [Final study](docs/final-study.md),
-[Results explained](docs/results-explained.md) and the dated [Handover](handover.md)
+[Results explained](docs/results-explained.md), the [Risk Lab findings](docs/findings-risklab.md)
+and the dated [Handover](handover.md)
 for the evidence and limits.
 
 ## Run the original study
