@@ -5,13 +5,19 @@ and what is left. Full detail: [Final study](docs/final-study.md),
 [Results explained](docs/results-explained.md), [README](README.md).
 
 **Latest (October 22, later session):** AMD GRU training now uses MIOpen,
-GPU training runs with TF32 off, and a trial on branch
-`risklab-volatility-trial` replaced Oxford-Man with Risk Lab SPY
-volatility. Over 2011–2020 Risk Lab reproduced every Oxford conclusion; in
-2022–2025 timing again cut the worst fall without beating its static mix,
-and long Treasuries made stress-period timing worse. None of this is
-merged into `main`. See [October 22: GPU, data access and the Risk Lab
-trial](#october-22-gpu-data-access-and-the-risk-lab-trial).
+GPU training runs with TF32 off, and on branch `risklab-volatility-trial`
+the main study (`paper_revised`) takes its volatility only from Risk Lab SPY
+5-minute realized variance; archived Oxford-based modules are unchanged. The
+forecast-evaluation review was addressed: gap-aware histories and ARFIMA,
+intraday and close-to-close targets with a pre-2010 Hansen–Lunde scale,
+variance-MSE and QLIKE beside volatility MSE, and an exact EWMA definition.
+**Results and all figures: [docs/findings-risklab.md](docs/findings-risklab.md).**
+In short: timing roughly halved crash losses, no portfolio test is
+significant, the one-input GRU has the lowest QLIKE, and long Treasuries were
+the worst storm-day asset in 2022–2025. The sign of timing's 2022–2025 Sharpe
+edge over the fixed mix depends on missing-date handling, so it is not a
+finding. None of this is merged into `main`. Background: [October 22: GPU,
+data access and the Risk Lab trial](#october-22-gpu-data-access-and-the-risk-lab-trial).
 
 The methodology audit now has a separate matched implementation:
 `financial_economics.paper_revised`, with frozen settings in
