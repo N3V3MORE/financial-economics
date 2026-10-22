@@ -83,6 +83,11 @@ ignore = ["RUF001", "RUF002", "RUF003"]
 [tool.ruff.lint.per-file-ignores]
 # ctypes structures must declare _fields_ as plain class-level lists.
 "src/financial_economics/wrds_credentials.py" = ["RUF012"]
+"src/financial_economics/datasets/credentials.py" = ["RUF012"]
 # Saved reconstruction caches are reused only while these forecasting files keep
 # their recorded hashes (paper_reconstruction._code_hashes), so they stay as frozen.
 "src/financial_economics/{paper_sources,paper,forecasting,paper_models,paper_networks,paper_networks_log,paper_gru,gru_forecasting}.py" = ["B905", "UP017", "RUF"]
+# The corresponding implementations retain the same frozen calculation code.
+"src/financial_economics/datasets/sources/paper.py" = ["B905", "UP017", "RUF"]
+"src/financial_economics/studies/paper.py" = ["B905", "UP017", "RUF"]
+"src/financial_economics/models/{variance,classical,networks,log_networks,paper_gru,gpu}.py" = ["B905", "UP017", "RUF"]

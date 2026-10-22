@@ -1,0 +1,2 @@
+# Source identities must survive Windows/Linux checkouts and wheel installation.
+/src/financial_economics/** text eol=lf

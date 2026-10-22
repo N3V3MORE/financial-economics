@@ -5,6 +5,8 @@ from hashlib import sha256
 from pathlib import Path
 import subprocess
 
+from ._layout import current_code_digests
+
 
 def file_digest(path):
     """SHA-256 of a file's bytes, as recorded in every run manifest."""
@@ -12,8 +14,8 @@ def file_digest(path):
 
 
 def package_code_digests():
-    """SHA-256 of every module in this package, keyed by file name."""
-    return {path.name: file_digest(path) for path in sorted(Path(__file__).parent.glob("*.py"))}
+    """Actual SHA-256 of every nested implementation and compatibility entry point."""
+    return current_code_digests()
 
 
 def directory_digests(directory):
