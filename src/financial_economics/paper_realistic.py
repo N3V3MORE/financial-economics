@@ -34,7 +34,6 @@ FORECAST_STAGES = {"evaluation": ("arfima", "garch", "gjr", "gru_univar", "gru_m
 REBALANCE_PERIODS = {"daily": None, "weekly": "W-SUN", "monthly": "M"}
 
 
-
 def load_realistic_settings(path):
     with Path(path).open("rb") as source:
         settings = tomllib.load(source)["realistic"]

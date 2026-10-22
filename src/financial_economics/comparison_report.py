@@ -12,24 +12,17 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import PercentFormatter, StrMethodFormatter
 import numpy as np
 import pandas as pd
-from .data import price_source_description
 
 from .analysis import drawdowns
 from .comparison import ComparisonResult
 from .config import Study
-
-
-def _date(value) -> str:
-    return "not observed" if pd.isna(value) else str(pd.Timestamp(value).date())
+from .data import price_source_description
+from .report import _save_figure
+from .stress_report import _date
 
 
 def _number(value, spec=".3f") -> str:
     return "undefined" if pd.isna(value) else format(value, spec)
-
-
-def _save(figure, destination: Path) -> None:
-    figure.savefig(destination, dpi=160, bbox_inches="tight")
-    plt.close(figure)
 
 
 def _figures(result: ComparisonResult, episodes: pd.DataFrame,
@@ -78,7 +71,7 @@ def _figures(result: ComparisonResult, episodes: pd.DataFrame,
                 axis.legend(loc="upper center", bbox_to_anchor=(.5, -.13),
                             ncol=3, frameon=False, fontsize=10)
             figure.tight_layout()
-            _save(figure, output / filename)
+            _save_figure(figure, output / filename)
 
         figure, axis = plt.subplots(figsize=(11.2, max(4.5, .9 * len(episodes) + 1.7)))
         axis.set_title(f"Losses across identical {benchmark} decline dates", loc="left", pad=33)
@@ -107,7 +100,7 @@ def _figures(result: ComparisonResult, episodes: pd.DataFrame,
             axis.legend(loc="upper center", bbox_to_anchor=(.5, -.13), ncol=3,
                         frameon=False, fontsize=10)
         figure.tight_layout()
-        _save(figure, output / "episode_losses.png")
+        _save_figure(figure, output / "episode_losses.png")
 
 
 def _recovery_text(row) -> str:

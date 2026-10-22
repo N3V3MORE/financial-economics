@@ -12,9 +12,11 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import PercentFormatter
 import numpy as np
 import pandas as pd
-from .data import price_source_description
 
 from .config import Study
+from .data import price_source_description
+from .report import _save_figure
+from .stress import _wealth
 
 
 COLORS = {"benchmark": "#B45232", "Equal weight": "#285E89",
@@ -24,15 +26,6 @@ COLORS = {"benchmark": "#B45232", "Equal weight": "#285E89",
 def _date(value) -> str:
     return "not observed" if pd.isna(value) else str(pd.Timestamp(value).date())
 
-
-def _save(figure, path: Path) -> None:
-    figure.savefig(path, dpi=160, bbox_inches="tight")
-    plt.close(figure)
-
-
-def _wealth(returns: pd.DataFrame, seed_date) -> pd.DataFrame:
-    anchor = pd.DataFrame(1.0, index=[pd.Timestamp(seed_date)], columns=returns.columns)
-    return pd.concat([anchor, (1 + returns).cumprod()])
 
 
 def _episode_figures(returns: pd.DataFrame, episodes: pd.DataFrame,
@@ -64,7 +57,7 @@ def _episode_figures(returns: pd.DataFrame, episodes: pd.DataFrame,
     axis.grid(axis="x", alpha=.2)
     axis.margins(x=.25)
     axis.legend(loc="upper center", bbox_to_anchor=(.5, -.13), ncol=2, frameon=False)
-    _save(figure, output / "episode_losses.png")
+    _save_figure(figure, output / "episode_losses.png")
 
     examples = episodes.loc[pd.to_datetime(episodes.trough_date).dt.year.isin([2020, 2022])]
     if examples.empty:
@@ -91,7 +84,7 @@ def _episode_figures(returns: pd.DataFrame, episodes: pd.DataFrame,
         axis.grid(axis="y", alpha=.2)
         axis.legend(loc="best")
     figure.tight_layout(h_pad=2)
-    _save(figure, output / "recovery_paths.png")
+    _save_figure(figure, output / "recovery_paths.png")
 
 
 def _correlation_figure(correlations: pd.DataFrame, benchmark: str,
@@ -108,7 +101,7 @@ def _correlation_figure(correlations: pd.DataFrame, benchmark: str,
     axis.grid(axis="y", alpha=.2)
     if names:
         axis.legend(loc="lower left", ncol=min(3, len(names)))
-    _save(figure, output / "rolling_correlations.png")
+    _save_figure(figure, output / "rolling_correlations.png")
 
 
 def _recovery_text(row) -> str:

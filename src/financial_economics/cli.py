@@ -143,10 +143,8 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "download":
             if args.source == "wrds":
                 from .wrds_source import download_wrds_snapshot
-                if args.verify_monthly:
-                    download_wrds_snapshot(study, args.data_dir, verify_monthly=True)
-                else:
-                    download_wrds_snapshot(study, args.data_dir)
+
+                download_wrds_snapshot(study, args.data_dir, verify_monthly=args.verify_monthly)
             else:
                 download_snapshot(study, args.data_dir)
             print(f"Saved source snapshot: {args.data_dir.resolve()}")
@@ -161,10 +159,11 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "predict":
             _predict(args, study)
         elif args.command == "protection":
-            from .protection_config import load_protection
-            from .return_data import load_returns
             from .protection import run_protection
+            from .protection_config import load_protection
             from .protection_report import write_protection
+            from .return_data import load_returns
+
             if args.output_dir.exists() or args.output_dir.resolve().is_relative_to(args.data_dir.resolve()):
                 raise ValueError("Use a new output directory outside the source snapshot.")
             settings = load_protection(args.config, study)

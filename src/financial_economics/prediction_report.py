@@ -104,7 +104,7 @@ def _figure_tables(tables, result, study, settings):
             "figure_growth_drawdowns": growth, "figure_protection": protection}
 
 
-def _figures(output, result, settings, source):
+def _figures(output, result, source):
     """Render only the saved figure CSVs, with no hidden plotting calculations."""
     plt.rcParams.update({"font.size": 11, "axes.spines.top": False, "axes.spines.right": False,
                          "text.color": "#222222", "axes.labelcolor": "#222222"})
@@ -216,7 +216,7 @@ def write_prediction(result, study, settings, manifest, directory, config_path,
         if checkpoints is not None:
             shutil.copytree(Path(checkpoints), output / "checkpoints")
         provider = manifest.get("sources", {}).get("prices", {}).get("provider", "Unspecified provider")
-        _figures(output, result, settings, provider)
+        _figures(output, result, provider)
         try:
             commit = git_head()
             dirty = git_dirty()

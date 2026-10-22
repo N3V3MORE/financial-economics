@@ -22,7 +22,6 @@ STAGES = ("classical", "gru_univar", "gru_multivar")
 LOG_STAGES = ("gru_univar_log", "gru_multivar_log")
 
 
-
 def _code_hashes(stage):
     names = ["paper_sources.py", "paper.py", "forecasting.py", "paper_reconstruction.py"]
     if stage == "classical":

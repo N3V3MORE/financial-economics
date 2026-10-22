@@ -244,7 +244,7 @@ def test_cli_selects_wrds_without_yahoo(sample, monkeypatch, tmp_path):
     config.write_text('[study]\nname="test"\nstart="2024-01-02"\nend="2024-01-04"\n'
                       'benchmark="AAA"\n[assets]\nAAA="Stocks"\n')
     calls = []
-    monkeypatch.setattr(wrds, "download_wrds_snapshot", lambda study, path: calls.append(path))
+    monkeypatch.setattr(wrds, "download_wrds_snapshot", lambda study, path, verify_monthly: calls.append(path))
     monkeypatch.setattr(cli, "download_snapshot", lambda *a: pytest.fail("Unexpected Yahoo fallback"))
     assert cli.main(["--config", str(config), "download", "--source", "wrds",
                      "--data-dir", str(tmp_path / "wrds")]) == 0

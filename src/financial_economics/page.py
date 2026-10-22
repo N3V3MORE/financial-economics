@@ -118,7 +118,7 @@ def _growth_chart(returns: pd.DataFrame, seed: str, label: str) -> str:
             '<div class="readout" hidden></div></figure>')
 
 
-def _axis(left: int, right: int, bottom: int, ticks: list, scale) -> str:
+def _axis(bottom: int, ticks: list, scale) -> str:
     parts = []
     for value, label in ticks:
         parts.append(f'<line class="grid" x1="{scale(value):.1f}" x2="{scale(value):.1f}" y1="0" y2="{bottom}"/>'
@@ -135,7 +135,7 @@ def _loss_chart(episodes: pd.DataFrame, comparison: pd.DataFrame, names: list[st
     def x(loss):
         return left + (right - left) * loss / xmax
 
-    parts = [_axis(left, right, bottom, [(v, f"{v}%") for v in range(0, xmax + 1, 10)], x)]
+    parts = [_axis(bottom, [(v, f"{v}%") for v in range(0, xmax + 1, 10)], x)]
     losses = comparison.pivot(index="episode", columns="asset", values="peak_to_trough_return") * -100
     for i, episode in enumerate(episodes.itertuples()):
         cy = row * i + row / 2
@@ -160,7 +160,7 @@ def _range_chart(rows: pd.DataFrame, title: str, limit: float, scale: float,
         return left + (right - left) * (scale * value + limit) / (2 * limit)
 
     ticks = [(-limit / scale, f"{-limit:g}"), (0, "0"), (limit / scale, f"+{limit:g}")]
-    parts = [_axis(left, right, bottom, ticks, x),
+    parts = [_axis(bottom, ticks, x),
              f'<line class="zero" x1="{x(0):.1f}" x2="{x(0):.1f}" y1="0" y2="{bottom}"/>']
     for i, item in enumerate(rows.itertuples()):
         cy = row * i + row / 2

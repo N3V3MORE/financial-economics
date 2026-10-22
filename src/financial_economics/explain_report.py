@@ -14,6 +14,7 @@ import numpy as np
 
 from .config import Study
 from .explain import ExplainResult
+from .report import _save_figure
 
 LABELS = {"sharpe": "Sharpe ratio", "cagr": "Yearly growth",
           "annualized_volatility": "Yearly fluctuation"}
@@ -24,11 +25,6 @@ def _format(measure: str, value: float) -> str:
     if measure == "sharpe":
         return f"{value:+.3f}"
     return f"{100 * value:+.2f} pp"
-
-
-def _save_figure(figure, destination: Path) -> None:
-    figure.savefig(destination, dpi=160, bbox_inches="tight")
-    plt.close(figure)
 
 
 def _write_figures(result: ExplainResult, output: Path) -> None:

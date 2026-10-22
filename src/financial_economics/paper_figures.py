@@ -37,7 +37,6 @@ FIGURE_MODEL = "gru_multivar"
 FIGURE_STRESS = (.9, .3)  # Figure 7's shown scenario: 90th percentile, 30% cap
 
 
-
 def _eligible(forecasts, returns):
     return forecasts.loc[forecasts.return_date.isin(returns.index)]
 

@@ -27,7 +27,7 @@ def _parse_rates(raw):
                        r'<td[^>]*>\s*(ND|\d+(?:\.\d+)?)\s*</td>\s*</tr>', raw.decode(), re.I)
     observed = [(datetime.strptime(date, "%d-%b-%y"), float(value))
                 for date, value in pairs if value.upper() != "ND"]
-    series = pd.Series({date: value for date, value in observed}, dtype=float)
+    series = pd.Series(dict(observed), dtype=float)
     if (not observed or len(series) != len(observed) or not series.index.is_monotonic_increasing
             or not np.isfinite(series).all() or (series <= 0).any()):
         raise ValueError("Federal Reserve FX needs ordered, unique, positive dated observations.")

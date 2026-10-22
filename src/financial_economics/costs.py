@@ -21,6 +21,25 @@ def _weights(values: dict, columns: pd.Index) -> np.ndarray:
     return weights
 
 
+def _retained_value(desired: np.ndarray, held: np.ndarray, rate: float) -> float:
+    """Exactly solve v + rate * sum(abs(v * desired - held)) = 1 for v in [0, 1].
+
+    The left side is piecewise linear and strictly increasing because rate < 1
+    and desired sums to at most one, so the root lies on the segment between
+    the last kink below one and the first kink at or above it.
+    """
+    moving = desired > 0
+    kinks = held[moving] / desired[moving]
+    points = np.unique(np.r_[0., kinks[(kinks > 0) & (kinks < 1)], 1.])
+    totals = points + rate * np.abs(np.outer(points, desired) - held).sum(axis=1)
+    upper = int(np.searchsorted(totals, 1.))
+    if totals[upper] == 1:
+        return float(points[upper])
+    lower = upper - 1
+    return float(points[lower] + (1 - totals[lower]) * (points[upper] - points[lower])
+                 / (totals[upper] - totals[lower]))
+
+
 def dynamic_costed_path(returns: pd.DataFrame, targets: pd.DataFrame,
                         cost_bps: float = 0,
                         rebalance_dates: pd.DatetimeIndex | None = None) -> pd.DataFrame:
@@ -61,17 +80,8 @@ def dynamic_costed_path(returns: pd.DataFrame, targets: pd.DataFrame,
         if rebalance[day]:
             desired = desired_weights[day]
             if rate:
-                # Solve v + fee * sum(abs(v * target - existing)) = 1.
                 # Both ETF sales and purchases fund the final target weights.
-                low, high = 0.0, 1.0
-                for _ in range(55):
-                    value = (low + high) / 2
-                    volume = np.abs(value * desired[risky] - held[risky]).sum()
-                    if value + rate * volume > 1:
-                        high = value
-                    else:
-                        low = value
-                retained = (low + high) / 2
+                retained = _retained_value(desired[risky], held[risky], rate)
             turnover = float(np.abs(retained * desired[risky] - held[risky]).sum())
             held = desired.copy()
         gross_return = float(held @ daily)

@@ -134,9 +134,9 @@ def evaluate_paper(returns, forecasts, settings, models=MODELS):
     details = pd.DataFrame(definitions).set_index("portfolio").join(metrics)
     additions = details.loc[details.asset.ne("cash")].copy()
     measures = ("sharpe", "paper_inferred_sharpe", "calmar")
+    clean = metrics.reindex(additions.model + "_clean")
     for measure in measures:
-        additions[f"{measure}_minus_clean"] = [row[measure] - metrics.loc[f"{row.model}_clean", measure]
-                                                 for _, row in additions.iterrows()]
+        additions[f"{measure}_minus_clean"] = additions[measure] - clean[measure].to_numpy()
     mean_columns = [*measures, *(f"{measure}_minus_clean" for measure in measures)]
     asset_means = additions.groupby(["model", "asset"])[mean_columns].mean()
     by_quantile = additions.groupby(["model", "asset", "quantile"])[mean_columns].mean()
@@ -158,10 +158,9 @@ def evaluate_paper(returns, forecasts, settings, models=MODELS):
                                *(benchmark.assign(model=model) for model in models)], ignore_index=True)
         decline_means = described.groupby(["decline", "model", "asset"])[
             ["cumulative_return", "paper_inferred_modified_sharpe", "arithmetic_modified_sharpe"]].mean()
+        clean = decline_means.xs("cash", level="asset").reindex(decline_means.index.droplevel("asset"))
         for measure in ("cumulative_return", "paper_inferred_modified_sharpe", "arithmetic_modified_sharpe"):
-            decline_means[f"{measure}_minus_clean"] = [
-                row[measure] - decline_means.loc[(decline, model, "cash"), measure]
-                for (decline, model, asset), row in decline_means.iterrows()]
+            decline_means[f"{measure}_minus_clean"] = decline_means[measure] - clean[measure].to_numpy()
     reference = dict(zip(MODELS, PUBLISHED, strict=True))
     published = pd.DataFrame([reference[model.removesuffix("_log")] for model in models],
                              index=pd.Index(models, name="model"),

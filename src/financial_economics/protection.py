@@ -139,7 +139,7 @@ def run_protection(data, study, settings):
             calibration.append({"portfolio": name, "status": "undefined_training_beta"})
             continue
         weight = float(np.clip(raw, 0, 1))
-        control_weights = {asset: 0. for asset in daily.columns}
+        control_weights = dict.fromkeys(daily.columns, 0.)
         control_weights.update({benchmark: weight, "RF": 1-weight})
         for cost in settings.costs_bps:
             pair = pd.DataFrame({name: monthly_costed_path(evaluation, definitions[name], cost)["return"],
