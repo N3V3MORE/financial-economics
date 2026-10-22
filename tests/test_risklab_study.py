@@ -14,10 +14,12 @@ def test_missing_risklab_dates_stay_missing_and_targets_are_actual_t_plus_two():
     bv = pd.Series(np.arange(1, 13, dtype=float), index=calendar).drop(calendar[6])
     prepared = univariate_inputs(bv, calendar, lookback=3)
     rows = prepared.rows
-    # Histories skip the missing session; they never fill it.
-    assert prepared.inputs[4, :, 0].tolist() == [5., 6., 8.]
+    # A window containing the missing session is skipped, never filled or bridged.
+    assert not rows.index.isin(calendar[6:9]).any() and calendar[9:10].isin(rows.index).all()
     for position, issue in enumerate(rows.index):
         assert prepared.inputs[position, :, 0].tolist() == bv.loc[:issue].iloc[-3:].tolist()
+        window = calendar[calendar.get_loc(issue) - 2:calendar.get_loc(issue) + 1]
+        assert window.isin(bv.index).all()
     # The target is the market session two days after issue, even when that date lacks a measurement.
     assert (rows.return_date == calendar[calendar.get_indexer(rows.index) + 2]).all()
     assert rows.loc[rows.return_date == calendar[6], "realized_bv"].isna().all()

@@ -2,11 +2,15 @@
 
 Run ``python -m financial_economics.paper_revised --help``. Freeze a new run,
 then run classical, gru_univar_log, gru_multivar_log and evaluate sequentially.
-Historical results are exploratory. Original reconstruction caches stay frozen.
+The volatility target is Risk Lab SPY 5-minute trade realized variance; dates it
+lacks stay missing, and no model treats observations either side of a gap as
+adjacent lags. Historical results are exploratory; archived Oxford-based
+reconstruction caches stay frozen in their own modules.
 Classical fitting/accounting are CPU-native; neural fitting requires cuda:0.
 """
 
 import argparse
+from itertools import combinations
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -14,20 +18,22 @@ import tomllib
 
 import numpy as np
 import pandas as pd
+from scipy.optimize import minimize_scalar
+from scipy.signal import fftconvolve
 from statsmodels.stats.multitest import multipletests
 
 from .config import load_study
-from .forecasting import ForecastData
+from .forecasting import ForecastData, qlike
 from .gru_forecasting import _annual_splits, _gpu_inputs, _gpu_metadata, _require_cuda, _uses_native_rnn
-from .paper import load_bipower
 from .paper_evaluation import _forecast_scores
 from .paper_gru import _cv_folds
-from .paper_models import _arfima_forecast, _fractional_prediction, _garch_forecast
+from .paper_models import _fractional_prediction, _fractional_weights, _garch_forecast
 from .paper_networks import _profiles
 from .paper_networks_log import _fit, _log_inputs, _log_predictions, _log_scale
 from .paper_realistic import (_declines, _performance, _tests, load_realistic_settings,
                               realistic_portfolios, sharpe_difference_test)
 from .paper_sources import _past_values, load_sources
+from .prediction_inference import _hac_test
 from .provenance import directory_digests, file_digest, git_dirty, git_head, package_code_digests, utc_now, verify_files
 from .return_data import load_returns
 from .volatility_proxy import load_risklab_bv
@@ -36,12 +42,18 @@ from .volatility_proxy import load_risklab_bv
 MODELS = ("ewma", "arfima", "garch", "gjr", "gru_univar_log", "gru_multivar_log")
 STAGES = ("classical", "gru_univar_log", "gru_multivar_log", "evaluate")
 COSTS_BPS = (0, 1, 2, 5, 10, 25)
+EWMA_DEFINITION = ("truncated normalized EWMA: the last 22 observed daily variances, all from consecutive "
+                   "market sessions, weighted 0.94**k (k=0 for the issue date) and divided by the weight sum; "
+                   "the h=2 forecast holds that level. Not the recursive RiskMetrics filter, whose weights "
+                   "extend over the whole history and sum to one only in the limit.")
 
 
 def matched_inputs(observations, bv, calendar, lookback=22):
     """Both GRUs receive identical dated histories; extra inputs lag one session.
 
     There is no artificial 2002 cutoff: start when all substitute features exist.
+    A history is the last ``lookback`` consecutive market sessions; an issue date
+    whose window contains a missing variance is skipped, never filled or bridged.
     Same-date BV availability and historical macro vintages remain assumptions.
     Targets are the actual market session t+2; missing labels remain missing.
     """
@@ -64,14 +76,16 @@ def matched_inputs(observations, bv, calendar, lookback=22):
                           "oil_log": np.log(levels["OIL"]).diff(),
                           "gov_change": levels["gov_yield"].diff(),
                           "corp_change": levels["corp_yield"].diff()}, index=dates).shift(1)
-    features = pd.concat([bv.reindex(dates).rename("bv"), extra], axis=1).dropna()
-    if len(features) < lookback + 2 or not np.isfinite(features).all().all():
+    features = pd.concat([bv.reindex(dates).rename("bv"), extra], axis=1)
+    observed = features.notna().all(axis=1).to_numpy()
+    complete = np.lib.stride_tricks.sliding_window_view(observed, lookback).all(axis=1)
+    if complete.sum() < 2 or not np.isfinite(features[observed]).all().all():
         raise ValueError("Insufficient finite common features for matched forecasting.")
-    issues = features.index[lookback - 1:]
+    issues = dates[lookback - 1:][complete]
     positions = calendar.get_indexer(issues)
     keep = positions + 2 < len(calendar)
     inputs = np.lib.stride_tricks.sliding_window_view(
-        features.to_numpy(), lookback, axis=0).transpose(0, 2, 1)[keep].copy()
+        features.to_numpy(), lookback, axis=0).transpose(0, 2, 1)[complete][keep].copy()
     positions = positions[keep]
     rows = pd.DataFrame({"trade_date": calendar[positions + 1], "return_date": calendar[positions + 2],
                          "realized_bv": bv.reindex(calendar[positions + 2]).to_numpy()},
@@ -79,6 +93,7 @@ def matched_inputs(observations, bv, calendar, lookback=22):
     return (ForecastData(rows.copy(), inputs[:, :, :1].copy()), ForecastData(rows.copy(), inputs),
             {"first_common_issue": str(rows.index[0].date()), "common_observations": len(rows),
              "input_channels": list(features), "external_feature_lag_sessions": 1,
+             "issues_skipped_for_incomplete_history": int((~complete).sum()),
              "feature_carries": carries, "target_horizon_sessions": 2, "history_trading_days": lookback})
 
 
@@ -193,13 +208,66 @@ def matched_gru(prepared, calendar, checkpoint_dir, settings, model_name, progre
                             **_gpu_metadata(torch, native_rnn=_uses_native_rnn(torch), rnn_autograd_nodes=nodes)}
 
 
+def consecutive_segments(observed, sessions):
+    """Split observed values into runs of consecutive market sessions."""
+    positions = sessions.get_indexer(observed.index)
+    if (positions < 0).any():
+        raise ValueError("Variance observations must fall on market sessions.")
+    return np.split(observed.to_numpy(dtype=float), np.flatnonzero(np.diff(positions) > 1) + 1)
+
+
+def segmented_arfima(segments, variance_floor=1e-12):
+    """ARFIMA(0,d,0) by conditional sums of squares, restarting the filter at every gap.
+
+    No lag ever spans a missing session: the likelihood sums each consecutive run
+    separately, and the h=1 and h=2 forecasts use only the final run's lags.
+    With one run this equals the ungapped estimator.
+    """
+    values = np.concatenate(segments)
+    scale = float(values.mean())
+    normalized = [segment / scale for segment in segments]
+    if np.ptp(values / scale) <= 1e-12:
+        raise RuntimeError("ARFIMA requires variation to identify fractional memory.")
+    longest = max(len(segment) for segment in segments)
+
+    def residuals(d):
+        weights = _fractional_weights(d, longest)
+        constant = weights.cumsum()
+        filtered = np.concatenate([fftconvolve(segment, weights)[:len(segment)] for segment in normalized])
+        constants = np.concatenate([constant[:len(segment)] for segment in normalized])
+        mean = float(filtered @ constants / (constants @ constants))
+        return filtered - mean * constants, mean
+
+    def objective(d):
+        errors, _ = residuals(d)
+        return float(np.log(max(float(errors @ errors / len(values)), np.finfo(float).tiny)))
+
+    fitted = minimize_scalar(objective, bounds=(-.49, .49), method="bounded",
+                             options={"xatol": 1e-7, "maxiter": 200})
+    if not fitted.success or not np.isfinite(fitted.fun):
+        raise RuntimeError(f"ARFIMA optimizer failed: {fitted.message}")
+    d = float(fitted.x)
+    _, mean = residuals(d)
+    mean_bv = mean * scale
+    one_step = _fractional_prediction(segments[-1], d, mean_bv)
+    raw = _fractional_prediction(np.r_[segments[-1], one_step], d, mean_bv)
+    if not np.isfinite(raw):
+        raise RuntimeError("ARFIMA produced a nonfinite h=2 forecast.")
+    return max(raw, variance_floor), {"d": d, "mean_bv": mean_bv, "raw_forecast_bv": raw,
+                                      "segments": len(segments), "final_segment_length": len(segments[-1])}
+
+
 def two_step_classical(rows, bv, price_returns, settings, progress=print):
-    """Analytic h=2 GARCH/GJR and recursive h=2 ARFIMA, fitted sequentially."""
+    """Analytic h=2 GARCH/GJR, gap-aware recursive h=2 ARFIMA and truncated EWMA.
+
+    Windows are counted in market sessions (``price_returns`` dates). ARFIMA never
+    bridges a missing variance date; EWMA follows ``EWMA_DEFINITION``.
+    """
     result, records, starts = rows.copy(), [], {}
     weights = .94 ** np.arange(settings["lookback"] - 1, -1, -1)
-    lengths = {"arfima": len(bv.loc[settings["window_start"]:settings["window_end"]]),
-               "garch": len(price_returns.loc[settings["window_start"]:settings["window_end"]])}
-    lengths["gjr"] = lengths["garch"]
+    sessions = price_returns.index
+    lengths = {"garch": len(price_returns.loc[settings["window_start"]:settings["window_end"]])}
+    lengths["gjr"] = lengths["arfima"] = lengths["garch"]
     if min(lengths.values()) < 60:
         raise ValueError("Classical models require at least 60 initial observations.")
     for name in MODELS[:4]:
@@ -209,17 +277,18 @@ def two_step_classical(rows, bv, price_returns, settings, progress=print):
         if issue.month != previous_month:
             progress(f"Classical h=2 fits: {issue.date()}", flush=True)
         previous_month = issue.month
-        history = bv.loc[:issue]
-        result.loc[issue, "ewma_bv"] = float(history.iloc[-len(weights):] @ (weights / weights.sum()))
+        history = bv.loc[:issue].iloc[-len(weights):]
+        if sessions.get_loc(history.index[-1]) - sessions.get_loc(history.index[0]) != len(weights) - 1:
+            raise ValueError("EWMA histories must be consecutive market sessions.")
+        result.loc[issue, "ewma_bv"] = float(history @ (weights / weights.sum()))
         result.loc[issue, "ewma_refit_asof"] = issue
         for name, source in (("arfima", bv), ("garch", price_returns), ("gjr", price_returns)):
-            observed = source.loc[settings["window_start"]:issue]
+            window = sessions[(sessions >= pd.Timestamp(settings["window_start"])) & (sessions <= issue)]
             if settings["window"] == "rolling":
-                observed = observed.iloc[-lengths[name]:]
+                window = window[-lengths[name]:]
+            observed = source.loc[window[0]:issue]
             if name == "arfima":
-                _, details = _arfima_forecast(observed.to_numpy())
-                raw = _fractional_prediction(np.r_[observed, details["raw_forecast_bv"]],
-                                              details["d"], details["mean_bv"])
+                raw, details = segmented_arfima(consecutive_segments(observed, sessions))
             else:
                 one_step, details, starts[name] = _garch_forecast(
                     observed.to_numpy(), asymmetric=name == "gjr", starting_values=starts.get(name))
@@ -230,23 +299,77 @@ def two_step_classical(rows, bv, price_returns, settings, progress=print):
             result.loc[issue, f"{name}_refit_asof"] = issue
             records.append({"issue_date": issue, "model": name, "training_first": observed.index[0],
                             "training_last": observed.index[-1], "training_observations": len(observed),
+                            "training_sessions": len(window), "segments": details.get("segments", 1),
                             "horizon": 2, "raw_forecast_bv": raw, "forecast_floored": raw < 1e-12})
     return result, pd.DataFrame(records)
 
 
+def hansen_lunde_factor(bv, price_returns, end):
+    """Close-to-close over intraday variance, summed over common dates through ``end`` only."""
+    common = bv.index.intersection(price_returns.index)
+    common = common[common <= pd.Timestamp(end)]
+    if len(common) < 250:
+        raise ValueError("The Hansen-Lunde scale needs at least 250 pre-evaluation dates.")
+    return float((price_returns.loc[common] ** 2).sum() / bv.loc[common].sum())
+
+
+def robust_forecast_scores(forecasts, price_returns, factor, hac_lags, models=MODELS):
+    """Score every model on intraday and close-to-close targets with robust and reference losses.
+
+    Variance MSE and QLIKE are robust to a noisy unbiased variance proxy (Patton 2011);
+    volatility MSE is not and is reported for reference only. GARCH/GJR forecast
+    close-to-close variance and the others intraday variance, so each target scales
+    the models of the other kind by the training-only Hansen-Lunde factor.
+    """
+    close_models = {"garch", "gjr"}
+    close = price_returns.reindex(pd.DatetimeIndex(forecasts.return_date)).to_numpy() ** 2
+    labeled = forecasts.realized_bv.notna().to_numpy() & np.isfinite(close)
+    targets = {"intraday": forecasts.realized_bv.to_numpy()[labeled], "close_to_close": close[labeled]}
+    losses = {"variance_mse": lambda x, h: (x - h) ** 2, "qlike": qlike,
+              "volatility_mse_reference": lambda x, h: (np.sqrt(x) - np.sqrt(h)) ** 2}
+    scores, tests = [], []
+    for target, actual in targets.items():
+        predicted = {}
+        for model in models:
+            values = forecasts[f"{model}_bv"].to_numpy()[labeled]
+            if target == "intraday" and model in close_models:
+                values = values / factor
+            elif target == "close_to_close" and model not in close_models:
+                values = values * factor
+            predicted[model] = values
+        for loss, function in losses.items():
+            series = {model: function(actual, predicted[model]) for model in models}
+            means = pd.Series({model: float(values.mean()) for model, values in series.items()})
+            for model in models:
+                scores.append({"target": target, "loss": loss, "model": model, "mean_loss": means[model],
+                               "rank": int(means.rank(method="min")[model]), "n_obs": int(labeled.sum()),
+                               "robust_to_noisy_proxy": loss != "volatility_mse_reference"})
+            family = []
+            for row, column in combinations(models, 2):
+                difference = series[column] - series[row]
+                inference = _hac_test(difference, np.ones((len(difference), 1)), 0, hac_lags, .05)
+                family.append({"target": target, "loss": loss, "row_model": row, "column_model": column,
+                               "loss_column_minus_row": float(difference.mean()),
+                               "dm_statistic": (float(difference.mean() / inference["hac_se"])
+                                                if inference["status"] == "available" else np.nan),
+                               "n_obs": len(difference), **inference})
+            family = pd.DataFrame(family)
+            family["holm_p_value"] = np.where(family.p_value.notna(),
+                multipletests(family.p_value.fillna(1), method="holm")[1], np.nan)
+            tests.append(family)
+    return pd.DataFrame(scores), pd.concat(tests, ignore_index=True)
+
+
 def _input_identity(args):
-    volatility = ({"oxford_archive": args.oxford_archive} if args.risklab_dir is None
-                  else {"risklab_manifest": args.risklab_dir / "manifest.json"})
     return {name: file_digest(path) for name, path in {
         "reconstruction_config": args.config, "portfolio_config": args.portfolio_config,
-        "source_manifest": args.data_dir / "manifest.json", **volatility,
+        "source_manifest": args.data_dir / "manifest.json",
+        "risklab_manifest": args.risklab_dir / "manifest.json",
         "returns_manifest": args.returns_dir / "manifest.json"}.items()}
 
 
 def _volatility(args, calendar, end):
-    """Oxford SPX BV, or Risk Lab SPY 5-minute trade variance on the same market calendar."""
-    if args.risklab_dir is None:
-        return load_bipower(args.oxford_archive, "2000-01-01", end)
+    """Risk Lab SPY 5-minute trade variance on the public S&P 500 market calendar."""
     bv, _ = load_risklab_bv(args.risklab_dir, "2000-01-01", end)
     return bv.loc[bv.index.isin(calendar)]
 
@@ -274,8 +397,7 @@ def _read_stage(root, stage, protocol_digest):
 
 def run(args):
     root = args.output_dir.resolve()
-    protected = [args.data_dir.resolve(), args.returns_dir.resolve(),
-                 (args.oxford_archive if args.risklab_dir is None else args.risklab_dir).resolve()]
+    protected = [args.data_dir.resolve(), args.returns_dir.resolve(), args.risklab_dir.resolve()]
     if any(root.is_relative_to(path) or path.is_relative_to(root) for path in protected):
         raise ValueError("Revised outputs must be separate from every source input.")
     with args.config.open("rb") as source:
@@ -288,13 +410,18 @@ def run(args):
         protocol = {"created_at_utc": utc_now(), "inputs": identity, "code": package_code_digests(),
                     "forecast_settings": settings, "portfolio_settings": portfolio_settings,
                     "forecast_horizon": 2, "external_feature_lag_sessions": 1,
-                    "volatility_source": ("Oxford-Man SPX bipower variation" if args.risklab_dir is None
-                                          else "Risk Lab SPY 5-minute trade realized variance"),
+                    "volatility_source": "Risk Lab SPY 5-minute trade realized variance (trade_rv5**2/252)",
+                    "missing_dates_rule": "issue only after the last lookback sessions are all observed; "
+                                          "ARFIMA restarts its filter at gaps; portfolios hold their last target",
+                    "ewma_definition": EWMA_DEFINITION,
+                    "forecast_scoring": "intraday and close-to-close targets; variance MSE and QLIKE (robust), "
+                                        "volatility MSE for reference; training-only Hansen-Lunde scale",
                     "evaluation_status": "exploratory revision of previously inspected historical data",
                     "subperiods": "slices of continuously held paths; liquidation charged only at the final evaluation close",
                     "selection": "matched observations; distinct purged stopping and scoring blocks",
                     "comparison_family": "all six timing/static tests; all configured defensive additions; both GRUs versus EWMA; richer versus univariate GRU; one joint Holm adjustment",
-                    "limitations": ["Oxford ends in February 2022; substitute inputs here end in 2020",
+                    "limitations": ["Risk Lab measures SPY trades with realized variance, not the S&P 500 index "
+                                    "or bipower variation; macro substitute inputs end in 2020",
                                     "Macro data are revised historical vintages; one-session lag is an assumption",
                                     "Same-close BV availability not verified; intraday BV omits overnight risk",
                                     "10% is an equity risk budget; defensive additions can change total risk",
@@ -317,6 +444,7 @@ def run(args):
     calendar = observations.equity_price.dropna().loc[:settings["evaluation_end"]].index
     bv = _volatility(args, calendar, settings["evaluation_end"])
     univar, multivar, quality = matched_inputs(observations, bv, calendar, settings["lookback"])
+    prices = np.log(observations.equity_price.dropna()).diff().dropna()
     first_refit = calendar[calendar < settings["evaluation_start"]][-1]
     eligible = univar.rows.loc[univar.rows.index >= first_refit]
     with TemporaryDirectory(prefix=".revised-", dir=root) as temporary:
@@ -324,7 +452,6 @@ def run(args):
         output.mkdir()
         model_metadata = {}
         if args.stage == "classical":
-            prices = np.log(observations.equity_price.dropna()).diff().dropna()
             forecasts, fits = two_step_classical(eligible, bv, prices, settings)
             tables = {"forecasts": forecasts, "daily_fits": fits}
             model_metadata = {"backend": "CPU-native SciPy/arch", "forecast_horizon": 2,
@@ -373,13 +500,17 @@ def run(args):
             scores, forecast_tests = _forecast_scores(scored, {**settings, "monthly_multiplier": np.sqrt(252)}, MODELS)
             scores = scores.rename(columns={"monthly_mse": "annual_volatility_mse", "monthly_mape": "annual_volatility_mape"})
             forecast_tests["measure"] = forecast_tests.measure.str.replace("monthly", "annual_volatility", regex=False)
+            factor = hansen_lunde_factor(bv, prices, settings["training_end"])
+            robust_scores, robust_tests = robust_forecast_scores(scored, prices, factor, settings["dm_hac_lags"])
             tables = {"forecasts": forecasts, "performance": metrics, "tests": tests,
                       "forecast_scores": scores, "forecast_tests": forecast_tests,
+                      "forecast_robust_scores": robust_scores, "forecast_robust_tests": robust_tests,
                       "declines": _declines(result, portfolio_settings), "thresholds": result["thresholds"],
                       "static_controls": result["static_controls"], "decisions": result["decisions"]}
             for cost, paths in result["paths"].items():
                 tables[f"daily_returns_{cost:g}bps"] = paths
             model_metadata = {"portfolio_days": len(result["returns"]), "models": list(MODELS),
+                              "hansen_lunde_factor": factor, "ewma_definition": EWMA_DEFINITION,
                               "forecast_horizon": 2, "inference": "exploratory; previously inspected history"}
         for name, frame in tables.items():
             frame.to_csv(output / f"{name}.csv", index=not isinstance(frame.index, pd.RangeIndex))
@@ -398,9 +529,7 @@ def main(argv=None):
     parser.add_argument("--portfolio-config", type=Path, default=Path("configs/paper-realistic.toml"))
     parser.add_argument("--data-dir", type=Path, required=True)
     parser.add_argument("--returns-dir", type=Path, required=True)
-    volatility = parser.add_mutually_exclusive_group(required=True)
-    volatility.add_argument("--oxford-archive", type=Path)
-    volatility.add_argument("--risklab-dir", type=Path, help="Risk Lab SPY snapshot used instead of Oxford")
+    parser.add_argument("--risklab-dir", type=Path, required=True, help="Verified Risk Lab SPY snapshot")
     parser.add_argument("--output-dir", type=Path, required=True)
     args = parser.parse_args(argv)
     try:

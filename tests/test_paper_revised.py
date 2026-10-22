@@ -158,8 +158,7 @@ def test_freeze_never_overwrites_and_changed_code_requires_new_run(tmp_path, mon
     monkeypatch.setattr(revised, "_portfolio_settings", lambda _: {"risk_mode": "annual"})
     monkeypatch.setattr(revised, "package_code_digests", lambda: {"model": "original"})
     args = Namespace(stage="freeze", config=config, output_dir=tmp_path / "run", data_dir=tmp_path / "source",
-                     returns_dir=tmp_path / "returns", oxford_archive=tmp_path / "bv.zip",
-                     risklab_dir=None)
+                     returns_dir=tmp_path / "returns", risklab_dir=tmp_path / "risklab")
     revised.run(args)
     frozen = json.loads((args.output_dir / "protocol.json").read_text())
     assert frozen["forecast_settings"]["lookback"] == 3
@@ -200,7 +199,7 @@ def test_staged_revision_evaluates_complete_returns_and_joint_exploratory_tests(
     monkeypatch.setattr(revised, "package_code_digests", lambda: {"code": "frozen"})
     monkeypatch.setattr(revised, "_portfolio_settings", lambda _: portfolio)
     monkeypatch.setattr(revised, "load_sources", lambda _: (observations, {}))
-    monkeypatch.setattr(revised, "load_bipower", lambda *a: bv)
+    monkeypatch.setattr(revised, "load_risklab_bv", lambda *a: (bv, {}))
     monkeypatch.setattr(revised, "load_study", lambda _: None)
     monkeypatch.setattr(revised, "load_returns", lambda *a, **kw: ReturnData(daily, factors, calendar[0], {}))
 
@@ -223,8 +222,7 @@ def test_staged_revision_evaluates_complete_returns_and_joint_exploratory_tests(
     monkeypatch.setattr(revised, "matched_gru", neural)
     args = Namespace(stage="freeze", config=config, portfolio_config=config,
                      output_dir=tmp_path / "run", data_dir=tmp_path / "source",
-                     returns_dir=tmp_path / "returns", oxford_archive=tmp_path / "bv.zip",
-                     risklab_dir=None)
+                     returns_dir=tmp_path / "returns", risklab_dir=tmp_path / "risklab")
     revised.run(args)
     for stage in revised.STAGES:
         args.stage = stage
@@ -241,3 +239,65 @@ def test_staged_revision_evaluates_complete_returns_and_joint_exploratory_tests(
     assert metadata["model"]["forecast_horizon"] == 2
     with pytest.raises(ValueError, match="never overwritten"):
         revised.run(args)
+
+
+def test_issue_dates_whose_history_spans_a_missing_session_are_skipped():
+    observations, bv, calendar = inputs_fixture()
+    gap = calendar[1300]
+    one, five, quality = revised.matched_inputs(observations, bv.drop(gap), calendar, 3)
+    pd.testing.assert_frame_equal(one.rows, five.rows)
+    position = calendar.get_loc(gap)
+    assert not one.rows.index.isin(calendar[position:position + 3]).any()
+    assert calendar[[position - 1, position + 3]].isin(one.rows.index).all()
+    for row, issue in enumerate(one.rows.index):
+        end = calendar.get_loc(issue)
+        np.testing.assert_array_equal(one.inputs[row, :, 0], bv.loc[calendar[end - 2:end + 1]])
+    assert quality["issues_skipped_for_incomplete_history"] >= 3
+
+
+def test_segmented_arfima_matches_the_ungapped_estimator_and_never_bridges_gaps():
+    from financial_economics.paper_models import _arfima_forecast, _fractional_prediction
+
+    _, bv, calendar = inputs_fixture()
+    window = bv.iloc[:400]
+    _, details = _arfima_forecast(window.to_numpy())
+    reference = _fractional_prediction(np.r_[window, details["raw_forecast_bv"]], details["d"], details["mean_bv"])
+    raw, segmented = revised.segmented_arfima(revised.consecutive_segments(window, calendar))
+    assert segmented["segments"] == 1 and segmented["d"] == pytest.approx(details["d"], abs=1e-9)
+    assert raw == pytest.approx(max(reference, 1e-12), rel=1e-9)
+    gapped = window.drop(window.index[[100, 101, 250]])
+    segments = revised.consecutive_segments(gapped, calendar)
+    assert [len(segment) for segment in segments] == [100, 148, 149]
+    # Values before the final gap move the estimate, but never the final run's lag weights.
+    changed = gapped.copy()
+    changed.iloc[:5] *= 3
+    _, a = revised.segmented_arfima(revised.consecutive_segments(gapped, calendar))
+    _, b = revised.segmented_arfima(revised.consecutive_segments(changed, calendar))
+    assert a["final_segment_length"] == b["final_segment_length"] == 149
+    with pytest.raises(ValueError, match="market sessions"):
+        revised.consecutive_segments(pd.Series(1., index=[pd.Timestamp("2006-01-07")]), calendar)
+
+
+def test_hansen_lunde_scale_uses_only_pre_evaluation_dates_and_aligns_targets():
+    calendar = pd.bdate_range("2008-01-01", "2011-12-30")
+    rng = np.random.default_rng(3)
+    bv = pd.Series(rng.uniform(.5, 1.5, len(calendar)) * 1e-4, index=calendar)
+    returns = pd.Series(rng.normal(0, 1, len(calendar)) * np.sqrt(1.4 * bv), index=calendar)
+    factor = revised.hansen_lunde_factor(bv, returns, "2009-12-31")
+    early = calendar[calendar <= "2009-12-31"]
+    assert factor == pytest.approx((returns[early] ** 2).sum() / bv[early].sum())
+    later = returns.copy()
+    later.loc["2010":] *= 10
+    assert revised.hansen_lunde_factor(bv, later, "2009-12-31") == factor
+    issues = calendar[300:-2]
+    frame = pd.DataFrame({"return_date": calendar[302:], "realized_bv": bv.loc[calendar[302:]].to_numpy()},
+                         index=issues)
+    for model in revised.MODELS:
+        frame[f"{model}_bv"] = frame.realized_bv * (factor if model in ("garch", "gjr") else 1.)
+    scores, tests = revised.robust_forecast_scores(frame, returns, factor, 5)
+    intraday = scores[(scores.target == "intraday") & (scores.loss == "variance_mse")]
+    # Rescaled close-to-close forecasts equal the intraday ones on the intraday target.
+    assert intraday.mean_loss.max() == pytest.approx(0., abs=1e-30)
+    assert set(scores.loss) == {"variance_mse", "qlike", "volatility_mse_reference"}
+    # Identical forecasts leave no loss difference to test, so no p-value is invented.
+    assert set(tests.target) == {"intraday", "close_to_close"} and "holm_p_value" in tests

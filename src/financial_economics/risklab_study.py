@@ -1,8 +1,9 @@
 """Trial 2022-2025 SPY/cash test trained and scored on Risk Lab volatility alone.
 
 Every date, from 2000 training history to the 2025 evaluation, uses the same Risk Lab
-SPY 5-minute trade measure; no Oxford labels are spliced in and missing dates stay
-missing. Settings match the earlier proxy pilot so the two can be compared.
+SPY 5-minute trade measure; missing dates stay missing, and a forecast is issued only
+when its whole history is consecutive market sessions. Settings match the earlier
+proxy pilot so the two can be compared.
 Optional: add the configured defensive ETFs in stress periods, and start the
 training history before 2000 on French's daily market calendar.
 Neural fitting requires cuda:0; EWMA/accounting are CPU-native.
@@ -22,7 +23,8 @@ from .data import parse_french_factors
 from .forecasting import ForecastData
 from .paper_realistic import (_performance, _tests, load_realistic_settings, realistic_portfolios,
                               sharpe_difference_test)
-from .paper_revised import _read_stage, matched_gru
+from .paper_revised import (EWMA_DEFINITION, _read_stage, hansen_lunde_factor, matched_gru,
+                            robust_forecast_scores)
 from .paper_sources import load_sources
 from .provenance import directory_digests, file_digest, package_code_digests, utc_now
 from .proxy_study import FORECAST_SETTINGS, portfolio_settings
@@ -31,6 +33,7 @@ from .volatility_proxy import load_risklab_bv
 
 
 DEFAULT_HISTORY_START = "2000-01-01"
+FORECAST_HAC_LAGS = 20
 
 
 def market_calendar(observations, daily_returns, french_dates=None, history_start=DEFAULT_HISTORY_START):
@@ -65,13 +68,18 @@ def trial_portfolio_settings(config, defensive):
 
 
 def univariate_inputs(bv, calendar, lookback):
-    """The last observed sessions as history; the actual session t+2 as target."""
+    """The last consecutive market sessions as history; the actual session t+2 as target.
+
+    Issue dates whose window contains a missing variance are skipped, never bridged.
+    """
     if not bv.index.isin(calendar).all() or not np.isfinite(bv).all() or (bv <= 0).any():
         raise ValueError("Risk Lab variance must be positive on known market dates.")
-    issues = bv.index[lookback - 1:]
+    values = bv.reindex(calendar).to_numpy()
+    complete = np.lib.stride_tricks.sliding_window_view(np.isfinite(values), lookback).all(axis=1)
+    issues = calendar[lookback - 1:][complete]
     positions = calendar.get_indexer(issues)
     keep = positions + 2 < len(calendar)
-    histories = np.lib.stride_tricks.sliding_window_view(bv.to_numpy(), lookback)[keep]
+    histories = np.lib.stride_tricks.sliding_window_view(values, lookback)[complete][keep]
     positions = positions[keep]
     rows = pd.DataFrame({"trade_date": calendar[positions + 1], "return_date": calendar[positions + 2],
                          "realized_bv": bv.reindex(calendar[positions + 2]).to_numpy()},
@@ -100,6 +108,9 @@ def run(args):
                   "forecast_settings": FORECAST_SETTINGS, "portfolio_settings": settings,
                   "history_start": args.history_start,
                   "target": "Risk Lab SPY 5-minute trade realized variance on every date; no Oxford labels",
+                  "missing_dates_rule": "issue only after the last lookback sessions are all observed; "
+                                        "portfolios hold their last target",
+                  "ewma_definition": EWMA_DEFINITION,
                   "status": "trial; exploratory; all study history already inspected",
                   "limitations": ["SPY ETF trades, not the S&P 500 index; intraday only, no overnight term",
                                   "Risk Lab dates absent from the market calendar stay missing, never filled",
@@ -136,6 +147,8 @@ def run(args):
             frame = frame.loc[frame.index >= first].copy()
             for issue in frame.index:
                 history = bv.loc[:issue].iloc[-FORECAST_SETTINGS["lookback"]:]
+                if calendar.get_loc(history.index[-1]) - calendar.get_loc(history.index[0]) != len(history) - 1:
+                    raise ValueError("EWMA histories must be consecutive market sessions.")
                 weights = .94 ** np.arange(len(history) - 1, -1, -1)
                 frame.loc[issue, "ewma_bv"] = float(history @ (weights / weights.sum()))
             frame["ewma_refit_asof"] = frame.index
@@ -157,7 +170,13 @@ def run(args):
             tests["holm_reject"] = tests.holm_p_value < settings["alpha"]
             performance = _performance(result, settings)
             performance["annual_equity_budget"] = .10
+            spy = np.log1p(data.daily.SPY.dropna())
+            factor = hansen_lunde_factor(bv, spy, FORECAST_SETTINGS["training_end"])
+            scored = frame.loc[frame.return_date.between(settings["evaluation_start"], settings["evaluation_end"])]
+            robust_scores, robust_tests = robust_forecast_scores(
+                scored, spy, factor, FORECAST_HAC_LAGS, models=settings["primary_models"])
             tables = {"forecasts": frame, "performance": performance, "tests": tests,
+                      "forecast_robust_scores": robust_scores, "forecast_robust_tests": robust_tests,
                       "decisions": result["decisions"], "thresholds": result["thresholds"],
                       "static_controls": result["static_controls"]}
             for cost, cost_paths in result["paths"].items():
@@ -165,6 +184,7 @@ def run(args):
             metadata = {"portfolio_days": len(result["returns"]), "forecast_horizon": 2,
                         "models": settings["primary_models"], "history_start": args.history_start,
                         "defensive_assets": [*settings["primary_assets"], *settings["secondary_assets"]],
+                        "hansen_lunde_factor": factor, "close_to_close_returns": "CRSP SPY log total returns",
                         "actual_return_source": "verified WRDS/CRSP ETF total returns"}
         for name, table in tables.items():
             table.to_csv(output / f"{name}.csv", index=not isinstance(table.index, pd.RangeIndex))

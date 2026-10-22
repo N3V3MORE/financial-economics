@@ -523,6 +523,20 @@ All six models (EWMA, ARFIMA, GARCH, GJR and both GRUs) forecast the session
 actually earned: issue at close t, trade at close t+1, earn the t+2 return.
 GARCH/GJR use analytic two-step variances; ARFIMA forecasts recursively;
 EWMA holds its conditional variance level without future observations.
+
+Since October 22, 2026 the volatility target is Risk Lab SPY 5-minute trade
+realized variance (`trade_rv5`² / 252) from `--risklab-dir`; the archived
+October 21 revision used Oxford-Man SPX bipower variation. A forecast is
+issued only when its 22-session history is complete; dates Risk Lab lacks are
+never filled, and portfolios hold their last target meanwhile. ARFIMA restarts
+its fractional filter at every gap, so no lag spans a missing session. EWMA is
+a truncated normalized average: the last 22 daily variances weighted 0.94^k
+and divided by the weight sum, not the recursive RiskMetrics filter.
+Forecast accuracy is scored on intraday and close-to-close targets with
+variance MSE and QLIKE (robust to a noisy variance proxy) and volatility MSE
+for reference. GARCH/GJR forecast close-to-close variance and the others
+intraday variance, so each target rescales the other kind by a Hansen–Lunde
+factor estimated on pre-2010 data only.
 The equity risk budget is 10% annually, using sqrt(252), with past-only
 stress cutoffs, observed cash income and verified ETF total returns.
 Defensive additions retain the stock target to isolate their contribution;
@@ -536,7 +550,7 @@ months are defined by gross stock returns, consistently across costs.
 All 27 portfolio comparisons enter one Holm family and remain exploratory.
 
 ```powershell
-$revisedArgs = @('--data-dir', 'data/paper-reconstruction-public-20261021', '--returns-dir', 'data/protection-long-wrds-20261020', '--oxford-archive', 'data/paper-source-20261020/oxfordman-20220301.zip', '--output-dir', 'outputs/revised-study-new')
+$revisedArgs = @('--data-dir', 'data/paper-wrds-eia-20261021', '--returns-dir', 'data/protection-long-wrds-20261021', '--risklab-dir', 'data/risklab-spy-20261022', '--output-dir', 'outputs/revised-study-new')
 foreach ($stage in @('freeze', 'classical', 'gru_univar_log', 'gru_multivar_log', 'evaluate')) {
     uv run --extra prediction --extra reconstruction python -m financial_economics.paper_revised $stage @revisedArgs
     if ($LASTEXITCODE -ne 0) { break }
