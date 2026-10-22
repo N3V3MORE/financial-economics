@@ -536,14 +536,12 @@ but have unavailable uncertainty and p-values when the sampling variance
 is degenerate. If there are no months when the benchmark falls, the
 conditional return difference estimate and test are unavailable.
 
-The archived research results have not been regenerated after these
-inference fixes because the original archived inputs and model forecasts
-remain unavailable. Fresh WRDS returns and a combined Yahoo/WRDS/EIA source
-snapshot are now verified; an AMD reconstruction was stopped at the user's request on October 21 in
-`outputs/paper-wrds-eia-rocm-20261021`. Its `status.json` and `logs/` record
-progress and failures. Rebuilt forecasts and results are not yet complete.
-Numerical findings in the documentation
-remain the archived values; they are not a recalculation with the fixes.
+On October 21, 2026 every stage was rerun from the saved data snapshots with
+these inference fixes and cuDNN-trained GRUs (`outputs/rerun-20261021`). No
+headline figure or Holm decision changed, so the documented findings stand.
+A separate rebuild from fresh Yahoo/WRDS/EIA inputs on an AMD machine was
+stopped on October 21 (`outputs/paper-wrds-eia-rocm-20261021`, with
+`status.json` and `logs/`); it is not used for the reported results.
 
 To compare trading schedules on these same saved forecasts, use separate runs:
 

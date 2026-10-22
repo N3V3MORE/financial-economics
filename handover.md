@@ -11,6 +11,10 @@ holding less stock?** The project started as an ETF diversification study,
 then adapted Kaczmarek, Będowska-Sójka, Grobelny and Perez (2022), “False Safe
 Haven Assets: Evidence From the Target Volatility Strategy Based on Recurrent
 Neural Network” ([paper](https://doi.org/10.1016/j.ribaf.2021.101610)).
+Kaczmarek and Grobelny (2023) later proposed a neural-network-driven
+stock/Treasury allocation ([doi](https://doi.org/10.18559/ebr.2023.2.738)), so
+dynamic Treasury allocation is not new; this project's addition is the
+realistic-trading test.
 
 ## What was done, in order
 
@@ -27,6 +31,7 @@ Neural Network” ([paper](https://doi.org/10.1016/j.ribaf.2021.101610)).
 | Realistic test | Rebuilt forecasts traded realistically against a static mix, 2011–2020 | `outputs/paper-realistic-20261021` |
 | Paper figures | Figures 3–7 redrawn, plus our data checked against the paper's printed statistics | `outputs/paper-figures-20261021`, `paper-figures-local-20261021` |
 | Post hoc checks | Swiss/German bonds in local currency; IEF added to the realistic test | `.../evaluation_local`, `outputs/paper-realistic-ief-20261021` |
+| Full verified rerun | Every stage above, from the saved data, on the final code | `outputs/rerun-20261021` |
 
 ## Datasets
 
@@ -54,9 +59,16 @@ WRDS data is licensed. Raw data and outputs stay local and are ignored by Git.
   per ETF dollar traded, earns French cash interest, and sets each year's
   cutoff from earlier forecasts only.
 - **Pre-calibrated comparison.** Timing is compared with a static SPY/cash
-  mix holding the model's mean 2010 stock target, reset monthly. It does
-  not ensure matching average 2011–2020 stock exposure or realized risk,
-  so differences can reflect exposure as well as timing.
+  mix holding the model's mean **2010** stock target, reset monthly. It is
+  not matched to 2011–2020 exposure. In practice timing held more stock
+  than its mix (ARFIMA 75% against 56%; one-input GRU 79% against 59%) with
+  lower volatility and beta, so its smaller crash losses do not come from
+  holding less stock. This exposure check was added afterwards and is descriptive.
+- **The paper's volatility scaling.** Monthly volatility is 22 × daily, as
+  printed in the paper; textbook scaling uses √22. The 10% target is
+  therefore about 7.2% a year. A conventional 10%-a-year target is reported
+  beside it from the extension run (2010–2021, 0.1% fees): Sharpe 0.91
+  against 0.87, worst fall −16.1% against −14.2%, less trading.
 - **Fixed significance tests.** The realistic test has six primary tests
   (ARFIMA and the one-input GRU × timing vs static, TLT vs cash, GLD vs
   cash) under one Holm adjustment. Everything else is descriptive.
@@ -70,6 +82,10 @@ WRDS data is licensed. Raw data and outputs stay local and are ignored by Git.
 - **No data splicing.** Providers are never mixed within one return series;
   missing values are never filled.
 - **Scope.** An international robustness run was started, then removed as out of scope.
+- **cuDNN for GRU training.** On NVIDIA, all GRUs train with cuDNN (about
+  five times faster). The one-input paper GRU is built as two single-layer
+  GRUs, which is the same network, to avoid a Windows cuDNN shutdown crash.
+  Forecasts differ slightly from the earlier native-kernel runs.
 
 ## Comparison with the paper (2010–2020, the paper's rules)
 
@@ -98,24 +114,13 @@ WRDS data is licensed. Raw data and outputs stay local and are ignored by Git.
 
 ## Findings
 
-The following numbers and significance statements are retained from the
-archived runs. The primary Holm correction now retains all six planned
-tests when one is unavailable, using p=1 internally while leaving its
-reported p-values unavailable and its rejection flag false. Sharpe HAC
-inference uses centered calculations and marks constant excess returns
-unavailable; identical or positively proportional excess returns retain
-their difference estimate with unavailable uncertainty and p-values when
-sampling variance is degenerate. Conditional return comparisons are
-unavailable when there are no months when stocks fall. Saved forecast stages
-must have matching, valid hashes for their source manifest, Oxford archive
-and reconstruction config, retained in the realistic run's provenance.
-The original archived inputs and model forecasts remain unavailable on the
-AMD machine. They are present on the original machine
-(`outputs/paper-reconstruction-20261021`), where the evaluation and realistic
-test were rerun from them before these fixes and matched the saved results.
-Fresh WRDS returns and Yahoo/WRDS/EIA reconstruction inputs are verified.
-The AMD reconstruction was stopped at the user's request on October 21; model forecasts are not yet
-complete and historical results have not been regenerated with these fixes.
+**Verified.** On October 21, 2026 every stage was rerun from the saved data
+on the final code (`outputs/rerun-20261021`, 37 stages, about 20 minutes of
+GPU time). The run includes the corrected inference (centered Sharpe tests,
+six-test Holm family, forecast input checks) and GRUs retrained from scratch
+with cuDNN. No headline figure and no Holm decision changed. Stages without
+GRUs matched to rounding; the largest realistic-test Sharpe change was
+0.00006. The original runs are kept unchanged beside the rerun.
 
 **Statistically supported:**
 - 11 of 13 ETFs lagged cash in falling months, 2015–2025 (Holm-adjusted).
@@ -129,10 +134,9 @@ complete and historical results have not been regenerated with these fixes.
 - Gold was positive on average but inconsistent across models and crashes.
 
 **Not shown:**
-- The archived primary TLT and GLD tests did not establish improvement
-  beyond cash.
-- The archived primary timing tests did not establish a Sharpe improvement
-  over the pre-calibrated static mixes.
+- The primary TLT and GLD tests did not establish improvement beyond cash.
+- The primary timing tests did not establish a Sharpe improvement over the
+  pre-calibrated static mixes.
 
 **Thesis:** in these retrospective tests, timing reduced the worst
 observed falls without an established Sharpe improvement over the
@@ -160,8 +164,11 @@ in other settings.
   retrospective, not out of sample.
 - **Small effects.** Safe-haven effects are a few hundredths of Sharpe, and none is significant.
 - **Not reconstructed.** The paper's international markets (Nikkei, Nifty, STOXX 50).
-- **No volatility forecasts after 2020.** The Oxford-Man archive ends in
-  February 2022; 2022–2025 is covered only by the fixed-holdings protection study.
+- **No paper-style forecasts after 2020.** The Oxford-Man archive ends in
+  February 2022 (the extension reaches 2021). The 2022–2025 Treasury
+  reversal comes from fixed holdings, not the timing strategy, so it does not
+  show that the paper's full strategy failed then. The early prediction
+  study is the only, rougher, timing evidence for 2022–2025.
 - **Exclusions.** Taxes and exit fees are excluded throughout.
 
 ## Where things are
@@ -171,7 +178,8 @@ in other settings.
 - **Fresh local snapshot:** `data/protection-long-wrds-20261021` contains
   verified SPY/TLT/GLD/DBC returns for 4,780 sessions from January 3, 2007
   through December 31, 2025; all 912 fund-month comparisons passed.
-  Model forecast reconstruction was stopped at the user's request; new results are not yet complete.
+  A rebuild from these fresh inputs was stopped on the AMD machine; it is
+  not needed for the reported results, which the full rerun verified.
 - **Other recovered inputs:** `data/paper-oxford-20261021/oxfordman-20220301.zip`
   matches the recorded archive hash; `data/paper-fx-20261021` passes dated H.10
   coverage checks. FRED maintenance was resolved using WRDS DGS3/DAAA and
@@ -191,7 +199,7 @@ in other settings.
   and `wrds` extras; use `prediction-rocm` in AMD training commands.
 - **Commands to rerun each stage:** README sections “Reconstruct the paper's
   U.S. experiment” and “Fixed GRUs and the realistic trading test”.
-- **Stopped full rebuild:** `outputs/paper-wrds-eia-rocm-20261021/status.json`
+- **Stopped fresh-input rebuild (AMD machine):** `outputs/paper-wrds-eia-rocm-20261021/status.json`
   records the interrupted stage and original process ID; `logs/run.stdout.log` and
   `logs/run.stderr.log` retain progress and errors. The process tree was terminated during the first GRU stage because no
   meaningful results-preserving speedup had been validated. No stages were

@@ -27,6 +27,15 @@ eight-ETF mix did not clearly beat SPY plus cash, and the protection study
 did not establish that any ETF beat cash in falling months. The paper offers an
 alternative to fixed holdings; this study checks whether it changes that answer.
 
+**Related work.** Two of the paper's authors later proposed a dynamic
+stock/Treasury allocation driven by neural-network volatility forecasts
+(Kaczmarek and Grobelny, 2023, “How to fly to safety without overpaying for the
+ticket”, *Economics and Business Review* 9(2),
+[doi](https://doi.org/10.18559/ebr.2023.2.738)). Dynamic Treasury allocation is
+therefore not new. Our addition is the realistic-trading test: a one-day
+delay, stated fee scenarios, interest on cash, past-only stress cutoffs and a
+fixed mix chosen before evaluation.
+
 ## What we did
 
 | Step | Data | Rules | Where |
@@ -49,25 +58,29 @@ The strategy holds
 predicted volatility is above its 90th percentile, up to 20% moves from cash
 into the defensive asset.
 
+**What "10% volatility" means here.** Following the paper's printed
+conversion (its Eq. 24), predicted monthly volatility is 22 × predicted daily
+volatility. Textbook scaling multiplies by √22 instead, so the paper's 10%
+monthly target equals about **7.2% a year** (0.10 / 22 × √252). We keep the
+paper's convention because it reproduces the paper's results and its frequent
+weight changes; with textbook scaling a 10% monthly target would rarely cut
+stocks at all. A conventional 10%-a-year target is reported alongside in
+section 2. Adding a defensive asset keeps the stock weight, so it changes total
+portfolio risk.
+
 ## What we found
 
-The numbers and significance statements below describe the archived
-research runs. The primary Holm adjustment now retains unavailable tests
-in its six-test family, using p=1 internally while keeping their reported
-p-values and adjusted p-values unavailable and their rejection flags false.
-Sharpe inference now uses centered calculations: constant excess returns
-make the test unavailable, and identical or positively proportional excess
-returns retain the difference estimate with unavailable uncertainty and
-p-values when sampling variance is degenerate. Conditional comparisons
-are unavailable when there are no months when stocks fall. Saved forecast
-stages must also have matching hashes for their source manifest, Oxford
-archive and reconstruction config, retained in the realistic run's provenance.
-The original archived inputs and model forecasts remain unavailable. A
-fresh WRDS return snapshot and a combined Yahoo/WRDS/EIA input snapshot are
-verified. The AMD reconstruction was stopped at the user's request on October 21; its status is in
-`outputs/paper-wrds-eia-rocm-20261021/status.json`. Rebuilt forecasts are not
-yet complete, and these historical results have not been regenerated with
-the inference fixes.
+**These results are verified.** On October 21, 2026 every stage was rerun
+from the saved data snapshots on the final code (`outputs/rerun-20261021`).
+That code includes the corrected inference: centered Sharpe tests, a
+six-test Holm family that keeps unavailable tests, and input checks on saved
+forecasts. All five GRUs were retrained from scratch with cuDNN. **No headline
+figure and no Holm decision changed.** The largest Sharpe change in the
+realistic test was 0.00006; one primary p-value moved from 0.9781 to 0.9783.
+GRU forecasts differ slightly from the earlier native-kernel runs, which are
+kept unchanged. A separate rebuild from fresh Yahoo/WRDS/EIA inputs on the AMD
+machine was stopped on October 21 and is not used here
+(`outputs/paper-wrds-eia-rocm-20261021/status.json`).
 
 ### 1. The rebuild approximates several reported metrics
 
@@ -80,7 +93,7 @@ the inference fixes.
 | Richer GRU | 0.0031 | 0.0040 | 0.97 | 0.98 |
 
 ARFIMA's rounded metrics are close to the paper's reported values. The
-one-input GRU has a similar forecast-error estimate; the archived test did
+one-input GRU has a similar forecast-error estimate; the test did
 not detect a difference, which does not establish equivalence. Our raw
 richer GRU had higher forecast error than the paper's and produced negative
 forecasts on 5.5% of days, almost all in the very calm years 2017–2018.
@@ -98,7 +111,7 @@ chose the same profile (two layers of 32 units).
 
 The fixed richer GRU has a forecast-error estimate close to ARFIMA's and
 the lowest percentage-error estimate of all seven models, bringing its
-reported metrics closer to the paper. The archived tests did not establish
+reported metrics closer to the paper. The tests did not establish
 lower forecast error than ARFIMA or the one-input GRU configurations. Because
 training histories and validation folds differ, this does not isolate whether extra
 inputs help. The fix is reported beside the original because it was added
@@ -119,14 +132,26 @@ Realistic test, 2011–2020, 0.1% fees, cash earning interest:
 | One-input GRU timing | 8.1% | 0.80 | −14.5% | −10.2% | −11.8% |
 | Fixed mix, 2010-calibrated stock target (59%) | 8.4% | 0.80 | −20.5% | −20.5% | −7.7% |
 
-The fixed stock targets are the models' mean targets during calibration
-year 2010, reset monthly. They are not calibrated to match average stock
-exposure or realized risk during 2011–2020, so differences can reflect
-exposure as well as timing.
+**The fixed mix uses the 2010 average stock share.** Each fixed mix holds
+its model's mean stock target over calibration year 2010, reset monthly. It
+was set before 2011 and is not matched to 2011–2020 exposure. Because 2010
+was volatile, timing in fact held *more* stock afterwards, yet with less risk:
+
+| 2011–2020, 0.1% fees | Average stock share | Volatility | Beta to SPY |
+|---|---:|---:|---:|
+| ARFIMA timing | 75% | 9.2% | 0.46 |
+| ARFIMA fixed mix | 56% | 9.4% | 0.55 |
+| One-input GRU timing | 79% | 9.6% | 0.48 |
+| One-input GRU fixed mix | 59% | 9.9% | 0.58 |
+
+So timing's smaller crash losses did not come from holding less stock on
+average; it cut stock when forecast risk rose. Every model shows the same
+pattern. This exposure check was added after the results were seen and is
+descriptive.
 
 - **No established Sharpe improvement.** Timing minus the fixed mix is
-  −0.04 (ARFIMA) and −0.005 (GRU); neither difference was significant in
-  the archived tests. This does not establish equal performance.
+  −0.04 (ARFIMA) and −0.005 (GRU); neither difference was significant. This
+  does not establish equal performance.
 - **Fees change the historical comparison.** Timing trades about 116 times
   its own value over ten years. ARFIMA's Sharpe was 0.89 against 0.80 before
   fees, 0.76 against 0.80 at 0.1%, and 0.57 against 0.80 at 0.25%.
@@ -137,6 +162,22 @@ exposure as well as timing.
   but lost more in the slow 2015–16 decline.
 - **It depended on the period.** Timing beat the fixed mix in 2016–2020
   (Sharpe 1.06 against 0.78) and lost in 2011–2015 (0.47 against 0.83).
+
+**A conventional 10%-a-year target.** The extension run
+(`paper-extension-gru`: one-input GRU retrained for the delayed trade,
+2010–2021, 0.1% fees, cash earning interest) scored both conventions on the
+same forecasts. It is descriptive and is a different setup from the
+realistic test above:
+
+| 2010–2021, 0.1% fees | Average stock share | Volatility | Annual growth | Sharpe | Worst fall | Trading (× value) |
+|---|---:|---:|---:|---:|---:|---:|
+| Paper's target (≈7.2% a year) | 77% | 9.6% | 8.7% | 0.87 | −14.2% | 114 |
+| 10% a year | 90% | 12.0% | 11.3% | 0.91 | −16.1% | 74 |
+| SPY, before any fees | 100% | 16.9% | 15.1% | 0.89 | −33.7% | — |
+
+The 10%-a-year target holds more stock and trades less, so fees cost it
+less. The pattern is the same: much smaller worst falls than SPY, with a
+Sharpe ratio close to SPY's rather than clearly above it.
 
 ### 3. Safe havens: Treasury protection varied by period
 
@@ -182,6 +223,15 @@ period. In this fixed-holdings check, their average return relative to cash
 in falling-stock months changed sign in 2022–2025. This describes the
 examined periods rather than a permanent property of Treasuries.
 
+**Keep this separate from the timing strategy.** These rows are fixed
+holdings in months when SPY fell, not the paper's forecast-driven strategy.
+The volatility archive ends in February 2022, so the full strategy is not
+tested after 2020 (2021 in the extension). We can say TLT's relative
+performance in falling-stock months reversed; we cannot say the paper's
+complete strategy failed in 2022–2025. The early prediction study
+(squared daily returns, 2017–2025) is the only timing evidence after 2021,
+and its setup is rougher.
+
 ## The answer
 
 **In these retrospective tests, volatility timing reduced the worst
@@ -198,7 +248,8 @@ protection; they do not rule out benefits in other settings.
 ## How sure are we
 
 - **Small effects.** The safe-haven gains are a few hundredths of Sharpe, and
-  no primary test was significant after Holm adjustment in the archived run.
+  no primary test was significant after Holm adjustment, in the original run
+  or the verified rerun.
 - **History already seen.** 2010–2020 was examined in earlier runs, so this is
   a careful historical check, not a test on untouched data.
 - **Substitute data.** Public prices replace the paper's Datastream series;
