@@ -8,7 +8,7 @@ A record of the October 2026 tidy-up, one entry per change, in the order the cha
 - `paper_revised` and `proxy_study` hash every module in the package into their frozen protocols, so any source edit means a protocol frozen before this cleanup no longer matches. None existed in the `outputs/` folder of the machine used for this cleanup. Freeze a new protocol after this cleanup rather than reusing an older one.
 - Each change is checked with `uv run --frozen ruff check` and `uv run --frozen pytest -q` before the next one starts.
 
-Baseline before any change (branch `volatility-project-checkpoint`, commit `5503ea0`): ruff reports no problems and 392 tests pass in 79 s.
+Baseline before any change (branch `volatility-project-checkpoint`, commit `e3a3f05`): ruff reports no problems and 392 tests pass in 79 s.
 
 ## Changes
 
@@ -87,11 +87,11 @@ The root folder went from 22 visible entries to 13. Run records store a hash of 
 
 Left as is: `paper.py` (hash-frozen) still says "such as paper.toml" in one error message, which is still the right file name. `handover.md` lines 84-85 were updated last, once the MIOpen GRU work finished with that file.
 
-After the move: ruff passes, `fecon --help` starts, and the suite gives 399 passed with the same 4 `gru_forecasting.py` failures as before. Those four were fixed by the MIOpen GRU work itself, which was committed separately as `38772b1`; see the final check below.
+After the move: ruff passes, `fecon --help` starts, and the suite gives 399 passed with the same 4 `gru_forecasting.py` failures as before. Those four were fixed by the MIOpen GRU work itself, which was committed separately as `4001531`; see the final check below.
 
 ## Final check
 
-Run on branch `miopen-gru-training` at `38772b1` (the MIOpen GRU commit) with all nine cleanup changes still uncommitted on top:
+Run on branch `miopen-gru-training` at `4001531` (the MIOpen GRU commit) with all nine cleanup changes still uncommitted on top:
 
 - `uv run --frozen ruff check` passes.
 - `uv run --frozen --extra reconstruction pytest -q -W error`, the command CI runs, gives 406 passed, 0 failed.

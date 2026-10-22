@@ -1,6 +1,6 @@
 # Structure-only restructuring
 
-The starting revision is `ebedece` on `risklab-volatility-trial`.
+The starting revision is `b78872e` on `risklab-volatility-trial`.
 Implementation work is on `restructure-project`.
 
 ## Preservation requirements

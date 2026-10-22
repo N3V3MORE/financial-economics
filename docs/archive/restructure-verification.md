@@ -8,7 +8,7 @@ added or removed.
 
 ## Backup and retained results
 
-Starting source revision: `ebedece`.
+Starting source revision: `b78872e`.
 Working branch: `restructure-project`.
 
 The independent Desktop backup is:
@@ -110,11 +110,11 @@ provenance is documented in [the structure guide](../structure.md).
 
 Major checkpoints are committed:
 
-- `971ca91`: baseline and preservation plan.
-- `9208177`: grouped implementation and provenance compatibility.
-- `ecd01ef`: reload and serialization compatibility.
-- `1d19113`: fresh `runpy` execution and caller-main preservation.
-- `69d2c7a`: documentation and full-table preservation verifier.
+- `a596b7f`: baseline and preservation plan.
+- `871dc1d`: grouped implementation and provenance compatibility.
+- `6e6131b`: reload and serialization compatibility.
+- `96653e3`: fresh `runpy` execution and caller-main preservation.
+- `0686191`: documentation and full-table preservation verifier.
 
 Machine-readable reports, test logs, replay requests, the wheel check and source
 equivalence report remain local at:

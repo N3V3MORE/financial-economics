@@ -20,7 +20,7 @@ forecast, table and all 81 GRU checkpoints; only timestamps and code hashes in
 the run records differ. The 11 findings figures also regenerate identically.
 
 **Cross-machine check (October 22, NVIDIA).** A fresh full run on the NVIDIA
-machine (RTX 5060 Ti, cuDNN, TF32 off, `main` at `361df9e`, same data
+machine (RTX 5060 Ti, cuDNN, TF32 off, `main` at `6c9d5a7`, same data
 snapshots) is in `outputs/full-run-20261022` there. Classical forecasts match
 the AMD run byte for byte. GRU forecast files differ at the byte level, as
 expected across GPU libraries, but every reported Sharpe ratio, worst fall and
@@ -410,13 +410,13 @@ the richer GRU's macro inputs end in 2020, so it was not extended.
 ## Where things are
 
 - **Branches (October 22, on GitHub):** `main` contains the
-  MIOpen default (`38772b1`), shared provenance helpers and the move of run
-  configs into `configs/` (`7066349`, logged in `docs/archive/cleanup-log.md`),
-  the cross-machine comparison script (`9fb9959`), TF32 off (`52c9745`), the
-  Risk Lab trial (`ea3b4f1`, `60e5b36`), the Risk Lab main study (`ebedece`) and
-  the grouped code layout (`971ca91`…`5db250c`). `miopen-gru-training`,
+  MIOpen default (`4001531`), shared provenance helpers and the move of run
+  configs into `configs/` (`6133f1c`, logged in `docs/archive/cleanup-log.md`),
+  the cross-machine comparison script (`41becc1`), TF32 off (`80337aa`), the
+  Risk Lab trial (`b97755b`, `c4b3a6d`), the Risk Lab main study (`b78872e`) and
+  the grouped code layout (`a596b7f`…`13ab6db`). `miopen-gru-training`,
   `risklab-volatility-trial` and `volatility-prediction` are fully
-  merged. Still unmerged: `Possible-Future-Ideas-for-Depth` (`5d3c16a`).
+  merged. Still unmerged: `Possible-Future-Ideas-for-Depth` (`df06758`).
   `volatility-project-checkpoint` was deleted locally and on GitHub on
   October 22 (tip `eceb1cf`). Compared with `main`, the only thing it held was a
   GPU training-speed benchmark (`scripts/compare_gru_backends.py` and two
@@ -495,7 +495,7 @@ the richer GRU's macro inputs end in 2020, so it was not extended.
   `archive/trial-runs-20261022`, never pushed because they contain returns
   derived from licensed WRDS/CRSP data. Restore them byte for byte into
   `outputs/` with `git archive archive/trial-runs-20261022 outputs | tar -x`
-  (`trial-logs/run-trial.sh` holds the commands). They predate `ebedece`'s
+  (`trial-logs/run-trial.sh` holds the commands). They predate `b78872e`'s
   missing-date and EWMA rules, so current code does not reproduce them. Rerunning elsewhere needs the Risk Lab download, whose source
   URL and hash are in `data/risklab-spy-20261022/manifest.json`.
 - **Done October 22:** the cross-machine comparison; a full NVIDIA rerun with
