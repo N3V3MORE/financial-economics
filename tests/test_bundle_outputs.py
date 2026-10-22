@@ -52,6 +52,22 @@ def test_every_file_round_trips_byte_for_byte(tmp_path):
     assert "Complete" in output.read_text(encoding="utf-8")
 
 
+def test_notes_add_an_introduction_and_folder_notes(tmp_path):
+    root = tmp_path / "run"
+    (root / "study").mkdir(parents=True)
+    (root / "study" / "a.csv").write_text("x\n1\n")
+    notes = tmp_path / "notes.md"
+    notes.write_text("Why this run exists.\n\n## study\n**Decision:** use `cash`.\n\n- first\n- second <b>\n")
+    output = tmp_path / "out.html"
+    module.bundle(root, output, notes=notes)
+    page = output.read_text(encoding="utf-8")
+    assert "<p>Why this run exists.</p>" in page
+    folder_notes = json.loads(re.search(r'<script id=notes type="application/json">(.*?)</script>', page, re.S)
+                              .group(1).replace("<\\/", "</"))
+    assert folder_notes["study"] == ("<p><b>Decision:</b> use <code>cash</code>.</p>"
+                                     "<ul><li>first</li><li>second &lt;b&gt;</li></ul>")
+
+
 def test_existing_output_is_never_replaced(tmp_path):
     (tmp_path / "a.txt").write_text("x")
     output = tmp_path / "out.html"

@@ -4,7 +4,9 @@
 
 Each file is embedded gzip-compressed (images as-is) with its size and SHA-256. Summaries,
 logs and JSON open as text, figures as images and CSV tables as a preview of their first
-rows. Every file, checkpoints included, downloads byte for byte from the page.
+rows. Every file, checkpoints included, downloads byte for byte from the page. An optional
+--notes Markdown file adds an introduction (text before the first '## folder' heading) and
+a short note above each folder's files.
 """
 
 import argparse
@@ -15,6 +17,7 @@ from hashlib import sha256
 import html
 import json
 from pathlib import Path
+import re
 
 TEXT = {".csv", ".json", ".log", ".md", ".txt", ".py", ".html", ".toml", ".tsv"}
 IMAGES = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".svg": "image/svg+xml"}
@@ -40,6 +43,38 @@ def entries(root, skip=()):
                "size": len(data), "sha256": sha256(data).hexdigest(), "gzip": file_kind != "image",
                "mime": IMAGES.get(path.suffix.lower(), "application/octet-stream"),
                "payload": base64.b64encode(packed).decode("ascii")}
+
+
+def inline(text):
+    text = html.escape(text)
+    text = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", text)
+    return re.sub(r"`(.+?)`", r"<code>\1</code>", text)
+
+
+def markdown(text):
+    """Paragraphs, bullet lists, bold and code: enough for short notes."""
+    blocks = []
+    for block in re.split(r"\n\s*\n", text.strip()):
+        lines = block.splitlines()
+        if all(line.lstrip().startswith("- ") for line in lines):
+            blocks.append("<ul>" + "".join(f"<li>{inline(line.lstrip()[2:])}</li>" for line in lines) + "</ul>")
+        elif lines and lines[0].startswith("### "):
+            blocks.append(f"<h3>{inline(lines[0][4:])}</h3>" + (f"<p>{inline(' '.join(lines[1:]))}</p>" if lines[1:] else ""))
+        else:
+            blocks.append(f"<p>{inline(' '.join(lines))}</p>")
+    return "".join(blocks)
+
+
+def read_notes(path):
+    """Text before the first '## folder' heading introduces the page; each section describes a folder."""
+    if path is None:
+        return "", {}
+    intro, *sections = re.split(r"(?m)^## ", Path(path).read_text(encoding="utf-8"))
+    notes = {}
+    for section in sections:
+        heading, _, body = section.partition("\n")
+        notes[heading.strip()] = markdown(body)
+    return markdown(intro), notes
 
 
 def overview(root):
@@ -77,7 +112,7 @@ PAGE = """<!doctype html>
 body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 system-ui,sans-serif}
 main{max-width:1200px;margin:0 auto;padding:16px}
 h1{font-size:22px;margin:8px 0}h2{font-size:16px;margin:24px 0 8px;border-bottom:1px solid var(--line)}
-.muted{color:var(--muted)}input{width:100%;box-sizing:border-box;padding:8px;font:inherit;background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:6px}
+.muted{color:var(--muted)}.note{max-width:820px}.note p,.note li{margin:4px 0}h3{font-size:15px;margin:16px 0 4px}code{font:12px ui-monospace,Consolas,monospace}input{width:100%;box-sizing:border-box;padding:8px;font:inherit;background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:6px}
 details{border:1px solid var(--line);border-radius:6px;margin:6px 0;background:var(--panel)}
 summary{cursor:pointer;padding:6px 10px;display:flex;gap:12px;flex-wrap:wrap}summary b{word-break:break-all}
 .body{padding:8px 10px;overflow:auto;max-height:70vh;background:var(--bg)}
@@ -87,15 +122,18 @@ table{border-collapse:collapse;font:12px ui-monospace,Consolas,monospace}td,th{b
 </style></head><body><main>
 <h1>__TITLE__</h1>
 <p class=muted>__COUNT__ files, __SIZE__ in total, packed __WHEN__. Open a file to view it; every file downloads byte for byte.</p>
+<div class=note>__INTRO__</div>
 __OVERVIEW__
 <h2>Files</h2>
 <input id=filter placeholder="Filter by path, e.g. performance.csv or matched-risklab/">
 <div id=list></div>
 </main>
 <script id=manifest type="application/json">__MANIFEST__</script>
+<script id=notes type="application/json">__NOTES__</script>
 __PAYLOADS__
 <script>
 const files = JSON.parse(document.getElementById("manifest").textContent);
+const notes = JSON.parse(document.getElementById("notes").textContent);
 const fmt = n => n < 1024 ? n + " B" : n < 1048576 ? (n / 1024).toFixed(1) + " KB" : (n / 1048576).toFixed(1) + " MB";
 async function bytes(f) {
   const raw = Uint8Array.from(atob(document.getElementById("f" + f.id).textContent), c => c.charCodeAt(0));
@@ -144,7 +182,8 @@ const list = document.getElementById("list");
 let folder = null;
 for (const f of files) {
   const top = f.path.includes("/") ? f.path.split("/")[0] : "(top level)";
-  if (top !== folder) { folder = top; const h = document.createElement("h2"); h.textContent = top; h.dataset.folder = top; list.append(h); }
+  if (top !== folder) { folder = top; const h = document.createElement("h2"); h.textContent = top; h.dataset.folder = top; list.append(h);
+    if (notes[top]) { const n = document.createElement("div"); n.className = "note"; n.dataset.folder = top; n.innerHTML = notes[top]; list.append(n); } }
   const d = document.createElement("details"); d.dataset.path = f.path.toLowerCase(); d.dataset.folder = top;
   d.innerHTML = `<summary><b></b><span class=muted>${fmt(f.size)} · ${f.kind} · sha256 ${f.sha256.slice(0, 16)}</span></summary><div class=body></div>`;
   d.querySelector("b").textContent = f.path;
@@ -154,14 +193,15 @@ for (const f of files) {
 document.getElementById("filter").addEventListener("input", e => {
   const q = e.target.value.toLowerCase(), shown = new Set();
   list.querySelectorAll("details").forEach(d => { const ok = d.dataset.path.includes(q); d.hidden = !ok; if (ok) shown.add(d.dataset.folder); });
-  list.querySelectorAll("h2").forEach(h => { h.hidden = !shown.has(h.dataset.folder); });
+  list.querySelectorAll("h2, div.note").forEach(h => { h.hidden = !shown.has(h.dataset.folder); });
 });
 </script></body></html>
 """
 
 
-def bundle(root, output, title=None):
+def bundle(root, output, title=None, notes=None):
     root, output = Path(root), Path(output)
+    intro, folder_notes = read_notes(notes)
     if output.exists():
         raise FileExistsError(f"Refusing to overwrite {output}")
     items = list(entries(root, skip={output.resolve()}))
@@ -173,7 +213,9 @@ def bundle(root, output, title=None):
             .replace("__COUNT__", f"{len(items):,}")
             .replace("__SIZE__", f"{total / 1048576:,.1f} MB")
             .replace("__WHEN__", datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC"))
+            .replace("__INTRO__", intro)
             .replace("__OVERVIEW__", overview(root))
+            .replace("__NOTES__", json.dumps(folder_notes).replace("</", "<\\/"))
             .replace("__MANIFEST__", json.dumps(manifest).replace("</", "<\\/"))
             .replace("__PAYLOADS__", payloads))
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -187,8 +229,9 @@ def main(argv=None):
     parser.add_argument("folder", type=Path, help="results folder to pack, e.g. outputs/final-run-20261022")
     parser.add_argument("--output", type=Path, required=True, help="new HTML file; never overwritten")
     parser.add_argument("--title", help="page heading (default: the folder name)")
+    parser.add_argument("--notes", type=Path, help="Markdown introduction and per-folder notes")
     args = parser.parse_args(argv)
-    count, total = bundle(args.folder, args.output, args.title)
+    count, total = bundle(args.folder, args.output, args.title, args.notes)
     print(f"Packed {count} files ({total / 1048576:.1f} MB) into {args.output} "
           f"({args.output.stat().st_size / 1048576:.1f} MB)")
 
