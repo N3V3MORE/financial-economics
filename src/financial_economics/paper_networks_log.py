@@ -11,7 +11,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from .gru_forecasting import _annual_splits, _gpu_inputs, _gpu_metadata, _require_cuda
+from .gru_forecasting import _annual_splits, _gpu_inputs, _gpu_metadata, _require_cuda, _uses_native_rnn
 from .paper_gru import _cv_folds
 from .paper_networks import DEFAULT_PROFILES, _model, _profiles
 
@@ -194,7 +194,7 @@ def reconstruct_log_gru(prepared, calendar, checkpoint_dir, *, model_name, profi
                        "training_observations": int(training.sum()),
                        "input_units": "log BV and signed explanatory changes; train-only channel standardization",
                        "target_units": "standardized log BV; exp(forecast) times training smearing factor",
-                       **_gpu_metadata(torch, native_rnn=True)}
+                       **_gpu_metadata(torch, native_rnn=_uses_native_rnn(torch))}
             with path.open("xb") as destination:
                 torch.save(payload, destination)
             paths.append(str(path.relative_to(checkpoint_dir)))
@@ -209,7 +209,7 @@ def reconstruct_log_gru(prepared, calendar, checkpoint_dir, *, model_name, profi
                                 "training_observations": int(training.sum()),
                                 "forecast_observations": int(issued.sum()),
                                 "smearing": smearings, "scaling": scaling, "checkpoints": paths})
-    metadata = {"model_name": model_name, **_gpu_metadata(torch, native_rnn=True), "num_layers": 2,
+    metadata = {"model_name": model_name, **_gpu_metadata(torch, native_rnn=_uses_native_rnn(torch)), "num_layers": 2,
                 "input_channels": inputs.shape[2], "lookback": inputs.shape[1],
                 "profiles": candidates, "selected_profile": dict(profile), "seeds": list(seeds),
                 "learning_rate": learning_rate, "max_epochs": max_epochs, "patience": patience,

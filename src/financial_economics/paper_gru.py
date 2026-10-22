@@ -5,7 +5,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from .gru_forecasting import _annual_splits, _gpu_inputs, _gpu_metadata, _native_rnn, _predict, _require_cuda
+from .gru_forecasting import (_annual_splits, _gpu_inputs, _gpu_metadata, _predict, _require_cuda,
+                              _rnn_kernels, _uses_native_rnn)
 
 
 def _cv_folds(rows, initial_training, folds):
@@ -42,16 +43,19 @@ def _model(torch, hidden_size, target_scale, dropout, device):
     class VolatilityGRU(torch.nn.Module):
         def __init__(self):
             super().__init__()
-            self.gru = torch.nn.GRU(1, hidden_size, num_layers=2,
-                                    batch_first=True, dropout=dropout)
+            # Two single-layer GRUs equal one two-layer GRU with inter-layer
+            # dropout, created in the same parameter order. Keeping dropout
+            # outside cuDNN avoids its reproducible Windows shutdown crash.
+            self.first = torch.nn.GRU(1, hidden_size, batch_first=True)
+            self.second = torch.nn.GRU(hidden_size, hidden_size, batch_first=True)
+            self.dropout = torch.nn.Dropout(dropout)
             self.output = torch.nn.Linear(hidden_size, 1)
             self.register_buffer("target_scale", torch.tensor(target_scale, dtype=torch.float32))
 
         def forward(self, inputs):
-            # Native GPU kernels avoid a reproducible Windows cuDNN shutdown crash.
-            # Parameters, activations, and gradients still reside on CUDA:0.
-            with _native_rnn(torch):
-                _, hidden = self.gru(inputs)
+            with _rnn_kernels(torch):
+                sequence, _ = self.first(inputs)
+                _, hidden = self.second(self.dropout(sequence))
             return (torch.nn.functional.softplus(self.output(hidden[-1]).squeeze(-1))
                     * self.target_scale + 1e-12)
 
@@ -213,7 +217,7 @@ def paper_gru_forecasts(prepared, settings, calendar, checkpoint_dir, progress=p
                        "train_last_target": str(rows.loc[training, "return_date"].max().date()),
                        "training_observations": int(training.sum()),
                        "input_units": "sqrt(raw daily BV)", "target_units": "sqrt(raw daily BV)",
-                       **_gpu_metadata(torch, native_rnn=True)}
+                       **_gpu_metadata(torch, native_rnn=_uses_native_rnn(torch))}
             with path.open("xb") as destination:
                 torch.save(payload, destination)
             paths.append(str(path.relative_to(checkpoint_dir)))
@@ -223,7 +227,7 @@ def paper_gru_forecasts(prepared, settings, calendar, checkpoint_dir, progress=p
         annual_metadata.append({"evaluation_year": year, "refit_asof": str(asof.date()),
                                 "train_last_target": payload["train_last_target"],
                                 "training_observations": int(training.sum()), "checkpoints": paths})
-    metadata = {**_gpu_metadata(torch, native_rnn=True), "num_layers": 2,
+    metadata = {**_gpu_metadata(torch, native_rnn=_uses_native_rnn(torch)), "num_layers": 2,
                 "selected_hidden_size": hidden_size, "learning_rate": settings.learning_rate,
                 "dropout": settings.dropout, "weight_decay": settings.weight_decay,
                 "seeds": list(settings.seeds), "refit_epochs": epochs, **selection_metadata,
@@ -231,6 +235,4 @@ def paper_gru_forecasts(prepared, settings, calendar, checkpoint_dir, progress=p
                 "forecast_units": "seed-mean sqrt(BV) squared for gru_bv storage",
                 "folds": fold_metadata, "annual_refits": annual_metadata, "checkpoints": checkpoints,
                 "deterministic_algorithms": True}
-    if not getattr(torch.version, "hip", None):
-        metadata["rnn_backend"] += " to avoid Windows shutdown failure"
     return result, tuning, metadata

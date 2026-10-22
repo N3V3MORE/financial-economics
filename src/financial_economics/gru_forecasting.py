@@ -59,6 +59,16 @@ def _native_rnn(torch):
         torch.backends.cudnn.enabled = previous
 
 
+def _uses_native_rnn(torch):
+    """ROCm needs PyTorch's native GPU RNN because MIOpen's Windows compiler fails."""
+    return bool(getattr(torch.version, "hip", None))
+
+
+def _rnn_kernels(torch):
+    """cuDNN RNN kernels on NVIDIA CUDA; the native GPU path on ROCm."""
+    return _native_rnn(torch) if _uses_native_rnn(torch) else nullcontext()
+
+
 def _annual_splits(rows, calendar, evaluation_start):
     """Assign each issue date to the model fitted at its preceding annual close."""
     if (not isinstance(calendar, pd.DatetimeIndex) or not calendar.is_unique
@@ -111,10 +121,7 @@ def _make_model(torch, hidden_size, target_scale, device):
             self.register_buffer("target_scale", torch.tensor(target_scale, dtype=torch.float32))
 
         def forward(self, inputs):
-            # Native HIP avoids MIOpen's runtime compiler dependency on Windows.
-            # Preserve the existing vendor-RNN path for NVIDIA CUDA.
-            context = _native_rnn(torch) if getattr(torch.version, "hip", None) else nullcontext()
-            with context:
+            with _rnn_kernels(torch):
                 _, hidden = self.gru(inputs)
             return torch.nn.functional.softplus(self.output(hidden[-1]).squeeze(-1)) * self.target_scale + 1e-12
 
@@ -188,7 +195,7 @@ def _save_checkpoint(torch, model, path, scaling, prepared, training,
                "batch_size": batch_size, "refit_asof": str(asof.date()),
                "train_last_target": str(prepared.rows.loc[training, "return_date"].max().date()),
                "training_observations": int(np.sum(training)),
-               **_gpu_metadata(torch, native_rnn=bool(getattr(torch.version, "hip", None)))}
+               **_gpu_metadata(torch, native_rnn=_uses_native_rnn(torch))}
     with path.open("xb") as destination:
         torch.save(payload, destination)
 
@@ -286,7 +293,7 @@ def gru_forecasts(prepared: ForecastData, settings, calendar: pd.DatetimeIndex,
         annual_metadata.append({"evaluation_year": year, "refit_asof": str(asof.date()),
                                 "train_last_target": str(rows.loc[training, "return_date"].max().date()),
                                 "training_observations": int(training.sum()), "checkpoints": paths})
-    metadata = {**_gpu_metadata(torch, native_rnn=bool(getattr(torch.version, "hip", None))),
+    metadata = {**_gpu_metadata(torch, native_rnn=_uses_native_rnn(torch)),
                 "seeds": list(settings.seeds),
                 "selected_hidden_size": int(selected_row.hidden_size),
                 "selected_learning_rate": float(selected_row.learning_rate),

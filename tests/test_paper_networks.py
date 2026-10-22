@@ -70,8 +70,9 @@ def test_tiny_cuda_raw_bv_refits_use_past_labels_and_save_independent_layers(tmp
         assert saved["state_dict"]["first.weight_ih_l0"].shape == (6, channels)
         assert saved["state_dict"]["second.weight_ih_l0"].shape == (9, 2)
         assert saved["train_last_target"] <= saved["refit_asof"]
-        expected_backend = "native ROCm/HIP; MIOpen disabled" if torch.version.hip else "native CUDA; cuDNN disabled"
-        assert saved["rnn_backend"] == metadata["rnn_backend"] == expected_backend
+        # NVIDIA uses cuDNN, recorded by the absence of a native-RNN label.
+        expected_backend = "native ROCm/HIP; MIOpen disabled" if torch.version.hip else None
+        assert saved.get("rnn_backend") == metadata.get("rnn_backend") == expected_backend
         assert saved["hip_version"] == metadata["hip_version"]
         assert all(tensor.device == torch.device("cuda:0") for tensor in saved["state_dict"].values())
     with pytest.raises(ValueError, match="never replaced"):

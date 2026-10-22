@@ -281,8 +281,12 @@ uv run --extra prediction fecon --config paper.toml paper --oxford-archive data/
 ```
 
 Training requires verified `cuda:0` through CUDA or ROCm; no CPU fallback.
-This small GRU uses native GPU kernels to avoid the observed Windows cuDNN
-shutdown and MIOpen compilation failures. The EWMA baseline,
+This small GRU is built as two single-layer GRUs with dropout between them,
+which equals one two-layer GRU with the same starting weights. cuDNN's own
+two-layer dropout crashes Windows processes at shutdown, so this shape lets
+NVIDIA GPUs use cuDNN (about five times faster; forecasts differ slightly
+from the October 2026 native-kernel runs). ROCm keeps native HIP kernels to
+avoid MIOpen compilation failures. The EWMA baseline,
 calendar preparation, and portfolio accounting are CPU-native. SPY, TLT,
 and GLD total returns substitute for the paper's Datastream indices. Each
 model runs a stock/cash portfolio and nine threshold/cap combinations per
@@ -410,6 +414,11 @@ The GRUs share evaluation dates, but their training histories differ. The
 one-input model uses BV history from 2000; the richer feature table starts
 on April 11, 2002, with its first usable issue after the 22-observation
 lookback. Their pre-2010 validation folds therefore cover different dates.
+On NVIDIA GPUs these GRUs train with cuDNN, about five times faster than
+native kernels; repeated runs match each other, but forecasts differ slightly
+from the October 21, 2026 run, which used native kernels. Their two
+single-layer GRUs keep dropout outside cuDNN, avoiding the shutdown crash
+described above. ROCm keeps native HIP kernels.
 These results compare complete model configurations; isolating the value
 of extra inputs requires a separate study with matched training histories
 and validation folds. The existing settings and forecasts are preserved.
