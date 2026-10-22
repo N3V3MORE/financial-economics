@@ -30,6 +30,7 @@ from .paper_realistic import (_declines, _performance, _tests, load_realistic_se
 from .paper_sources import _past_values, load_sources
 from .provenance import directory_digests, file_digest, git_dirty, git_head, package_code_digests, utc_now, verify_files
 from .return_data import load_returns
+from .volatility_proxy import load_risklab_bv
 
 
 MODELS = ("ewma", "arfima", "garch", "gjr", "gru_univar_log", "gru_multivar_log")
@@ -234,10 +235,20 @@ def two_step_classical(rows, bv, price_returns, settings, progress=print):
 
 
 def _input_identity(args):
+    volatility = ({"oxford_archive": args.oxford_archive} if args.risklab_dir is None
+                  else {"risklab_manifest": args.risklab_dir / "manifest.json"})
     return {name: file_digest(path) for name, path in {
         "reconstruction_config": args.config, "portfolio_config": args.portfolio_config,
-        "source_manifest": args.data_dir / "manifest.json", "oxford_archive": args.oxford_archive,
+        "source_manifest": args.data_dir / "manifest.json", **volatility,
         "returns_manifest": args.returns_dir / "manifest.json"}.items()}
+
+
+def _volatility(args, calendar, end):
+    """Oxford SPX BV, or Risk Lab SPY 5-minute trade variance on the same market calendar."""
+    if args.risklab_dir is None:
+        return load_bipower(args.oxford_archive, "2000-01-01", end)
+    bv, _ = load_risklab_bv(args.risklab_dir, "2000-01-01", end)
+    return bv.loc[bv.index.isin(calendar)]
 
 
 def _portfolio_settings(args):
@@ -263,7 +274,8 @@ def _read_stage(root, stage, protocol_digest):
 
 def run(args):
     root = args.output_dir.resolve()
-    protected = [args.data_dir.resolve(), args.returns_dir.resolve(), args.oxford_archive.resolve()]
+    protected = [args.data_dir.resolve(), args.returns_dir.resolve(),
+                 (args.oxford_archive if args.risklab_dir is None else args.risklab_dir).resolve()]
     if any(root.is_relative_to(path) or path.is_relative_to(root) for path in protected):
         raise ValueError("Revised outputs must be separate from every source input.")
     with args.config.open("rb") as source:
@@ -276,6 +288,8 @@ def run(args):
         protocol = {"created_at_utc": utc_now(), "inputs": identity, "code": package_code_digests(),
                     "forecast_settings": settings, "portfolio_settings": portfolio_settings,
                     "forecast_horizon": 2, "external_feature_lag_sessions": 1,
+                    "volatility_source": ("Oxford-Man SPX bipower variation" if args.risklab_dir is None
+                                          else "Risk Lab SPY 5-minute trade realized variance"),
                     "evaluation_status": "exploratory revision of previously inspected historical data",
                     "subperiods": "slices of continuously held paths; liquidation charged only at the final evaluation close",
                     "selection": "matched observations; distinct purged stopping and scoring blocks",
@@ -301,7 +315,7 @@ def run(args):
         raise ValueError("Use a new stage directory; saved results are never overwritten.")
     observations, _ = load_sources(args.data_dir)
     calendar = observations.equity_price.dropna().loc[:settings["evaluation_end"]].index
-    bv = load_bipower(args.oxford_archive, "2000-01-01", settings["evaluation_end"])
+    bv = _volatility(args, calendar, settings["evaluation_end"])
     univar, multivar, quality = matched_inputs(observations, bv, calendar, settings["lookback"])
     first_refit = calendar[calendar < settings["evaluation_start"]][-1]
     eligible = univar.rows.loc[univar.rows.index >= first_refit]
@@ -384,7 +398,9 @@ def main(argv=None):
     parser.add_argument("--portfolio-config", type=Path, default=Path("configs/paper-realistic.toml"))
     parser.add_argument("--data-dir", type=Path, required=True)
     parser.add_argument("--returns-dir", type=Path, required=True)
-    parser.add_argument("--oxford-archive", type=Path, required=True)
+    volatility = parser.add_mutually_exclusive_group(required=True)
+    volatility.add_argument("--oxford-archive", type=Path)
+    volatility.add_argument("--risklab-dir", type=Path, help="Risk Lab SPY snapshot used instead of Oxford")
     parser.add_argument("--output-dir", type=Path, required=True)
     args = parser.parse_args(argv)
     try:

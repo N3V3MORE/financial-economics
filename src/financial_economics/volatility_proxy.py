@@ -63,6 +63,16 @@ def load_risklab(directory, symbol="SPY", permno=84398):
     return frame[list(CHANNELS)].replace(0., np.nan), manifest
 
 
+def load_risklab_bv(directory, start, end):
+    """Risk Lab SPY 5-minute trade volatility as daily variance, in Oxford BV units.
+
+    Unavailable dates stay missing; nothing is filled or spliced with Oxford labels.
+    """
+    measures, manifest = load_risklab(directory)
+    volatility = measures.trade_rv5.loc[start:end].dropna()
+    return (volatility ** 2 / 252).rename("bv"), manifest
+
+
 def weighted_median(values, weights):
     order = np.argsort(values)
     cumulative = np.cumsum(np.asarray(weights)[order])

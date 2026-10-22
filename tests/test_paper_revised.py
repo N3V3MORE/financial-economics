@@ -158,7 +158,8 @@ def test_freeze_never_overwrites_and_changed_code_requires_new_run(tmp_path, mon
     monkeypatch.setattr(revised, "_portfolio_settings", lambda _: {"risk_mode": "annual"})
     monkeypatch.setattr(revised, "package_code_digests", lambda: {"model": "original"})
     args = Namespace(stage="freeze", config=config, output_dir=tmp_path / "run", data_dir=tmp_path / "source",
-                     returns_dir=tmp_path / "returns", oxford_archive=tmp_path / "bv.zip")
+                     returns_dir=tmp_path / "returns", oxford_archive=tmp_path / "bv.zip",
+                     risklab_dir=None)
     revised.run(args)
     frozen = json.loads((args.output_dir / "protocol.json").read_text())
     assert frozen["forecast_settings"]["lookback"] == 3
@@ -222,7 +223,8 @@ def test_staged_revision_evaluates_complete_returns_and_joint_exploratory_tests(
     monkeypatch.setattr(revised, "matched_gru", neural)
     args = Namespace(stage="freeze", config=config, portfolio_config=config,
                      output_dir=tmp_path / "run", data_dir=tmp_path / "source",
-                     returns_dir=tmp_path / "returns", oxford_archive=tmp_path / "bv.zip")
+                     returns_dir=tmp_path / "returns", oxford_archive=tmp_path / "bv.zip",
+                     risklab_dir=None)
     revised.run(args)
     for stage in revised.STAGES:
         args.stage = stage
