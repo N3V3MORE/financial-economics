@@ -1,0 +1,20 @@
+{
+  "input_sha256": "cc81b98a1317e28f3ac900de149ae39d3085f75492de9544390bce9c7907b1e2",
+  "seconds": 63.5,
+  "forecasts": 1564,
+  "qlike": -8.467422920489039,
+  "gpu": "AMD Radeon(TM) 8060S Graphics",
+  "torch_version": "2.11.0+rocm7.14.1",
+  "cuda_version": null,
+  "hip_version": "7.14.60850",
+  "cudnn_version": null,
+  "miopen_version": 3005002,
+  "rnn_backend": "MIOpen (observed training forward)",
+  "selected_hidden_size": 32,
+  "selected_learning_rate": 0.001,
+  "refit_epochs": 6,
+  "selected_best_epochs": [
+    7,
+    6
+  ]
+}
