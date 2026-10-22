@@ -120,6 +120,21 @@ def _stress_thresholds(volatility, calendar, settings, years):
     return cutoffs, records
 
 
+def risk_budget(settings):
+    """Return target and daily-volatility multiplier with explicit risk units."""
+    mode = settings.get("risk_mode", "paper")
+    if mode == "annual":
+        target, multiplier = settings.get("annual_target", .10), np.sqrt(252)
+    elif mode == "paper":
+        target, multiplier = settings["monthly_target"], settings["monthly_multiplier"]
+    else:
+        raise ValueError("Risk mode must be paper or annual.")
+    if (isinstance(target, bool) or not np.isfinite(target) or not 0 < target < 1
+            or isinstance(multiplier, bool) or not np.isfinite(multiplier) or multiplier <= 0):
+        raise ValueError("Risk target and volatility multiplier must be finite and positive.")
+    return target, multiplier
+
+
 def realistic_portfolios(daily, calendar, forecasts, settings):
     """Model-timed stock/cash, matched static stock/cash, and stress-period defensive additions.
 
@@ -138,7 +153,17 @@ def realistic_portfolios(daily, calendar, forecasts, settings):
     if not returns.index.equals(expected):
         raise ValueError("Realistic returns must keep every ETF-calendar evaluation date.")
     rows, dropped = delayed_signals(forecasts, calendar)
+    if settings.get("require_aligned_horizon", False):
+        if ("return_date" not in rows or "trade_date" not in forecasts
+                or not pd.DatetimeIndex(rows.return_date).equals(pd.DatetimeIndex(rows.earn_date))
+                or not pd.DatetimeIndex(forecasts.loc[rows.index, "trade_date"]).equals(
+                    pd.DatetimeIndex(rows.trade_date))):
+            raise ValueError("Aligned forecasts must target the t+2 return earned after execution.")
     signals = rows.loc[rows.earn_date.isin(returns.index)]
+    initial_cash = settings.get("initial_cash", False)
+    if initial_cash:
+        freeze = calendar[calendar < returns.index[0]][-1]
+        signals = signals.loc[(signals.index >= freeze) & (signals.earn_date > returns.index[0])]
     if signals.empty or signals.earn_date.duplicated().any():
         raise ValueError("Realistic evaluation needs unique delayed signal dates.")
     period = REBALANCE_PERIODS[frequency]
@@ -148,6 +173,7 @@ def realistic_portfolios(daily, calendar, forecasts, settings):
     rebalance = signal_dates[scheduled]
     years = sorted(returns.index.year.unique())
     month_starts = returns.index[~returns.index.to_period("M").duplicated()]
+    target_level, multiplier = risk_budget(settings)
     definitions, thresholds, statics, decisions = {}, [], [], []
     for model in models:
         values = rows[f"{model}_bv"]
@@ -155,8 +181,8 @@ def realistic_portfolios(daily, calendar, forecasts, settings):
         if (not np.isfinite(values).all() or (values <= 0).any()
                 or asof.isna().any() or (asof > rows.index).any()):
             raise ValueError(f"Invalid or future-fitted {model} forecasts.")
-        volatility = settings["monthly_multiplier"] * np.sqrt(values)
-        stock_all = np.minimum(settings["monthly_target"] / volatility, 1.)
+        volatility = multiplier * np.sqrt(values)
+        stock_all = np.minimum(target_level / volatility, 1.)
         calibration = stock_all.loc[(stock_all.index >= settings["calibration_start"])
                                     & (stock_all.index < pd.Timestamp(first))]
         static_weight = float(calibration.mean())
@@ -185,12 +211,25 @@ def realistic_portfolios(daily, calendar, forecasts, settings):
             definitions[f"{model}_{asset}"] = (targets.ffill(), rebalance.union(returns.index[:1]))
         static = pd.DataFrame(0., index=returns.index, columns=columns)
         static[benchmark], static["RF"] = static_weight, 1 - static_weight
-        definitions[f"{model}_static"] = (static, month_starts)
+        static_rebalance = month_starts
+        if initial_cash:
+            static.iloc[0] = [0.] * (len(columns) - 1) + [1.]
+            static_rebalance = month_starts.union(returns.index[1:2])
+        definitions[f"{model}_static"] = (static, static_rebalance)
+    if settings.get("cost_benchmark", False):
+        benchmark_targets = pd.DataFrame(0., index=returns.index, columns=columns)
+        benchmark_targets[benchmark] = 1.
+        benchmark_entry = returns.index[:1]
+        if initial_cash:
+            benchmark_targets.iloc[0] = [0.] * (len(columns) - 1) + [1.]
+            benchmark_entry = returns.index[:2]
+        definitions[benchmark] = (benchmark_targets, benchmark_entry)
     paths_by_cost, accounting_by_cost = {}, {}
     for cost in settings["costs_bps"]:
         paths, accounting = {benchmark: returns[benchmark]}, {}
         for name, (targets, rebalance) in definitions.items():
-            path = dynamic_costed_path(returns, targets, cost, rebalance)
+            path = dynamic_costed_path(returns, targets, cost, rebalance,
+                                       liquidate_end=settings.get("liquidate_end", False))
             paths[name] = path["return"]
             before = (1 + path["return"]).cumprod().shift(1, fill_value=1.)
             accounting[name] = path.assign(fees_per_initial_dollar=before * path.fee_fraction)
@@ -238,7 +277,10 @@ def _tests(result, calendar, settings):
     paths = result["paths"][settings["main_cost_bps"]]
     rf = result["returns"].RF.to_numpy()
     monthly = compound_months(paths, calendar, settings["evaluation_start"], settings["evaluation_end"])
-    down = (monthly[settings.get("benchmark", "SPY")] < 0).to_numpy(dtype=float)
+    benchmark = settings.get("benchmark", "SPY")
+    market_months = compound_months(result["returns"][[benchmark]], calendar,
+                                    settings["evaluation_start"], settings["evaluation_end"])
+    down = (market_months[benchmark] < 0).to_numpy(dtype=float)
     design = np.column_stack([down, 1 - down])
     rows = []
     for model in result["models"]:

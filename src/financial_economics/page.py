@@ -6,6 +6,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from .data import price_source_description
+
 NAMES = {"SPY": "SPY", "Equal weight": "Equal-weight mix", "SPY + cash": "SPY + cash"}
 CLASSES = {"SPY": "spy", "Equal weight": "mix", "SPY + cash": "cash"}
 WIDTH = 720
@@ -32,6 +34,7 @@ def _load(outputs: Path) -> dict:
         raise ValueError("Phases 3 and 4 used different test periods or SPY + cash splits; rerun them.")
     return {
         "study": runs[0]["study"], "files": runs[0]["snapshot_files"],
+        "sources": runs[0].get("sources", {}),
         "seed": runs[1]["seed_date"], "threshold": runs[1]["drawdown_threshold"],
         "exposure": _read(phase3, "stock_exposure.csv"),
         "returns1": _read(phase1, "daily_returns.csv", index_col=0, parse_dates=True),
@@ -373,7 +376,7 @@ follows one question: do different ETFs help spread risk, especially when market
 </header>
 {''.join(sections)}
 <footer>
-<p>Prices: Yahoo Finance adjusted closes through yfinance. Risk-free rate and cash: Kenneth French's daily factors.
+<p>ETF source: {escape(price_source_description(data))}. Risk-free rate and cash: Kenneth French's daily factors.
 Built from saved snapshot <code>{first_hash}</code> with <code>uv run fecon page</code>. Full tables and
 definitions are in <code>outputs/phase1</code> to <code>outputs/phase4</code>.</p>
 </footer>

@@ -78,9 +78,12 @@ def test_tiny_cuda_refits_save_checkpoints_and_ignore_future_targets(tmp_path):
         assert saved["num_layers"] == 2
         assert saved["input_units"] == "sqrt(raw daily BV)"
         assert saved["target_units"] == "sqrt(raw daily BV)"
-        # NVIDIA uses cuDNN, recorded by the absence of a native-RNN label.
-        expected_backend = "native ROCm/HIP; MIOpen disabled" if torch.version.hip else None
+        expected_backend = ("native ROCm/HIP; MIOpen disabled" if torch.version.hip
+                            else "cuDNN (observed training forward)")
         assert saved.get("rnn_backend") == expected_backend
+        assert saved["cudnn_used"] is (not bool(torch.version.hip))
+        assert saved["cudnn_version"] == (None if torch.version.hip else torch.backends.cudnn.version())
+        assert saved["rnn_autograd_nodes"] == metadata["rnn_autograd_nodes"]
         assert saved["hip_version"] == torch.version.hip
         assert saved["train_last_target"] <= saved["refit_asof"]
         assert all(tensor.device == torch.device("cuda:0") for tensor in saved["state_dict"].values())

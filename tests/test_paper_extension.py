@@ -89,6 +89,19 @@ def test_future_forecasts_cannot_change_prior_thresholds_or_allocations():
     assert first.threshold == pytest.approx(np.quantile(22 * np.sqrt(past), .9))
 
 
+def test_year_boundary_uses_the_earned_return_year_cutoff():
+    data, rows, calendar, paper, settings = extension_fixture()
+    tables, _ = extension_portfolios(data, rows, calendar, paper, settings)
+    thresholds = tables["annual_thresholds"].set_index(["risk_mode", "model", "evaluation_year"])
+    decisions = tables["decisions"]
+    boundary = decisions.loc[(decisions.forecast_date.dt.year < decisions.return_date.dt.year)
+                             & decisions.return_date.dt.year.eq(2011)]
+    assert len(boundary)
+    for row in boundary.itertuples():
+        expected = thresholds.loc[(row.risk_mode, row.model, 2011), "threshold"]
+        assert row.threshold == pytest.approx(expected)
+
+
 def test_misaligned_forecast_and_unavailable_refit_fail():
     data, rows, calendar, paper, settings = extension_fixture()
     bad = rows.copy()

@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 
 from .gru_forecasting import (_annual_splits, _gpu_inputs, _gpu_metadata, _predict, _require_cuda,
-                              _rnn_kernels, _uses_native_rnn)
+                              _record_rnn_dispatch, _rnn_kernels, _uses_native_rnn)
 
 
 def _cv_folds(rows, initial_training, folds):
@@ -54,8 +54,9 @@ def _model(torch, hidden_size, target_scale, dropout, device):
 
         def forward(self, inputs):
             with _rnn_kernels(torch):
-                sequence, _ = self.first(inputs)
+                sequence, first_hidden = self.first(inputs)
                 _, hidden = self.second(self.dropout(sequence))
+            _record_rnn_dispatch(self, first_hidden, hidden)
             return (torch.nn.functional.softplus(self.output(hidden[-1]).squeeze(-1))
                     * self.target_scale + 1e-12)
 
@@ -194,6 +195,7 @@ def paper_gru_forecasts(prepared, settings, calendar, checkpoint_dir, progress=p
     result["gru_bv"], result["gru_refit_asof"] = np.nan, pd.NaT
     checkpoint_dir.mkdir(parents=True, exist_ok=False)
     checkpoints, annual_metadata = [], []
+    rnn_autograd_nodes = set()
     for year, asof, training, issued in splits:
         training &= available
         if not training.any():
@@ -205,6 +207,7 @@ def paper_gru_forecasts(prepared, settings, calendar, checkpoint_dir, progress=p
             progress(f"Paper GRU annual refit: year={year}, seed={seed}, epochs={epochs}")
             model, _ = _fit(torch, prepared, training, None, scaling,
                             hidden_size, seed, epochs, settings)
+            rnn_autograd_nodes.update(getattr(model, "_rnn_autograd_nodes", ()))
             predictions.append(_predict(torch, model, issued_inputs))
             path = checkpoint_dir / str(year) / f"seed_{seed}.pt"
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -217,7 +220,8 @@ def paper_gru_forecasts(prepared, settings, calendar, checkpoint_dir, progress=p
                        "train_last_target": str(rows.loc[training, "return_date"].max().date()),
                        "training_observations": int(training.sum()),
                        "input_units": "sqrt(raw daily BV)", "target_units": "sqrt(raw daily BV)",
-                       **_gpu_metadata(torch, native_rnn=_uses_native_rnn(torch))}
+                       **_gpu_metadata(torch, native_rnn=_uses_native_rnn(torch),
+                                       rnn_autograd_nodes=getattr(model, "_rnn_autograd_nodes", ()))}
             with path.open("xb") as destination:
                 torch.save(payload, destination)
             paths.append(str(path.relative_to(checkpoint_dir)))
@@ -227,7 +231,8 @@ def paper_gru_forecasts(prepared, settings, calendar, checkpoint_dir, progress=p
         annual_metadata.append({"evaluation_year": year, "refit_asof": str(asof.date()),
                                 "train_last_target": payload["train_last_target"],
                                 "training_observations": int(training.sum()), "checkpoints": paths})
-    metadata = {**_gpu_metadata(torch, native_rnn=_uses_native_rnn(torch)), "num_layers": 2,
+    metadata = {**_gpu_metadata(torch, native_rnn=_uses_native_rnn(torch),
+                               rnn_autograd_nodes=rnn_autograd_nodes), "num_layers": 2,
                 "selected_hidden_size": hidden_size, "learning_rate": settings.learning_rate,
                 "dropout": settings.dropout, "weight_decay": settings.weight_decay,
                 "seeds": list(settings.seeds), "refit_epochs": epochs, **selection_metadata,

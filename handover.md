@@ -4,6 +4,36 @@ A short record of what this project did, what it found, what was decided
 and what is left. Full detail: [Final study](docs/final-study.md),
 [Results explained](docs/results-explained.md), [README](README.md).
 
+The methodology audit now has a separate matched implementation:
+`financial_economics.paper_revised`, with frozen settings in
+`outputs/revised-study-20261021/protocol.json`. It retains the original
+reconstruction and labels the revised historical comparisons exploratory.
+See the cross-reference table in `docs/final-study.md` and the runnable
+commands in `README.md`.
+
+Current code has returned to **22 trading observations**. The stricter
+substitute check is saved in `outputs/volatility-proxy-final-20261022`:
+added IVV/VOO inputs improve 2017–February 2022 average volatility accuracy
+from 93.3% to 93.7%, but 76 of 1,285 dates miss the requested 85% individual
+floor; the worst later date scores 32.0%. Earlier history has larger errors.
+The candidate is diagnostic only and is rejected for new training/backtests.
+The gate checks every available Oxford date, including training history.
+
+The earlier October 22 experiment added an explicitly estimated volatility history in
+`outputs/volatility-proxy-complete-20261022` and a separate later-year pilot
+in `outputs/proxy-study-20261022`. Final overlap error is 6.7% on volatility
+levels, 13.2% on raw BV; the missing 2018 crash week has 32.4% error under
+the daily-range fallback. That archived pilot used 30-calendar-day histories;
+its outputs stay unchanged, and it has not been rerun with 22. The October 21
+numbers below retain their original 22-observation setup.
+
+The later-year pilot completed all 1,003 trading days in 2022–2025. At 10 bps,
+EWMA/one-input GRU cash Sharpe is 0.335/0.340, versus about 0.433 for their
+2021-calibrated static mixes. Before fees it is 0.358/0.420. All three paired
+tests are nonsignificant after Holm adjustment. This extends the historical
+test with estimated volatility; it does not establish a profitable GRU edge.
+The full table and the 2018 approximation weakness are in `docs/final-study.md`.
+
 ## The question
 
 **Can a stock investor protect against market falls better than by simply
@@ -32,6 +62,7 @@ realistic-trading test.
 | Paper figures | Figures 3–7 redrawn, plus our data checked against the paper's printed statistics | `outputs/paper-figures-20261021`, `paper-figures-local-20261021` |
 | Post hoc checks | Swiss/German bonds in local currency; IEF added to the realistic test | `.../evaluation_local`, `outputs/paper-realistic-ief-20261021` |
 | Full verified rerun | Every stage above, from the saved data, on the final code | `outputs/rerun-20261021` |
+| Matched methodology revision | Shared GRU histories, separate stopping/scoring, true t+2 forecasts, annual equity budget, full entry/exit accounting and 27 paired tests | `outputs/revised-study-20261021` |
 
 ## Datasets
 
@@ -62,8 +93,8 @@ WRDS data is licensed. Raw data and outputs stay local and are ignored by Git.
   mix holding the model's mean **2010** stock target, reset monthly. It is
   not matched to 2011–2020 exposure. In practice timing held more stock
   than its mix (ARFIMA 75% against 56%; one-input GRU 79% against 59%) with
-  similar volatility and lower beta, so its smaller crash losses do not come
-  from holding less stock. This exposure check was added afterwards and is
+  similar volatility and lower beta, so its smaller maximum drawdown and
+  COVID loss do not come from holding less stock. This exposure check was added afterwards and is
   descriptive; see the main result under Findings.
 - **The paper's volatility scaling.** Monthly volatility is 22 × daily, as
   printed in the paper; textbook scaling uses √22. The 10% target is
@@ -115,6 +146,18 @@ WRDS data is licensed. Raw data and outputs stay local and are ignored by Git.
 
 ## Findings
 
+**October 21 matched revision.** The completed revised study retains all 2,517 market
+days in 2011–2020. At 10 bps, EWMA/one-input GRU/richer GRU stock/cash Sharpe
+is 0.843/0.827/0.841, versus 0.861/0.885/0.892 without fees. Both GRUs have
+lower measured volatility forecast MSE than EWMA, but neither forecast
+advantage survives adjustment; none of the 27 main portfolio tests is
+significant after Holm adjustment. Timing has smaller maximum drawdown and
+COVID loss than its static mix for all six models, but loses more in 2015–16
+for all six. Realized volatility is about 12% for EWMA and the GRUs despite
+the 10% equity budget. All 87 saved stage files match their hashes; all 369
+tests pass, including GPU training. See `docs/final-study.md` for the table
+and limits. The findings below describe the earlier experiments.
+
 **Verified.** On October 21, 2026 every stage was rerun from the saved data
 on the final code (`outputs/rerun-20261021`, 37 stages, about 20 minutes of
 GPU time). The run includes the corrected inference (centered Sharpe tests,
@@ -129,11 +172,14 @@ GRUs matched to rounding; the largest realistic-test Sharpe change was
 
 **Main result (descriptive, no uncertainty estimates):**
 - Timing held more stock on average than its fixed mix (ARFIMA 75% against
-  56%) with similar volatility, lower beta and smaller severe losses. It
-  stayed invested in calm periods and cut stock when forecast risk rose:
+  56%) with similar volatility, lower beta and smaller maximum drawdown and
+  COVID loss. It stayed invested in calm periods and cut stock when forecast risk rose:
   effective risk allocation in this sample. This is not evidence that it
   predicted whether stocks would rise or fall, or that the advantage is
   statistically reliable or will persist.
+  These two loss measures overlap. Across the other decline windows,
+  timing lost more for seven of seven models in 2015–16, four in 2011 and
+  three in 2018; ARFIMA's 2018 loss was 11.8% versus its fixed mix's 10.7%.
 - The assumed trading costs erased the observed before-fee advantage
   (ARFIMA Sharpe +0.09 before fees, −0.04 at 10 bps). Fees are scenarios,
   and the before-fee advantage was not itself tested for significance.
@@ -166,14 +212,25 @@ in other settings.
   clean prices. The realistic test uses total returns.
 - **Unpublished details.** The paper's code, seeds, tuning grid and some metric
   formulas are unpublished; our Sharpe formula and GRU details are inferred.
-- **Different GRU histories.** The one-input model uses BV history from
+- **Different archived GRU histories.** The one-input model uses BV history from
   2000, while the richer feature table starts on April 11, 2002, before
   the 22-observation lookback. Training samples and validation-fold dates
-  differ. A matched-history study is needed to attribute differences to
-  the additional inputs.
+  differ. The revised study matches both histories from October 3, 2000,
+  with identical validation dates and a one-session lag on external inputs.
+- **Validation reused in the original models.** GRU early stopping and configuration
+  scoring share validation folds, so tuning scores can be optimistic. The
+  revised study uses disjoint stopping and selection blocks.
+- **Archived extension and realistic boundaries.** The extension refits a two-session
+  target and assigned cutoffs by annual issue-date blocks; the realistic
+  test delays saved one-session forecasts and assigned cutoffs by return
+  year. The extension starts in cash, while an earlier signal can invest
+  the realistic portfolio on its first evaluation day. These histories
+  are retained as distinct setups. New extension runs share the earned-return-year
+  cutoff rule. All revised models target t+2, and every comparator starts in cash.
 - **ARFIMA bound.** ARFIMA's memory parameter hit its upper bound on 38% of days.
-- **History already seen.** 2010–2020 was examined repeatedly, so results are
-  retrospective, not out of sample.
+- **History already seen.** Forecasts are chronological out-of-sample
+  predictions, but the study history was examined repeatedly. The revised
+  calculation is exploratory rather than an untouched confirmatory test.
 - **Small effects.** Safe-haven effects are a few hundredths of Sharpe, and none is significant.
 - **Not reconstructed.** The paper's international markets (Nikkei, Nifty, STOXX 50).
 - **No paper-style forecasts after 2020.** The Oxford-Man archive ends in
@@ -181,45 +238,62 @@ in other settings.
   reversal comes from fixed holdings, not the timing strategy, so it does not
   show that the paper's full strategy failed then. The early prediction
   study is the only, rougher, timing evidence for 2022–2025.
-- **Exclusions.** Taxes and exit fees are excluded throughout.
+- **Exclusions.** Taxes remain excluded. Archived runs omit final sale fees;
+  the matched revision includes liquidation costs and charges the benchmark too.
 
 ## Where things are
 
 - **Branch:** `volatility-prediction`.
 - **Frozen GRU study tag:** `frozen-gru-study-20261021`.
-- **Fresh local snapshot:** `data/protection-long-wrds-20261021` contains
+- **Fresh snapshot recorded on the AMD machine:** `data/protection-long-wrds-20261021` contained
   verified SPY/TLT/GLD/DBC returns for 4,780 sessions from January 3, 2007
   through December 31, 2025; all 912 fund-month comparisons passed.
+  This directory is absent on this machine; these are the recorded AMD checks.
   A rebuild from these fresh inputs was stopped on the AMD machine; it is
   not needed for the reported results, which the full rerun verified.
-- **Other recovered inputs:** `data/paper-oxford-20261021/oxfordman-20220301.zip`
-  matches the recorded archive hash; `data/paper-fx-20261021` passes dated H.10
+- **Other recovered inputs recorded on the AMD machine:** `data/paper-oxford-20261021/oxfordman-20220301.zip`
+  matched the recorded archive hash; `data/paper-fx-20261021` passed dated H.10
   coverage checks. FRED maintenance was resolved using WRDS DGS3/DAAA and
   direct EIA Brent in `data/paper-macro-wrds-eia-20261021`. The combined
-  `data/paper-wrds-eia-20261021` snapshot has 19 series and 5,284 equity
+  `data/paper-wrds-eia-20261021` snapshot had 19 series and 5,284 equity
   sessions; hashes, prior-only alignment, and official FX conversion passed.
-  All 5,253 WRDS DGS3 observations match the official Fed export exactly.
-  The 4,197 overlapping AAA observations match too; later WRDS AAA values
-  lack independent current-FRED comparison. All actual source identities
-  and the fresh vintage are retained in the manifests.
+  All 5,253 WRDS DGS3 observations matched the official Fed export exactly.
+  The 4,197 overlapping AAA observations matched too; later WRDS AAA values
+  lacked independent current-FRED comparison. Source identities and the
+  fresh vintage were retained in the manifests. These four dated directories
+  are absent on this machine; the recorded checks were not repeated here.
 - **AMD training:** Radeon 8060S on Windows runs PyTorch 2.11.0 + ROCm 7.14.1.
   Native HIP GRU probes passed forward/backward, Adam updates, exact same-seed
   repetition and checkpoint reload. MIOpen's Windows RNN compiler failed on
   a missing `type_traits` header, so ROCm uses the native GPU RNN path.
-  Run and checkpoint metadata now identify ROCm and its HIP version.
-  The main `.venv` now includes the locked `prediction-rocm`, `reconstruction`
-  and `wrds` extras; use `prediction-rocm` in AMD training commands.
+  Run and checkpoint metadata identify ROCm and its HIP version. Future runs
+  also separate NVIDIA cuDNN availability, enabled flag and version from
+  observed training-forward dispatch; inference dispatch remains unobserved.
+  Archived run metadata stays unchanged. Exact reviewed metadata-only code
+  hash transitions preserve retained raw/log forecast reuse; arbitrary model
+  changes still fail the cache guard.
+  That AMD environment included the locked `prediction-rocm`, `reconstruction`
+  and `wrds` extras; use `prediction-rocm` in AMD training commands. This
+  machine's current validation uses NVIDIA CUDA.
 - **Commands to rerun each stage:** README sections “Reconstruct the paper's
   U.S. experiment” and “Fixed GRUs and the realistic trading test”.
 - **Stopped fresh-input rebuild (AMD machine):** `outputs/paper-wrds-eia-rocm-20261021/status.json`
-  records the interrupted stage and original process ID; `logs/run.stdout.log` and
-  `logs/run.stderr.log` retain progress and errors. The process tree was terminated during the first GRU stage because no
+  was the recorded status path; `logs/run.stdout.log` and
+  `logs/run.stderr.log` were retained on that machine. Those paths are absent
+  on this machine and cannot be checked locally here. The process tree was
+  terminated during the first GRU stage because no
   meaningful results-preserving speedup had been validated. No stages were
-  completed. Downloaded inputs and logs are retained. Final output was planned
+  completed. Downloaded inputs and logs were retained there. Final output was
+  planned
   at `outputs/paper-realistic-wrds-eia-rocm-20261021`.
-- **Tests after the inference, provenance, Windows login, AMD and source fixes:**
+- **Historical tests after the inference, provenance, Windows login, AMD and source fixes:**
   335 passed with warnings treated as errors in the main ROCm environment,
   including all seven actual GPU tests; none skipped.
-- **Tests and lint:** `uv run pytest -q` (345 pass after merging both machines' work, including GPU tests on the NVIDIA machine; GPU tests skip without CUDA or ROCm)
-  and `uv run ruff check`.
+- **Historical merged-suite result:** 345 passed after merging both machines'
+  work, including GPU tests on NVIDIA.
+- **Current tests and lint:** 392 passed with warnings treated as errors,
+  including matched-model GPU checks on NVIDIA CUDA, using
+  `.venv/Scripts/python.exe -m pytest -q -W error` with a workspace temporary
+  directory. GPU tests skip without compatible CUDA or ROCm.
+  `.venv/Scripts/ruff.exe check` passed.
 - **Write-up draft:** [Google Doc](https://docs.google.com/document/d/1aUVYdh1XzAlTyHhGPN4SLtOsYPSjuieeSwIQuM8PsnE/edit?usp=sharing).

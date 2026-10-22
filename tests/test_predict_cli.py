@@ -135,6 +135,21 @@ def test_verified_full_reuse_is_descriptive_for_secondary_asset_without_torch(of
     assert "outside the saved forecast source" in capsys.readouterr().err
 
 
+def test_missing_defensive_asset_fails_before_data_or_forecast_work(offline_prediction, tmp_path,
+                                                                  monkeypatch, capsys):
+    config, _, _, _, args = offline_prediction
+    config.write_text(config.read_text(encoding="utf-8").replace('GLD = "Gold"\n', ""), encoding="utf-8")
+    monkeypatch.setattr("financial_economics.return_data.load_returns",
+                        lambda *_args, **_kwargs: pytest.fail("Must validate before loading data"))
+    monkeypatch.setattr("financial_economics.forecasting.prepare_forecasts",
+                        lambda *_args: pytest.fail("Must validate before preparing forecasts"))
+    output = tmp_path / "missing-asset"
+    assert cli.main([*args, "--output-dir", str(output), "--defensive-asset", "GLD"]) == 1
+    message = capsys.readouterr().err
+    assert "Defensive asset GLD is absent from the study's [assets]" in message
+    assert "verified snapshot" in message and not output.exists()
+
+
 @pytest.mark.parametrize("change, message", [("hash", "hash"), ("provenance", "provenance"),
                                               ("settings", "settings")])
 def test_saved_forecast_integrity_failures_are_readable(offline_prediction, tmp_path, capsys, change, message):

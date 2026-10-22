@@ -21,6 +21,19 @@ STAGES = ("classical", "gru_univar", "gru_multivar")
 # Post hoc, labelled log-BV fixes; the raw-BV stages above stay frozen.
 LOG_STAGES = ("gru_univar_log", "gru_multivar_log")
 
+# Exact reviewed transitions add dispatch provenance only; model math is unchanged.
+# Any later edit requires a fresh review and cannot pass these fixed digest pairs.
+METADATA_ONLY_CODE_TRANSITIONS = {
+    "gru_forecasting.py": ("e55887f5c820fc4467f45c9762f193110b3193617de188933e1ca59d36fffd41",
+                           "5be8eadf6d8ecc4fcef2599abf326d70de1a6488d2469622d39f388ed145dd83"),
+    "paper_gru.py": ("565e94d2bbd433118dc41fee67b849cf5504c3489f5f5a75dd528ce37bba2564",
+                     "b0dee9a9a30a773ddd79405fe22124ca56156022729d516c509894da90f951da"),
+    "paper_networks.py": ("0018d3d7645ac02e9031a2a4bc87c812bdb48d81ed3cfa3b76ecac7b7d24184e",
+                          "80ca9710081bed0aaee1d2dfc07c5546e98b3949d265798f7cbe16d12c073dd1"),
+    "paper_networks_log.py": ("6e132375daa7c3e2cf774a2924071ab97ff43abf126112c66cf6b86c1f36f5c6",
+                              "185a93030c3a780fe0d3ad16ab48578a126206b9e75d13cf52372a614d7c2865"),
+}
+
 
 def _code_hashes(stage):
     names = ["paper_sources.py", "paper.py", "forecasting.py", "paper_reconstruction.py"]
@@ -50,8 +63,16 @@ def _read_stage(directory, identity, stage):
     # Reading old CSV headers can change without changing any fitted model.
     dependencies = {name: digest for name, digest in current_code.items()
                     if name != "paper_reconstruction.py"}
+    compatible_code = {
+        name: {"original_sha256": metadata["code"].get(name), "current_sha256": digest,
+               "reason": "reviewed metadata-only addition: cuDNN library flags/version and "
+                         "first training-forward dispatch evidence; model math unchanged"}
+        for name, digest in dependencies.items()
+        if (metadata["code"].get(name), digest) == METADATA_ONLY_CODE_TRANSITIONS.get(name)
+    }
     if (metadata["inputs"] != identity
-            or any(metadata["code"].get(name) != digest for name, digest in dependencies.items())):
+            or any(metadata["code"].get(name) != digest and name not in compatible_code
+                   for name, digest in dependencies.items())):
         raise ValueError(f"Saved {stage} settings, inputs or model code changed; use a fresh run.")
     for name, digest in metadata["files"].items():
         if file_digest(directory / name) != digest:
@@ -66,7 +87,10 @@ def _read_stage(directory, identity, stage):
             forecasts[name] = pd.to_datetime(forecasts[name])
     metadata["cache_reader"] = {"original_wrapper_sha256": metadata["code"]["paper_reconstruction.py"],
                                 "current_wrapper_sha256": current_code["paper_reconstruction.py"],
-                                "rule": "input/settings, forecasting dependencies and every saved file must match; wrapper-only reader compatibility accepted"}
+                                "metadata_only_code_compatibility": compatible_code,
+                                "rule": "input/settings and every saved file must match; forecasting "
+                                        "dependencies match exactly or use a reviewed exact metadata-only "
+                                        "digest transition; wrapper-only reader compatibility accepted"}
     return forecasts, metadata
 
 

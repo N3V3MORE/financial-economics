@@ -33,19 +33,47 @@ def _require_cuda():
     return torch, device
 
 
-def _gpu_metadata(torch, *, native_rnn=False):
-    """Record the actual runtime; ROCm intentionally uses PyTorch's cuda device API."""
+def _gpu_metadata(torch, *, native_rnn=False, rnn_autograd_nodes=()):
+    """Keep library flags separate from evidence of the fitted models' dispatch."""
     hip = getattr(torch.version, "hip", None)
     cuda = getattr(torch.version, "cuda", None)
     runtime = "ROCm" if hip else "CUDA"
+    cudnn = torch.backends.cudnn
+    nodes = sorted(set(rnn_autograd_nodes))
     metadata = {"backend": f"{runtime}-required PyTorch", "device": "cuda:0",
                 "gpu": torch.cuda.get_device_name(0), "torch_version": str(torch.__version__),
                 "cuda_version": str(cuda) if cuda is not None else None,
-                "hip_version": str(hip) if hip is not None else None}
+                "hip_version": str(hip) if hip is not None else None,
+                # On ROCm the cudnn namespace controls MIOpen, not NVIDIA cuDNN.
+                "cudnn_available": bool(cudnn.is_available()) if not hip else False,
+                "cudnn_enabled": bool(cudnn.enabled) if not hip else None,
+                "cudnn_version": cudnn.version() if not hip else None,
+                "rnn_autograd_nodes": nodes,
+                "rnn_dispatch_observation": "first gradient-enabled forward per saved fitted model; "
+                                            "inference dispatch not observed",
+                "rnn_backend_selection": "native GPU; vendor RNN disabled" if native_rnn
+                                         else "PyTorch dispatch according to enabled libraries and inputs",
+                "cudnn_used": None}
     if native_rnn:
         metadata["rnn_backend"] = ("native ROCm/HIP; MIOpen disabled" if hip
                                    else "native CUDA; cuDNN disabled")
+        metadata["cudnn_used"] = False
+    elif nodes and all(name.startswith("CudnnRnnBackward") for name in nodes) and not hip:
+        metadata["rnn_backend"] = "cuDNN (observed training forward)"
+        metadata["cudnn_used"] = True
+    elif nodes and all(name.startswith("StackBackward") for name in nodes) and not hip:
+        metadata["rnn_backend"] = "native CUDA (observed training forward)"
+        metadata["cudnn_used"] = False
+    else:
+        metadata["rnn_backend"] = "unknown; no recognized training dispatch evidence"
     return metadata
+
+
+def _record_rnn_dispatch(model, *outputs):
+    """Read existing autograd nodes once, without extra tensor operations or profiling."""
+    if not getattr(model, "_rnn_autograd_nodes", ()):
+        model._rnn_autograd_nodes = tuple(type(output.grad_fn).__name__ for output in outputs
+                                          if output.grad_fn is not None)
 
 
 @contextmanager
@@ -123,6 +151,7 @@ def _make_model(torch, hidden_size, target_scale, device):
         def forward(self, inputs):
             with _rnn_kernels(torch):
                 _, hidden = self.gru(inputs)
+            _record_rnn_dispatch(self, hidden)
             return torch.nn.functional.softplus(self.output(hidden[-1]).squeeze(-1)) * self.target_scale + 1e-12
 
     model = VarianceGRU().to(device)
@@ -195,7 +224,8 @@ def _save_checkpoint(torch, model, path, scaling, prepared, training,
                "batch_size": batch_size, "refit_asof": str(asof.date()),
                "train_last_target": str(prepared.rows.loc[training, "return_date"].max().date()),
                "training_observations": int(np.sum(training)),
-               **_gpu_metadata(torch, native_rnn=_uses_native_rnn(torch))}
+               **_gpu_metadata(torch, native_rnn=_uses_native_rnn(torch),
+                               rnn_autograd_nodes=getattr(model, "_rnn_autograd_nodes", ()))}
     with path.open("xb") as destination:
         torch.save(payload, destination)
 
@@ -231,6 +261,7 @@ def gru_forecasts(prepared: ForecastData, settings, calendar: pd.DatetimeIndex,
     validation_targets = torch.as_tensor(rows.squared_return.to_numpy()[validation], dtype=torch.float32, device=device)
     history_inputs = _gpu_inputs(torch, inputs[history], scaling, device)
     tuning_rows, candidates, checkpoints = [], [], []
+    rnn_autograd_nodes = set()
     for hidden_size in settings.hidden_sizes:
         for learning_rate in settings.learning_rates:
             predictions, best_epochs, paths = [], [], []
@@ -241,6 +272,7 @@ def gru_forecasts(prepared: ForecastData, settings, calendar: pd.DatetimeIndex,
                                          (validation_inputs, validation_targets), scaling,
                                          hidden_size, learning_rate, seed, settings.max_epochs,
                                          settings.batch_size, settings.patience)
+                rnn_autograd_nodes.update(getattr(model, "_rnn_autograd_nodes", ()))
                 predictions.append(_predict(torch, model, history_inputs))
                 best_epochs.append(best_epoch)
                 path = checkpoint_dir / "initial" / f"grid_{candidate}" / f"seed_{seed}.pt"
@@ -281,6 +313,7 @@ def gru_forecasts(prepared: ForecastData, settings, calendar: pd.DatetimeIndex,
             model, _ = _fit(torch, train_inputs, train_targets, None, scaling,
                             int(selected_row.hidden_size), float(selected_row.learning_rate), seed,
                             refit_epochs, settings.batch_size, settings.patience)
+            rnn_autograd_nodes.update(getattr(model, "_rnn_autograd_nodes", ()))
             predictions.append(_predict(torch, model, issued_inputs))
             path = checkpoint_dir / "annual" / str(year) / f"seed_{seed}.pt"
             _save_checkpoint(torch, model, path, scaling, prepared, training, asof, seed,
@@ -293,7 +326,8 @@ def gru_forecasts(prepared: ForecastData, settings, calendar: pd.DatetimeIndex,
         annual_metadata.append({"evaluation_year": year, "refit_asof": str(asof.date()),
                                 "train_last_target": str(rows.loc[training, "return_date"].max().date()),
                                 "training_observations": int(training.sum()), "checkpoints": paths})
-    metadata = {**_gpu_metadata(torch, native_rnn=_uses_native_rnn(torch)),
+    metadata = {**_gpu_metadata(torch, native_rnn=_uses_native_rnn(torch),
+                               rnn_autograd_nodes=rnn_autograd_nodes),
                 "seeds": list(settings.seeds),
                 "selected_hidden_size": int(selected_row.hidden_size),
                 "selected_learning_rate": float(selected_row.learning_rate),

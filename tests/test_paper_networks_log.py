@@ -68,8 +68,12 @@ def test_tiny_cuda_log_refits_are_positive_and_use_past_labels(tmp_path, channel
         saved = torch.load(tmp_path / name / relative_path, map_location="cuda:0", weights_only=True)
         assert saved["smearing"] > 0 and saved["train_last_target"] <= saved["refit_asof"]
         # NVIDIA uses cuDNN, recorded by the absence of a native-RNN label.
-        expected_backend = "native ROCm/HIP; MIOpen disabled" if torch.version.hip else None
+        expected_backend = ("native ROCm/HIP; MIOpen disabled" if torch.version.hip
+                            else "cuDNN (observed training forward)")
         assert saved.get("rnn_backend") == metadata.get("rnn_backend") == expected_backend
+        assert saved["cudnn_used"] is (not bool(torch.version.hip))
+        assert saved["cudnn_version"] == metadata["cudnn_version"]
+        assert saved["rnn_autograd_nodes"] == metadata["rnn_autograd_nodes"]
         assert saved["hip_version"] == metadata["hip_version"]
     with pytest.raises(ValueError, match="never replaced"):
         reconstruct_log_gru(prepared, calendar, tmp_path / name, **options)

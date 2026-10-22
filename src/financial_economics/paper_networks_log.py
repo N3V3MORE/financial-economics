@@ -172,6 +172,7 @@ def reconstruct_log_gru(prepared, calendar, checkpoint_dir, *, model_name, profi
     result[f"{model_name}_bv"], result[f"{model_name}_refit_asof"] = np.nan, pd.NaT
     checkpoint_dir.mkdir(parents=True, exist_ok=False)
     checkpoints, annual_metadata = [], []
+    rnn_autograd_nodes = set()
     for year, asof, training, issued in splits:
         training = training & available
         scaling = _log_scale(prepared, training)
@@ -181,6 +182,7 @@ def reconstruct_log_gru(prepared, calendar, checkpoint_dir, *, model_name, profi
             progress(f"{model_name} annual refit: year={year}, seed={seed}, epochs={epochs}")
             model, _, smearing = _fit(torch, prepared, training, None, scaling, profile,
                                       seed, epochs, patience, learning_rate)
+            rnn_autograd_nodes.update(getattr(model, "_rnn_autograd_nodes", ()))
             predictions.append(np.exp(_log_predictions(torch, model, issued_inputs, scaling)) * smearing)
             smearings.append(smearing)
             path = checkpoint_dir / str(year) / f"seed_{seed}.pt"
@@ -194,7 +196,8 @@ def reconstruct_log_gru(prepared, calendar, checkpoint_dir, *, model_name, profi
                        "training_observations": int(training.sum()),
                        "input_units": "log BV and signed explanatory changes; train-only channel standardization",
                        "target_units": "standardized log BV; exp(forecast) times training smearing factor",
-                       **_gpu_metadata(torch, native_rnn=_uses_native_rnn(torch))}
+                       **_gpu_metadata(torch, native_rnn=_uses_native_rnn(torch),
+                                       rnn_autograd_nodes=getattr(model, "_rnn_autograd_nodes", ()))}
             with path.open("xb") as destination:
                 torch.save(payload, destination)
             paths.append(str(path.relative_to(checkpoint_dir)))
@@ -209,7 +212,8 @@ def reconstruct_log_gru(prepared, calendar, checkpoint_dir, *, model_name, profi
                                 "training_observations": int(training.sum()),
                                 "forecast_observations": int(issued.sum()),
                                 "smearing": smearings, "scaling": scaling, "checkpoints": paths})
-    metadata = {"model_name": model_name, **_gpu_metadata(torch, native_rnn=_uses_native_rnn(torch)), "num_layers": 2,
+    metadata = {"model_name": model_name, **_gpu_metadata(torch, native_rnn=_uses_native_rnn(torch),
+                rnn_autograd_nodes=rnn_autograd_nodes), "num_layers": 2,
                 "input_channels": inputs.shape[2], "lookback": inputs.shape[1],
                 "profiles": candidates, "selected_profile": dict(profile), "seeds": list(seeds),
                 "learning_rate": learning_rate, "max_epochs": max_epochs, "patience": patience,

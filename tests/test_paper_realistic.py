@@ -33,6 +33,41 @@ def test_signals_trade_one_session_after_issue_and_earn_the_next():
     assert dropped == 2
 
 
+def test_revised_rules_use_annual_units_common_entry_and_terminal_costs():
+    daily, calendar, forecasts = _inputs()
+    issues = calendar.get_indexer(forecasts.index)
+    forecasts["trade_date"] = calendar[issues + 1]
+    forecasts["return_date"] = calendar[issues + 2]
+    settings = {**SETTINGS, "risk_mode": "annual", "annual_target": .10,
+                "initial_cash": True, "cost_benchmark": True, "liquidate_end": True,
+                "require_aligned_horizon": True}
+    result = realistic_portfolios(daily, calendar, forecasts, settings)
+    decisions = result["decisions"]
+    expected = np.minimum(.10 / np.sqrt(252 * forecasts.loc[decisions.issue_date, "arfima_bv"]), 1.)
+    np.testing.assert_allclose(decisions.stock_target, expected)
+    paths = result["paths"][10]
+    np.testing.assert_allclose(paths.iloc[0], result["returns"].RF.iloc[0])
+    assert result["accounting"][10]["SPY"].fee_fraction.iloc[1] > 0
+    assert result["accounting"][10]["SPY"].fee_fraction.iloc[-1] > 0
+    forecasts["return_date"] = forecasts.trade_date
+    with pytest.raises(ValueError, match="t\\+2"):
+        realistic_portfolios(daily, calendar, forecasts, settings)
+
+
+def test_terminal_sale_charges_actual_drifted_etf_value():
+    from financial_economics.costs import dynamic_costed_path
+
+    dates = pd.bdate_range("2020-01-02", periods=2)
+    returns = pd.DataFrame({"SPY": [1., 0.], "RF": [0., 0.]}, index=dates)
+    targets = pd.DataFrame({"SPY": [.5, .5], "RF": [.5, .5]}, index=dates)
+    result = dynamic_costed_path(returns, targets, 100, dates[:1], liquidate_end=True)
+    # Entry leaves 1/1.005 wealth. Stock then doubles; sell that drifted value.
+    expected_wealth = (1.5 - .01) / 1.005
+    assert (1 + result["return"]).prod() == pytest.approx(expected_wealth)
+    wealth_before = (1 + result["return"]).cumprod().shift(1, fill_value=1.)
+    assert (wealth_before * result.fee_fraction).sum() == pytest.approx(.015 / 1.005)
+
+
 def test_sharpe_difference_is_zero_for_identical_series_and_signed_otherwise():
     rng = np.random.default_rng(1)
     base = rng.normal(.0005, .01, 3000)
@@ -278,9 +313,17 @@ def _inference_inputs(*, unavailable_asset):
     settings = {"evaluation_start": "2011-01-01", "evaluation_end": "2020-12-31",
                 "primary_models": ["arfima", "gru_univar"], "primary_assets": ["TLT", "GLD"],
                 "main_cost_bps": 10, "sharpe_hac_lags": 20, "monthly_hac_lags": 6, "alpha": .05}
-    result = {"paths": {10: paths}, "returns": pd.DataFrame({"RF": .00002}, index=calendar),
+    result = {"paths": {10: paths}, "returns": pd.DataFrame({"RF": .00002, "SPY": market}, index=calendar),
               "models": settings["primary_models"].copy(), "assets": settings["primary_assets"].copy()}
     return result, calendar, settings
+
+
+def test_down_months_use_gross_market_returns_even_when_benchmark_pays_fees():
+    result, calendar, settings = _inference_inputs(unavailable_asset=False)
+    result["returns"]["SPY"] = .00001
+    result["paths"][10]["SPY"] = -.00001
+    tests = _tests(result, calendar, settings)
+    assert tests.negative_months.eq(0).all()
 
 
 @pytest.mark.parametrize("unavailable_asset", [False, True], ids=["complete", "one_unavailable"])

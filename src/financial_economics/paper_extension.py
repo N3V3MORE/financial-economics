@@ -14,6 +14,7 @@ from .analysis import _check_returns, performance_summary
 from .costs import dynamic_costed_path
 from .data import parse_french_factors
 from .paper import load_bipower, load_paper_settings, prepare_paper_forecasts
+from .paper_realistic import _stress_thresholds
 from .provenance import file_digest, git_dirty, git_head, utc_now
 from .return_data import compound_months, load_returns
 
@@ -196,19 +197,12 @@ def extension_portfolios(data, forecasts, calendar, paper, settings):
             accepted = _allocation_change_signals(stock, scheduled, settings.min_allocation_change)
             rebalance = pd.DatetimeIndex([daily.index[0], *eligible.loc[accepted, "return_date"]]).unique().sort_values()
             rebalance_counts[f"{model} | {mode}"] = int(accepted.sum())
-            cutoffs = np.empty(len(eligible))
-            for year in sorted(daily.index.year.unique()):
-                asof = calendar[calendar < pd.Timestamp(year=year, month=1, day=1)][-1]
-                next_asof = calendar[calendar < pd.Timestamp(year=year + 1, month=1, day=1)][-1]
-                past = rows.loc[(rows.index >= settings.calibration_start) & (rows.index < asof), f"{model}_bv"]
-                if past.empty:
-                    raise ValueError("Past-only stress thresholds need pre-evaluation forecast calibration.")
-                threshold = float(np.quantile(multiplier * np.sqrt(past), settings.stress_quantile))
-                block = (eligible.index >= asof) & (eligible.index < next_asof)
-                cutoffs[block] = threshold
-                thresholds.append({"risk_mode": mode, "model": model, "evaluation_year": int(year),
-                                   "asof": asof, "calibration_last_issue": past.index[-1],
-                                   "calibration_forecasts": len(past), "threshold": threshold})
+            annual, records = _stress_thresholds(
+                multiplier * np.sqrt(rows[f"{model}_bv"]), calendar,
+                {"calibration_start": settings.calibration_start, "stress_quantile": settings.stress_quantile},
+                sorted(daily.index.year.unique()))
+            cutoffs = eligible.return_date.dt.year.map(annual).to_numpy()
+            thresholds.extend({"risk_mode": mode, "model": model, **record} for record in records)
             stressed = predicted > cutoffs
             decisions.append(eligible[["trade_date", "return_date"]].reset_index().assign(
                 model=model, risk_mode=mode, volatility=predicted, threshold=cutoffs,
@@ -356,7 +350,7 @@ def run_extension_command(args, study):
                     "rebalance_schedule": ("every eligible execution close" if settings.rebalance_frequency == "daily"
                                            else "first eligible execution close per Monday-Sunday week; holdings drift between trades"),
                     "allocation_change_rule": "0 disables filtering; otherwise first scheduled entry always trades, then absolute SPY target change from last accepted target must meet the minimum (1e-12 tolerance); full target reset; actual holdings drift does not trigger trades",
-                    "thresholds": "annual; model forecasts since calibration_start issued strictly before the preceding annual close",
+                    "thresholds": "assigned by earned-return year; model forecasts since calibration_start issued strictly before the preceding annual close; shared with realistic portfolios",
                     "calibration": "2009 forecasts reconstructed with pre-2009 fitted weights and architecture selected through 2009; all calibration known before 2010 evaluation",
                     "missing_data": "missing BV labels unscored; missing signals retain holdings and drift; no return day dropped",
                     "main_scenario": "paper risk scaling; actual cash income; 10 bps per ETF dollar bought or sold",

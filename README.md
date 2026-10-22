@@ -215,13 +215,22 @@ Windows `gfx1151`; other AMD devices need their matching runtime packages.
 See [AMD's compatibility matrix](https://rocm.docs.amd.com/en/docs-7.14.1/compatibility/compatibility-matrix.html)
 and [PyTorch's HIP device semantics](https://docs.pytorch.org/docs/2.11/notes/hip.html).
 
-The October 21 local validation passed all 335 tests, including seven GPU
+An earlier October 21 local validation passed 335 tests, including seven GPU
 tests, with warnings treated as errors. Separate model probes verified
 forward/backward computation, Adam updates, exact same-seed repetition and
 checkpoint reload on Radeon 8060S. ROCm GRUs use native HIP operations to
 avoid the observed Windows MIOpen compiler failure. Run and checkpoint
-metadata record the actual runtime and HIP version. Deterministic training
-does not imply identical forecasts across different GPU runtimes.
+metadata record the actual runtime and HIP version. Future runs also record
+NVIDIA cuDNN availability, its enabled flag and version separately from
+observed training-forward dispatch. Inference dispatch is not observed;
+unrecognized training evidence is labelled unknown. ROCm's native HIP path
+is identified separately, and archived runs gain no invented metadata.
+Deterministic training does not imply identical forecasts across different
+GPU runtimes.
+
+The current suite passes 392 tests with warnings treated as errors, including
+the matched-model GPU checks on NVIDIA CUDA. The earlier 335-test result above is
+historical; GPU tests skip when no compatible CUDA or ROCm device is available.
 
 A/B use EWMA/GRU to divide SPY and cash. C/D keep the same respective SPY
 targets and add up to 20% defensive ETF from available cash during predicted
@@ -487,6 +496,138 @@ same-date external quote was available before the U.S. close.
 PyTorch uses reset-after GRU gates; the paper's displayed equation uses
 reset-before, while its executed Keras/TensorFlow settings are unpublished.
 
+### Revised matched study after the methodology audit
+
+`financial_economics.paper_revised` corrects the practical limitations of the
+historical reconstruction while retaining its original files and outputs.
+The saved October 21 revision used identical 22-observation histories,
+beginning October 3, 2000. Current runs again use the last 22 trading
+observations, following the requested rollback of the calendar-day experiment.
+The annual conversion remains sqrt(252), and forecasts still target t+2.
+The four external features lag
+one market session. Training, stopping and selection dates are identical;
+early stopping and configuration scoring use separate, purged blocks.
+Log-BV predictions are positive, with training-only smearing.
+
+All six models (EWMA, ARFIMA, GARCH, GJR and both GRUs) forecast the session
+actually earned: issue at close t, trade at close t+1, earn the t+2 return.
+GARCH/GJR use analytic two-step variances; ARFIMA forecasts recursively;
+EWMA holds its conditional variance level without future observations.
+The equity risk budget is 10% annually, using sqrt(252), with past-only
+stress cutoffs, observed cash income and verified ETF total returns.
+Defensive additions retain the stock target to isolate their contribution;
+the budget is not a guarantee about the complete portfolio's realized risk.
+
+Costs are fixed at 0, 1, 2, 5, 10 and 25 bps per ETF dollar traded; 10 bps is
+the main scenario. Every strategy, its static control and the benchmark start
+in cash on the first evaluation day. The benchmark pays entry and final sale
+costs too. Final liquidation uses actual drifted holdings. Negative-market
+months are defined by gross stock returns, consistently across costs.
+All 27 portfolio comparisons enter one Holm family and remain exploratory.
+
+```powershell
+$revisedArgs = @('--data-dir', 'data/paper-reconstruction-public-20261021', '--returns-dir', 'data/protection-long-wrds-20261020', '--oxford-archive', 'data/paper-source-20261020/oxfordman-20220301.zip', '--output-dir', 'outputs/revised-study-new')
+foreach ($stage in @('freeze', 'classical', 'gru_univar_log', 'gru_multivar_log', 'evaluate')) {
+    uv run --extra prediction --extra reconstruction python -m financial_economics.paper_revised $stage @revisedArgs
+    if ($LASTEXITCODE -ne 0) { break }
+}
+```
+
+Freeze writes source/config/code hashes before fitting. Each later stage
+rejects changed inputs or calculation code, existing outputs, mixed protocols,
+different target dates or different GRU fold dates. Ordinary GPU requirements
+apply; classical fits and accounting are CPU-native and stages run sequentially.
+See `outputs/revised-study-20261021/protocol.json` for the executed revision.
+The archived reconstruction configurations retain their previous behavior.
+
+The saved 22-observation revision covers every one of the 2,517 market days in 2011–2020.
+At 10 bps, stock/cash Sharpe is 0.843 for EWMA, 0.827 for the one-input GRU
+and 0.841 for the richer GRU. At zero fees those figures are 0.861, 0.885
+and 0.892. The GRUs have lower measured volatility forecast error, but no
+portfolio comparison survives the joint 27-test adjustment. Full results
+and their limits are in `docs/final-study.md`; saved tables are under
+`outputs/revised-study-20261021/evaluate`.
+
+Remaining limits are explicit: the selected source inputs end in 2020;
+historical macro vintages and exact publication times are unavailable;
+intraday BV omits overnight risk; costs are assumptions; taxes are excluded.
+The same history has been inspected repeatedly, so freezing this revision
+does not turn it into an untouched confirmatory test. A current-data extension
+requires a validated consistent volatility source, not an undocumented splice.
+
+### Estimated Oxford-like measurements and later-year test
+
+`financial_economics.volatility_proxy` estimates same-day Oxford-like volatility
+from public [Risk Lab](https://dachxiu.chicagobooth.edu/) intraday measures.
+The current comparison adds IVV and VOO to SPY, flags gross trade/quote
+disagreements and tests 78 mappings, including constrained combinations.
+Coefficients use 2000–2013, and 2014–2016 selects the method before scoring
+2017–February 25, 2022. These dates have already been inspected; successive
+revisions are exploratory. The wider inputs and longer calibration history
+change together, so this does not isolate the effect of adding another ETF.
+
+The requested acceptance rule is now **at least 90% average accuracy and 85%
+on every individual day**, with complete coverage of Oxford comparison dates,
+including history offered for training. Accuracy means one minus absolute
+percentage error in volatility levels. It does not measure future prediction
+accuracy, raw-variance accuracy or the percentage of correct days.
+
+| 2017–February 25, 2022; 1,285 days | Original substitute | Revised substitute |
+|---|---:|---:|
+| Average volatility accuracy | 93.3% | 93.7% |
+| Days reaching 85% accuracy | 94.2% | 94.1% |
+| Worst individual accuracy | 35.0% | 32.0% |
+| February 2018 crash-week average error | 32.4% | 7.5% |
+
+The revised comparison is saved in `outputs/volatility-proxy-final-20261022`.
+It improves average error from 6.69% to 6.35%, but **fails the daily minimum**:
+76 later-period dates fall below 85%, and some earlier errors exceed 100%.
+All 5,552 Oxford dates remain in the comparison; failures are saved in
+`failures.csv`. Raw BV average error in the later period is 12.8%.
+Daily-price fallbacks remain explicitly flagged. The full diagnostic export
+has 7,743 dates through October 9, 2026, including all 1,003 dates in 2022–2025.
+
+**This substitute is not approved for a new training/backtest run.** The proxy
+command returns a failure status when either accuracy requirement fails, and
+`proxy_study` rejects both this result and legacy runs lacking the new daily
+check. Passing an older average-only gate is insufficient.
+
+```powershell
+uv run python -m financial_economics.volatility_proxy --data-dir data/volatility-proxy-20261022 --prices-dir data/volatility-proxy-prices-20261022 --ivv-dir data/volatility-proxy-ivv-20261022 --voo-dir data/volatility-proxy-voo-20261022 --oxford-archive data/paper-source-20261020/oxfordman-20220301.zip --output-dir outputs/volatility-proxy-new
+if ($LASTEXITCODE -eq 0) {
+    $proxyArgs = @('--proxy-run', 'outputs/volatility-proxy-new', '--prices-dir', 'data/volatility-proxy-prices-20261022', '--returns-dir', 'data/protection-long-wrds-20261020', '--output-dir', 'outputs/proxy-study-new')
+    foreach ($stage in @('freeze', 'forecast', 'evaluate')) {
+        uv run --extra prediction --extra reconstruction python -m financial_economics.proxy_study $stage @proxyArgs
+        if ($LASTEXITCODE -ne 0) { break }
+    }
+}
+```
+
+The archived later-year pilot used the original substitute, one log-BV GRU
+and EWMA, 2021 calibration and
+2022–2025 evaluation on verified WRDS/CRSP ETF total returns. The full
+volatility history is estimated consistently; Oxford labels are not spliced
+onto later proxy labels. The existing 32/32 architecture has no new width
+search; pre-2021 folds select stopping epochs capped at 12, using seeds
+11/22/33. It used 30-calendar-day histories, t+2 forecasts, 10% annual equity
+risk, cash interest, entry/exit costs and the six fixed fee scenarios. Current
+code has reverted to 22 trading observations; this pilot has not been rerun
+with 22 because the substitute fails the stricter quality requirement.
+The three Sharpe comparisons share one Holm adjustment. These are historical
+research results: exact publication times and the ability to obtain these
+measurements before trading remain unverified. The richer GRU is not included
+because the retained external-input snapshot ends in 2020.
+
+The completed pilot retains all 1,003 market days in 2022–2025. At 10 bps,
+EWMA/GRU cash Sharpe is 0.335/0.340, versus about 0.433 for their static
+controls. Before fees the timing figures are 0.358/0.420. Maximum drawdown
+is 20.59%/21.27%, versus 23.17%/23.18% for the static controls. None of the
+three comparisons survives Holm adjustment. These results are saved under
+`outputs/proxy-study-20261022`; they do not establish that the GRU improves
+investment performance. Five actual NVIDIA/cuDNN annual refits use 10 epochs
+selected from pre-2021 stopping data. The 29 stage files/checkpoints match
+their recorded hashes.
+
 ### Fixed GRUs and the realistic trading test
 
 The raw-BV richer GRU predicted negative variance on 5.5% of days, almost all
@@ -541,7 +682,8 @@ these inference fixes and cuDNN-trained GRUs (`outputs/rerun-20261021`). No
 headline figure or Holm decision changed, so the documented findings stand.
 A separate rebuild from fresh Yahoo/WRDS/EIA inputs on an AMD machine was
 stopped on October 21 (`outputs/paper-wrds-eia-rocm-20261021`, with
-`status.json` and `logs/`); it is not used for the reported results.
+`status.json` and `logs/` on that machine); that directory is absent on this
+machine. The stopped run is not used for the reported results.
 
 To compare trading schedules on these same saved forecasts, use separate runs:
 

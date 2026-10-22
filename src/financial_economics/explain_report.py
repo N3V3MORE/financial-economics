@@ -115,7 +115,8 @@ def _write_summary(result: ExplainResult, settings: dict, output: Path) -> None:
              f"{calibration['evaluation_start']} to {calibration['evaluation_end']}; "
              f"{calibration['evaluation_observations']:,} daily observations, the same dates as Phase 3.", "",
              "## Could chance explain the differences?", "",
-             f"Eight years is one history. We rebuilt it {settings['resamples']:,} times from runs of "
+             f"The {calibration['evaluation_start']} to {calibration['evaluation_end']} evaluation "
+             f"period is one history. We rebuilt it {settings['resamples']:,} times from runs of "
              f"real trading days, about {settings['mean_block_length']:g} days long on average, keeping "
              "every portfolio on the same days. The range is the middle 95% of the rebuilt differences.", "",
              "| Comparison | Measure | Observed | 95% range | Mix better in |",
@@ -126,7 +127,7 @@ def _write_summary(result: ExplainResult, settings: dict, output: Path) -> None:
                      f"{_format(row.measure, row.ci_high)} | {row.share_favoring_portfolio:.0%} |")
     sharpe = result.uncertainty.set_index(["reference", "measure"]).loc[(control, "sharpe")]
     if sharpe.ci_low < 0 < sharpe.ci_high:
-        verdict = (f"The Sharpe range against {control} includes zero, so these eight years cannot "
+        verdict = (f"The Sharpe range against {control} includes zero, so this evaluation period cannot "
                    "tell the two portfolios apart on risk-adjusted return.")
     else:
         verdict = f"The Sharpe range against {control} does not include zero."

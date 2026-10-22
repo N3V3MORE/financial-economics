@@ -4,10 +4,16 @@ import json
 
 import numpy as np
 import pandas as pd
+import pytest
 from financial_economics import cli
 
 
-def test_page_shows_all_four_phases(tmp_path, monkeypatch, capsys):
+@pytest.mark.parametrize("source, description", [
+    ({"provider": "Yahoo Finance via yfinance"}, "Yahoo Finance via yfinance; adjusted closes"),
+    ({"provider": "WRDS / CRSP CIZ", "representation": "total_return_index"},
+     "WRDS / CRSP CIZ; total-return index reconstructed from daily total returns, not traded prices"),
+])
+def test_page_shows_all_four_phases(tmp_path, monkeypatch, capsys, source, description):
     config = tmp_path / "study.toml"
     config.write_text('''[study]
 name = "synthetic-page"
@@ -26,7 +32,7 @@ BND = "Bond fund"
     prices = pd.DataFrame(100 * (1 + daily).cumprod(axis=0), index=dates, columns=["SPY", "OTH", "BND"])
     noise = np.random.default_rng(1).normal(0, .001, len(dates))
     factors = pd.DataFrame({"Mkt-RF": market + noise, "RF": .0001}, index=dates)
-    manifest = {"files": {"prices.csv": {"sha256": "0" * 64}}}
+    manifest = {"files": {"prices.csv": {"sha256": "0" * 64}}, "sources": {"prices": source}}
     monkeypatch.setattr(cli, "load_snapshot", lambda *_: (prices, factors, manifest))
 
     for phase, command in enumerate(["analyze", "stress", "compare", "explain"], start=1):
@@ -40,6 +46,9 @@ BND = "Bond fund"
     assert html.count("<section>") == 6 and "Jan 2018 fall" in html
     # Wording comes from the recorded settings, not this study's defaults.
     assert "3 funds" in html and "The 2018 test period" in html and "21 days long on average" in html
+    assert f"ETF source: {description}." in html
+    if source["provider"].startswith("WRDS"):
+        assert "Yahoo Finance" not in html
 
     # Phase 4 must describe the same comparison as Phase 3.
     run4 = tmp_path / "phase4" / "run.json"

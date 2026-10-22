@@ -20,6 +20,9 @@ def _predict(args, study):
     from .prediction_report import load_forecast_run, write_prediction
     from .return_data import load_returns
 
+    if args.defensive_asset not in study.tickers:
+        raise ValueError(f"Defensive asset {args.defensive_asset} is absent from the study's [assets]. "
+                         "Choose a configured ETF or use a config and verified snapshot containing it.")
     destination = args.output_dir.resolve()
     if destination.exists() or destination.is_relative_to(args.data_dir.resolve()):
         raise ValueError("Use a new output directory outside the source snapshot.")
@@ -141,6 +144,9 @@ def main(argv: list[str] | None = None) -> int:
             write_page(args.outputs_dir, args.output)
             print(f"Open: {args.output.resolve()}")
         elif args.command == "download":
+            if args.verify_monthly and args.source != "wrds":
+                raise ValueError("--verify-monthly requires --source wrds for CRSP daily/monthly "
+                                 "reconciliation; remove it to download public prices.")
             if args.source == "wrds":
                 from .wrds_source import download_wrds_snapshot
 

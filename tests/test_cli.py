@@ -56,6 +56,16 @@ def test_missing_config_is_a_readable_error(tmp_path, capsys):
     assert "Error:" in capsys.readouterr().err
 
 
+@pytest.mark.parametrize("source", [[], ["--source", "public"]])
+def test_public_monthly_verification_fails_before_download(tmp_path, monkeypatch, capsys, source):
+    monkeypatch.setattr(cli, "download_snapshot", lambda *_: pytest.fail("Must fail before downloading"))
+    destination = tmp_path / "snapshot"
+    assert cli.main(["download", "--data-dir", str(destination), "--verify-monthly", *source]) == 1
+    message = capsys.readouterr().err
+    assert "--verify-monthly requires --source wrds" in message
+    assert "remove it to download public prices" in message and not destination.exists()
+
+
 def test_stress_runs_offline_and_preserves_missing_recovery(tmp_path, monkeypatch):
     config = tmp_path / "study.toml"
     config.write_text('''[study]

@@ -8,7 +8,8 @@ import pytest
 
 from financial_economics.forecasting import prepare_forecasts
 from financial_economics.gru_forecasting import (
-    _annual_splits, _gpu_metadata, _native_rnn, _require_cuda, _training_scale, gru_forecasts,
+    _annual_splits, _gpu_metadata, _native_rnn, _record_rnn_dispatch, _require_cuda,
+    _training_scale, gru_forecasts,
 )
 from financial_economics.prediction_config import PredictionSettings
 
@@ -73,16 +74,47 @@ def test_gpu_metadata_records_the_runtime_behind_the_cuda_api(runtime, cuda, hip
         return gpu
 
     torch = SimpleNamespace(__version__="2.11.0", version=SimpleNamespace(cuda=cuda, hip=hip),
-                            cuda=SimpleNamespace(get_device_name=device_name))
+                            cuda=SimpleNamespace(get_device_name=device_name),
+                            backends=SimpleNamespace(cudnn=SimpleNamespace(
+                                enabled=True, is_available=lambda: True, version=lambda: 91002)))
     metadata = _gpu_metadata(torch, native_rnn=native_rnn)
     assert metadata["backend"] == f"{runtime}-required PyTorch"
     assert metadata["device"] == "cuda:0" and requested_devices == [0]
     assert metadata["gpu"] == gpu and metadata["torch_version"] == "2.11.0"
     assert metadata["cuda_version"] == cuda and metadata["hip_version"] == hip
+    assert metadata["cudnn_available"] is (not bool(hip))
+    assert metadata["cudnn_enabled"] is (None if hip else True)
+    assert metadata["cudnn_version"] == (None if hip else 91002)
+    assert metadata["cudnn_used"] is (False if native_rnn else None)
+    assert metadata["rnn_autograd_nodes"] == []
     if native_rnn:
         assert metadata["rnn_backend"] == rnn_backend
     else:
-        assert "rnn_backend" not in metadata
+        assert metadata["rnn_backend"].startswith("unknown")
+
+
+@pytest.mark.parametrize("node, used, backend", [
+    ("CudnnRnnBackward0", True, "cuDNN (observed training forward)"),
+    ("StackBackward0", False, "native CUDA (observed training forward)"),
+    ("UnrecognizedBackward0", None, "unknown; no recognized training dispatch evidence"),
+    (None, None, "unknown; no recognized training dispatch evidence"),
+])
+def test_cudnn_use_requires_dispatch_evidence_even_when_enabled(node, used, backend):
+    torch = SimpleNamespace(__version__="2.11.0", version=SimpleNamespace(cuda="13.0", hip=None),
+                            cuda=SimpleNamespace(get_device_name=lambda _: "synthetic NVIDIA"),
+                            backends=SimpleNamespace(cudnn=SimpleNamespace(
+                                enabled=True, is_available=lambda: True, version=lambda: 91002)))
+    model = SimpleNamespace()
+    output = SimpleNamespace(grad_fn=type(node, (), {})() if node else None)
+    _record_rnn_dispatch(model, output)
+    metadata = _gpu_metadata(torch, rnn_autograd_nodes=model._rnn_autograd_nodes)
+    assert metadata["cudnn_available"] and metadata["cudnn_enabled"]
+    assert metadata["cudnn_used"] is used and metadata["rnn_backend"] == backend
+    assert metadata["rnn_autograd_nodes"] == ([node] if node else [])
+    assert "inference dispatch not observed" in metadata["rnn_dispatch_observation"]
+    # A later inference call has no graph; retain the original training evidence.
+    _record_rnn_dispatch(model, SimpleNamespace(grad_fn=None))
+    assert model._rnn_autograd_nodes == ((node,) if node else ())
 
 
 @pytest.mark.parametrize("enabled", [False, True])

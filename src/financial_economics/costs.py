@@ -42,15 +42,19 @@ def _retained_value(desired: np.ndarray, held: np.ndarray, rate: float) -> float
 
 def dynamic_costed_path(returns: pd.DataFrame, targets: pd.DataFrame,
                         cost_bps: float = 0,
-                        rebalance_dates: pd.DatetimeIndex | None = None) -> pd.DataFrame:
+                        rebalance_dates: pd.DatetimeIndex | None = None, *,
+                        liquidate_end: bool = False) -> pd.DataFrame:
     """Apply dated targets before their return; rebalance daily unless scheduled.
 
     Fees apply to absolute ETF purchases plus sales; RF is a frictionless cash
-    proxy. Entry is charged, exit is not. Fees reduce capital before returns.
+    proxy. Entry is charged; optional liquidation charges sales after the final
+    return. Turnover and fees are fractions of each day's beginning wealth.
     All calculations use NumPy on CPU; this is not a GPU backend.
     """
     _check_returns(returns)
     _check_frame(targets, "Targets")
+    if type(liquidate_end) is not bool:
+        raise ValueError("liquidate_end must be a boolean.")
     if "RF" not in returns:
         raise ValueError("Returns must include the RF cash proxy.")
     if not targets.index.equals(returns.index) or set(targets.columns) != set(returns.columns):
@@ -86,8 +90,12 @@ def dynamic_costed_path(returns: pd.DataFrame, targets: pd.DataFrame,
             held = desired.copy()
         gross_return = float(held @ daily)
         net_return = gross_return + (retained - 1) * (1 + gross_return)
-        rows.append((net_return, turnover, rate * turnover))
         held *= (1 + daily) / (1 + gross_return)
+        if liquidate_end and day == len(returns) - 1:
+            exit_turnover = (1 + net_return) * float(held[risky].sum())
+            net_return -= rate * exit_turnover
+            turnover += exit_turnover
+        rows.append((net_return, turnover, rate * turnover))
     return pd.DataFrame(rows, index=returns.index,
                         columns=["return", "traded_fraction", "fee_fraction"])
 

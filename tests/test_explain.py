@@ -1,5 +1,7 @@
 """Phase 4: uncertainty ranges and fund contributions."""
 
+import json
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -89,3 +91,8 @@ BND = "Bond fund"
     }
     contributions = pd.read_csv(output / "contributions.csv")
     assert list(dict.fromkeys(contributions.window)) == ["Jan 2018 fall", "2018"]
+    calibration = json.loads((output / "run.json").read_text(encoding="utf-8"))["calibration"]
+    summary = (output / "summary.md").read_text(encoding="utf-8")
+    assert (f"The {calibration['evaluation_start']} to {calibration['evaluation_end']} evaluation "
+            "period is one history.") in summary
+    assert "eight years" not in summary.lower()

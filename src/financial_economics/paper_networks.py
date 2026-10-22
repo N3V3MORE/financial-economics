@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 
 from .gru_forecasting import (_annual_splits, _gpu_inputs, _gpu_metadata, _require_cuda, _rnn_kernels,
-                              _uses_native_rnn)
+                              _record_rnn_dispatch, _uses_native_rnn)
 from .paper_gru import _cv_folds
 
 
@@ -59,8 +59,9 @@ def _model(torch, channels, profile, device):
             # Two single-layer GRUs keep dropout outside cuDNN, which avoids the
             # Windows shutdown crash of cuDNN's multi-layer dropout (paper_gru.py).
             with _rnn_kernels(torch):
-                sequence, _ = self.first(inputs)
+                sequence, first_hidden = self.first(inputs)
                 _, hidden = self.second(self.dropout(sequence))
+            _record_rnn_dispatch(self, first_hidden, hidden)
             return self.output(hidden[-1]).squeeze(-1)
 
     model = RawBVGRU().to(device)
@@ -194,6 +195,7 @@ def reconstruct_gru(prepared, calendar, checkpoint_dir, *, model_name, profiles=
     result[f"{model_name}_bv"], result[f"{model_name}_refit_asof"] = np.nan, pd.NaT
     checkpoint_dir.mkdir(parents=True, exist_ok=False)
     checkpoints, annual_metadata, floor_events = [], [], 0
+    rnn_autograd_nodes = set()
     for year, asof, training, issued in splits:
         training = training & available
         scaling = _training_scale(prepared, training)
@@ -203,6 +205,7 @@ def reconstruct_gru(prepared, calendar, checkpoint_dir, *, model_name, profiles=
             progress(f"{model_name} annual refit: year={year}, seed={seed}, epochs={epochs}")
             model, _ = _fit(torch, prepared, training, None, scaling, profile,
                             seed, epochs, patience, learning_rate)
+            rnn_autograd_nodes.update(getattr(model, "_rnn_autograd_nodes", ()))
             predictions.append(_raw_predictions(torch, model, issued_inputs, scaling))
             path = checkpoint_dir / str(year) / f"seed_{seed}.pt"
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -215,7 +218,8 @@ def reconstruct_gru(prepared, calendar, checkpoint_dir, *, model_name, profiles=
                        "training_observations": int(training.sum()),
                        "input_units": "raw BV and signed explanatory changes; train-only channel standardization",
                        "target_units": "raw BV divided by training-mean BV; linear output",
-                       **_gpu_metadata(torch, native_rnn=_uses_native_rnn(torch))}
+                       **_gpu_metadata(torch, native_rnn=_uses_native_rnn(torch),
+                                       rnn_autograd_nodes=getattr(model, "_rnn_autograd_nodes", ()))}
             with path.open("xb") as destination:
                 torch.save(payload, destination)
             paths.append(str(path.relative_to(checkpoint_dir)))
@@ -230,7 +234,8 @@ def reconstruct_gru(prepared, calendar, checkpoint_dir, *, model_name, profiles=
                                 "training_observations": int(training.sum()),
                                 "forecast_observations": int(issued.sum()),
                                 "floor_events": floored, "scaling": scaling, "checkpoints": paths})
-    metadata = {"model_name": model_name, **_gpu_metadata(torch, native_rnn=_uses_native_rnn(torch)), "num_layers": 2,
+    metadata = {"model_name": model_name, **_gpu_metadata(torch, native_rnn=_uses_native_rnn(torch),
+                rnn_autograd_nodes=rnn_autograd_nodes), "num_layers": 2,
                 "input_channels": inputs.shape[2], "lookback": inputs.shape[1],
                 "profiles": candidates, "selected_profile": dict(profile), "seeds": list(seeds),
                 "learning_rate": learning_rate, "max_epochs": max_epochs, "patience": patience,
