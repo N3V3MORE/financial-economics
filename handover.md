@@ -4,6 +4,15 @@ A short record of what this project did, what it found, what was decided
 and what is left. Full detail: [Final study](docs/final-study.md),
 [Results explained](docs/results-explained.md), [README](README.md).
 
+**Latest (October 22, later session):** AMD GRU training now uses MIOpen,
+GPU training runs with TF32 off, and a trial on branch
+`risklab-volatility-trial` replaced Oxford-Man with Risk Lab SPY
+volatility. Over 2011–2020 Risk Lab reproduced every Oxford conclusion; in
+2022–2025 timing again cut the worst fall without beating its static mix,
+and long Treasuries made stress-period timing worse. None of this is
+merged into `main`. See [October 22: GPU, data access and the Risk Lab
+trial](#october-22-gpu-data-access-and-the-risk-lab-trial).
+
 The methodology audit now has a separate matched implementation:
 `financial_economics.paper_revised`, with frozen settings in
 `outputs/revised-study-20261021/protocol.json`. It retains the original
@@ -63,6 +72,8 @@ realistic-trading test.
 | Post hoc checks | Swiss/German bonds in local currency; IEF added to the realistic test | `.../evaluation_local`, `outputs/paper-realistic-ief-20261021` |
 | Full verified rerun | Every stage above, from the saved data, on the final code | `outputs/rerun-20261021` |
 | Matched methodology revision | Shared GRU histories, separate stopping/scoring, true t+2 forecasts, annual equity budget, full entry/exit accounting and 27 paired tests | `outputs/revised-study-20261021` |
+| GPU backends (Oct 22) | Does MIOpen/cuDNN change forecasts? Does TF32 matter? | `scripts/compare_gpu_backends.py`, `scripts/gpu-backend-reference/miopen` |
+| Risk Lab trial (Oct 22) | Does Risk Lab SPY volatility reproduce Oxford's 2011–2020 answers, and what happens in 2022–2025? | `outputs/trial-*-20261022` (AMD machine) |
 
 ## Datasets
 
@@ -76,6 +87,7 @@ realistic-trading test.
 | `paper-reconstruction-public-20261021` | Yahoo and FRED: S&P 500, futures, bond ETFs, yields, Brent | Paper rebuild returns and richer-GRU inputs |
 | `paper-reconstruction-fx-20261021` | Federal Reserve H.10 dated FX | Correct CHF/EUR conversion of Swiss and German bonds |
 | `protection-long-ief-wrds-20261021` | WRDS/CRSP SPY/TLT/GLD/DBC/IEF, 2007–2025 (first four identical to the older snapshot) | IEF realistic check |
+| `risklab-spy-20261022` | [Risk Lab](https://dachxiu.chicagobooth.edu/) SPY (PERMNO 84398) daily 5-minute trade/quote volatility and QMLE, Jan 2, 1996–Oct 9, 2026; research use only | Risk Lab trial (AMD machine only) |
 
 WRDS data is licensed. Raw data and outputs stay local and are ignored by Git.
 
@@ -219,6 +231,107 @@ and period, including a reversal for long Treasuries in 2022–2025; these
 results do not establish a universally reliable haven or rule out benefits
 in other settings.
 
+## October 22: GPU, data access and the Risk Lab trial
+
+Work done on the AMD machine (Radeon 8060S) with a parallel NVIDIA session
+(RTX 5060 Ti). Everything below is exploratory and sits on unmerged branches.
+
+### GPU training
+
+| What was tried | Outcome |
+|---|---|
+| MIOpen GRUs on Windows ROCm 7.14.1 | Failed with `'type_traits' file not found`: MIOpen's runtime compiler needs the Visual Studio C++ headers. Installing VS 2022 Build Tools (C++ workload, Windows 11 SDK 10.0.26100) fixed it. AMD now trains with MIOpen by default; `FINANCIAL_ECONOMICS_NATIVE_RNN=1` restores native HIP. |
+| MIOpen vs native HIP (AMD) | Same-seed fits identical; full-pipeline forecasts within 2.05e-7 relative, same selected model and epochs; 1.9–2.5× faster per step, pipeline 51–65 s vs 124 s. |
+| cuDNN vs native CUDA (NVIDIA benchmark, `scripts/compare_gru_backends.py` on the checkpoint branch) | cuDNN 5.2× faster. With TF32 on, final-loss gaps after 110 steps were 2e-5 to 3.2%; with TF32 off, 4e-7 to 3.4e-5 in five of six cases at the same speed. |
+| Remaining 2.6% case (five inputs, seed 33) | Not a bug. The same case reproduced on AMD (MIOpen vs native): runs agreed to ~1e-7 for 95 steps, split at a sharp turn in the loss at steps 96–99, then rejoined (3e-5 by step 200). Inputs were pure noise, which makes such turns likely. |
+| TF32 in the study | Now off for cuDNN and matrix products in `_require_cuda`; metadata records both flags. AMD forecasts unchanged to the last digit. NVIDIA GRU caches made with TF32 are refused by the reconstruction cache guard and need a fresh run. |
+| Cross-machine cuDNN vs MIOpen | **Not yet measured.** `scripts/compare_gpu_backends.py compare scripts/gpu-backend-reference/miopen` must be run on the NVIDIA machine. |
+
+### Volatility data access
+
+- **WRDS (BU account):** full TAQ, WRDS Intraday Indicators and `wct` are
+  listed but refused (`permission denied for schema taqm_YYYY`); only TAQ
+  samples open. CRSP, CBOE (VIX) and OptionMetrics are readable. BU's library
+  (pardstf@bu.edu, Pardee Management Library) can be asked whether full TAQ
+  can be enabled.
+- **Free alternatives:** Risk Lab (SPY 5-minute measures, 1996–present, one
+  consistent method); VOLARE (E-mini S&P 500 futures, from September 2009;
+  download terms unconfirmed); daily-range estimators from CRSP/Yahoo highs
+  and lows (any period, noisier).
+- **Why the earlier proxy failed but Risk Lab alone can work:** the rejected
+  proxy had to imitate Oxford within 15% on every day so the two could be
+  spliced. Using Risk Lab for the whole history removes the splice.
+
+### Risk Lab trial (branch `risklab-volatility-trial`)
+
+**Design.** Risk Lab's `trade_rv5` (5-minute realized volatility from trades)
+was converted to daily variance in Oxford units (vol²/252) and used for every
+date: no Oxford labels, missing dates never filled. It was chosen before any
+results: closest to Oxford, no missing values, while quote-based series had
+implausible spikes (up to 890% annualized). Code: `load_risklab_bv`, a
+`--risklab-dir` option in `paper_revised`, and `risklab_study` (2022–2025;
+options `--defensive-assets` and `--history-start`).
+
+**Data checks.** Over 5,539 shared days Risk Lab and Oxford volatility levels
+correlate 0.979 (logs 0.981); averages 12.7% vs 12.1%, partly because realized
+variance keeps jumps that bipower variation removes. Risk Lab lacks 8 market
+days in 2000–2020, including the whole February 5–9, 2018 crash week, and 28
+through 2025; Oxford lacks 19 in 2000–2020. 1996–1999 is complete.
+
+**1. 2011–2020, matched study, Oxford vs Risk Lab** (same code and machine;
+`outputs/trial-oxford-revised-20261022`, `trial-risklab-revised-20261022`).
+The Oxford rerun on AMD reproduced the documented NVIDIA Sharpe ratios to
+within 0.001.
+
+| | Oxford | Risk Lab |
+|---|---:|---:|
+| Sharpe at 10 bps: EWMA / one-input GRU / richer GRU | 0.843 / 0.827 / 0.842 | 0.851 / 0.796 / 0.811 |
+| Sharpe before fees | 0.861 / 0.885 / 0.892 | 0.868 / 0.859 / 0.868 |
+| EWMA timing maximum drawdown | −16.0% | −15.6% |
+| Holm rejections of 27 tests | 0 | 0 |
+
+All 27 test estimates share the same sign, the forecast-accuracy ranking is
+identical, and classical forecasts correlate 0.994–1.000 with identical
+average stock shares. Median absolute Sharpe gap across all portfolios is
+0.008 (maximum 0.066). Conclusion: Risk Lab reproduces every conclusion;
+GRU/ARFIMA Sharpe numbers run about 0.02–0.03 lower, so the two sources'
+numbers should not be mixed in one table.
+
+**2. 2022–2025, SPY/cash** (`trial-risklab-2025-20261022`; one 32/32 GRU
+profile, pilot settings, 22 trading-day histories). At 10 bps, EWMA/GRU timing
+Sharpe 0.355/0.346 vs about 0.432 for static mixes and 0.434 for SPY; worst
+fall −19.0%/−20.3% vs −22.5% static and −24.6% SPY; all three tests
+nonsignificant (p 0.53–0.91). The rejected-proxy pilot gave 0.335/0.340 vs
+0.433 despite a different volatility series, 30-calendar-day histories,
+filled gaps and NVIDIA/TF32 training. 2022 was the weak year: in a slow,
+steady fall timing lost more risk-adjusted return than the static mix.
+
+**3. 2022–2025 with defensive ETFs** (`trial-risklab-defensive-2000-20261022`).
+Stress days (forecast above the past-only 90th percentile) move up to 20%
+from cash into one ETF. EWMA at 10 bps:
+
+| Stress-period asset | Sharpe | Worst fall | 2022 return |
+|---|---:|---:|---:|
+| Cash only | 0.355 | −19.0% | −16.3% |
+| Long Treasuries (TLT) | 0.209 | −23.8% | −21.5% |
+| Gold (GLD) | 0.398 | −19.6% | −15.7% |
+| Commodities (DBC) | 0.400 | −17.7% | −15.0% |
+| Static mix | 0.432 | −22.5% | −17.0% |
+
+The GRU is similar (TLT 0.210, GLD 0.384, DBC 0.362). TLT came closest to
+significance (raw p 0.076–0.092) but no test survives Holm. This is the first
+timing-strategy evidence for the post-2021 Treasury reversal.
+
+**4. Training from 1996** (`trial-risklab-defensive-1996-20261022`). GRU cash
+Sharpe 0.358 vs 0.346 from 2000; same conclusions. EWMA is unaffected.
+
+**Caveats for any write-up.** Risk Lab measures SPY trades, not the S&P 500
+index, and realized variance, not bipower variation; it is a website without
+a DOI, so cite the October 22, 2026 download and its manifest hash; the
+missing 2018 crash week is not random; 2022–2025 was already inspected in
+the pilot, so only 2026 would be untouched (CRSP returns here end in 2025);
+the richer GRU's macro inputs end in 2020, so it was not extended.
+
 ## Limitations left
 
 - **Substitute data.** Public prices and futures replace the paper's Datastream
@@ -252,18 +365,33 @@ in other settings.
   February 2022 (the extension reaches 2021). The 2022–2025 Treasury
   reversal comes from fixed holdings, not the timing strategy, so it does not
   show that the paper's full strategy failed then. The early prediction
-  study is the only, rougher, timing evidence for 2022–2025.
+  study is the only, rougher, timing evidence for 2022–2025. The October 22
+  Risk Lab trial adds one-input timing evidence with defensive ETFs for
+  2022–2025 on a different volatility measure; it is not merged and covers
+  EWMA and the one-input GRU only.
 - **Exclusions.** Taxes remain excluded. Archived runs omit final sale fees;
   the matched revision includes liquidation costs and charges the benchmark too.
 
 ## Where things are
 
-- **Branch:** `volatility-prediction`.
+- **Branches (October 22, all on GitHub; none merged into `main`):**
+  - `main` and `volatility-prediction`: `56824dc`, unchanged.
+  - `volatility-project-checkpoint`: checkpoint `5503ea0`, then the
+    NVIDIA session's README/handover refresh and its GRU backend benchmark
+    (`scripts/compare_gru_backends.py`, `benchmarks/gru/*.json`), ending `eceb1cf`.
+  - `miopen-gru-training`: from `5503ea0`; MIOpen default (`38772b1`),
+    the cleanup session's shared provenance helpers and move of run configs
+    into `configs/` (`7066349`, logged in `docs/cleanup-log.md`), the
+    cross-machine comparison script (`9fb9959`) and TF32 off (`52c9745`).
+  - `risklab-volatility-trial`: from `miopen-gru-training`; the
+    Risk Lab trial (`ea3b4f1`, `60e5b36`) and this handover update.
+  - The checkpoint branch and the MIOpen/trial branches have diverged and
+    both edit `README.md` and `handover.md`; merge them before any pull request.
 - **Frozen GRU study tag:** `frozen-gru-study-20261021`.
 - **Fresh snapshot recorded on the AMD machine:** `data/protection-long-wrds-20261021` contained
   verified SPY/TLT/GLD/DBC returns for 4,780 sessions from January 3, 2007
   through December 31, 2025; all 912 fund-month comparisons passed.
-  This directory is absent on this machine; these are the recorded AMD checks.
+  This directory is present on the AMD machine and absent on the NVIDIA machine.
   A rebuild from these fresh inputs was stopped on the AMD machine; it is
   not needed for the reported results, which the full rerun verified.
 - **Other recovered inputs recorded on the AMD machine:** `data/paper-oxford-20261021/oxfordman-20220301.zip`
@@ -276,7 +404,7 @@ in other settings.
   The 4,197 overlapping AAA observations matched too; later WRDS AAA values
   lacked independent current-FRED comparison. Source identities and the
   fresh vintage were retained in the manifests. These four dated directories
-  are absent on this machine; the recorded checks were not repeated here.
+  are present on the AMD machine and absent on the NVIDIA machine.
 - **AMD training:** Radeon 8060S on Windows runs PyTorch 2.11.0 + ROCm 7.14.1.
   Native HIP GRU probes passed forward/backward, Adam updates, exact same-seed
   repetition and checkpoint reload. MIOpen's Windows RNN compiler first failed
@@ -301,8 +429,8 @@ in other settings.
   which were trained with NVIDIA cuDNN. Turning TF32 off then changed NVIDIA
   training math, so GRU stages cached before it need a fresh run.
   That AMD environment included the locked `prediction-rocm`, `reconstruction`
-  and `wrds` extras; use `prediction-rocm` in AMD training commands. This
-  machine's current validation uses NVIDIA CUDA.
+  and `wrds` extras; use `prediction-rocm` in AMD training commands. The
+  NVIDIA machine uses the `prediction` extra.
 - **Commands to rerun each stage:** README sections “Reconstruct the paper's
   U.S. experiment” and “Fixed GRUs and the realistic trading test”.
 - **Stopped fresh-input rebuild (AMD machine):** `outputs/paper-wrds-eia-rocm-20261021/status.json`
@@ -319,9 +447,19 @@ in other settings.
   including all seven actual GPU tests; none skipped.
 - **Historical merged-suite result:** 345 passed after merging both machines'
   work, including GPU tests on NVIDIA.
-- **Current tests and lint:** 392 passed with warnings treated as errors,
-  including matched-model GPU checks on NVIDIA CUDA, using
-  `.venv/Scripts/python.exe -m pytest -q -W error` with a workspace temporary
-  directory. GPU tests skip without compatible CUDA or ROCm.
-  `.venv/Scripts/ruff.exe check` passed.
+- **Earlier tests and lint:** 392 passed with warnings treated as errors,
+  including matched-model GPU checks on NVIDIA CUDA.
+- **Current tests and lint (October 22, `risklab-volatility-trial`, AMD
+  MIOpen):** 417 passed with warnings treated as errors, including GPU
+  training, using `.venv/Scripts/python.exe -m pytest -q -W error` with a
+  workspace temporary directory. GPU tests skip without compatible CUDA or
+  ROCm. `.venv/Scripts/ruff.exe check` passed.
+- **Trial outputs and logs (AMD machine only, ignored by Git):**
+  `outputs/trial-*-20261022` and `outputs/trial-logs/` (`run-trial.sh` holds
+  the commands). Rerunning elsewhere needs the Risk Lab download, whose source
+  URL and hash are in `data/risklab-spy-20261022/manifest.json`.
+- **Open next steps:** run the cross-machine comparison on NVIDIA; rerun the
+  saved NVIDIA GRU stages with TF32 off; decide whether Risk Lab enters the
+  write-up (as an extension, not a replication); merge the branches; ask the
+  BU library about full TAQ; optionally test 2026 once CRSP returns cover it.
 - **Write-up draft:** [Google Doc](https://docs.google.com/document/d/1aUVYdh1XzAlTyHhGPN4SLtOsYPSjuieeSwIQuM8PsnE/edit?usp=sharing).
