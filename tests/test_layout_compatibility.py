@@ -40,23 +40,40 @@ def test_provenance_hashes_nested_implementations_and_the_relocation_manifest():
     assert code["portfolio/execution.py"] != code["costs.py"]
 
 
-def test_only_the_exact_reviewed_baseline_is_compatible():
-    before = _layout._manifest()["before"]
-    current = package_code_digests()
+@pytest.fixture
+def reviewed_package(monkeypatch):
+    """Simulate the reviewed after-state so these checks survive later package edits."""
+    manifest = _layout._manifest()
+    monkeypatch.setattr(_layout, "_python_digests", lambda: dict(manifest["after"]))
+    return manifest["before"], _layout.current_code_digests()
+
+
+def test_only_the_exact_reviewed_baseline_is_compatible(reviewed_package):
+    before, current = reviewed_package
     assert _layout.code_matches(before, current)
     assert _layout.code_matches(current, current)
     assert not _layout.code_matches(before | {"costs.py": "changed"}, current)
     assert not _layout.code_matches(before, current | {"portfolio/execution.py": "changed"})
 
 
-def test_editing_any_python_dependency_invalidates_the_relocation_exception(monkeypatch):
-    before = _layout._manifest()["before"]
-    current = package_code_digests()
-    actual = _layout._python_digests()
-    monkeypatch.setattr(_layout, "_python_digests", lambda: actual | {"portfolio/execution.py": "changed"})
-    assert not _layout.code_matches(before, current)
+def test_editing_any_python_dependency_invalidates_the_whole_package_exception(monkeypatch, reviewed_package):
+    before, _ = reviewed_package
+    after = _layout._python_digests()
+    monkeypatch.setattr(_layout, "_python_digests", lambda: after | {"portfolio/execution.py": "changed"})
+    assert not _layout.code_matches(before, _layout.current_code_digests())
+
+
+def test_single_module_relocation_ignores_edits_elsewhere(monkeypatch, reviewed_package):
+    before, _ = reviewed_package
+    after = _layout._manifest()["after"]
+    monkeypatch.setattr(_layout, "_python_digests", lambda: after | {"portfolio/execution.py": "changed"})
+    assert _layout.relocated_digest_matches(
+        "paper_sources.py", before["paper_sources.py"], after["datasets/sources/paper.py"])
     assert not _layout.relocated_digest_matches(
-        "paper_sources.py", before["paper_sources.py"], current["datasets/sources/paper.py"])
+        "paper_sources.py", before["paper_sources.py"], "changed")
+    assert not _layout.relocated_digest_matches(
+        "paper_sources.py", before["costs.py"], after["datasets/sources/paper.py"])
+    assert not _layout.relocated_digest_matches("new_module.py", None, after["datasets/sources/paper.py"])
 
 
 def test_retired_gpu_math_is_not_approved_by_a_module_move():

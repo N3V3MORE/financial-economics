@@ -1,8 +1,10 @@
 """Resolve relocated sources and recognize one exact, reviewed source relocation.
 
 The manifest records real before/after byte hashes. New runs always record actual
-current hashes. Historical fingerprints are accepted only while the entire Python
-package matches the reviewed after-state; later edits invalidate that exception.
+current hashes. Historical whole-package fingerprints are accepted only while the
+entire Python package matches the reviewed after-state; later edits invalidate that
+exception. A historical single-module digest is accepted while that module itself
+still matches its reviewed after-state, as selected-module provenance always did.
 """
 
 from hashlib import sha256
@@ -55,11 +57,14 @@ def code_matches(recorded, current):
 
 
 def relocated_digest_matches(name, recorded, current):
-    """Recognize a baseline module moved without changing its calculation code."""
+    """Recognize a baseline module moved without changing its calculation code.
+
+    Only this module is compared, so edits elsewhere in the package do not affect it.
+    """
     if recorded == current:
         return True
-    manifest = _reviewed_relocation()
-    if not manifest or recorded != manifest["before"].get(name):
+    manifest = _manifest()
+    if recorded is None or recorded != manifest["before"].get(name):
         return False
     relative = manifest["modules"].get(name, name)
     return current == manifest["after"].get(relative)

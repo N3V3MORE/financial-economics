@@ -45,8 +45,10 @@ implementation, entry-point, helper and mapping hashes. Workflows with selected-
 module provenance retain that convention and hash the relocated implementation
 files. A historical whole-package fingerprint is accepted
 only while the entire Python package matches the reviewed after-state; later
-code changes invalidate that exception. Existing retired GPU-math fingerprints
-remain rejected. The original saved metadata is never rewritten.
+code changes invalidate that exception. A historical selected-module digest is
+accepted while that module still matches its own reviewed after-state, so edits
+to unrelated modules do not invalidate it, as before the move. Existing retired
+GPU-math fingerprints remain rejected. The original saved metadata is never rewritten.
 
 Python source files use LF line endings through `.gitattributes`, so these byte
 identities survive Windows/Linux checkouts and wheel installation. Changes in
