@@ -173,6 +173,12 @@ Non-significance does not establish equivalence.
   unscored.
 - **GRU training** used MIOpen on an AMD Radeon 8060S with deterministic
   settings; TF32 is off on NVIDIA.
+- **Cross-machine check.** A fresh run of both studies on an NVIDIA RTX 5060 Ti
+  (cuDNN, TF32 off) gave byte-identical classical forecasts and the same Sharpe
+  ratios, worst falls and Holm decisions for every portfolio reported here. The
+  GRU forecasts differ only at rounding level: on fixed synthetic data the two
+  GPU libraries chose the same settings, with a largest relative forecast gap
+  of 1.7e-6.
 - **Comparison with Oxford-Man** uses the October 22 trial runs, which share
   code and bridge gaps; the main figures use the current strict rule.
 

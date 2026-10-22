@@ -19,6 +19,20 @@ A full rerun on the AMD machine after the regrouping reproduced both final runs
 forecast, table and all 81 GRU checkpoints; only timestamps and code hashes in
 the run records differ. The 11 findings figures also regenerate identically.
 
+**Cross-machine check (October 22, NVIDIA).** A fresh full run on the NVIDIA
+machine (RTX 5060 Ti, cuDNN, TF32 off, `main` at `361df9e`, same data
+snapshots) is in `outputs/full-run-20261022` there. Classical forecasts match
+the AMD run byte for byte. GRU forecast files differ at the byte level, as
+expected across GPU libraries, but every reported Sharpe ratio, worst fall and
+Holm decision in both Risk Lab studies is identical to the AMD results, and the
+one-input GRU still has the lowest QLIKE. On the fixed synthetic data of
+`scripts/compare_gpu_backends.py`, cuDNN and MIOpen chose the same settings and
+epochs, with a largest relative forecast gap of 1.7e-6 and QLIKE equal to 8
+digits. The same run supersedes the older NVIDIA GRU folders made before TF32
+was turned off: results moved by at most about 0.004 in the prediction
+experiment's Sharpe ratios and by 1e-6 or less elsewhere, and no conclusion
+changed.
+
 **Earlier (October 22, later session):** AMD GRU training now uses MIOpen,
 GPU training runs with TF32 off, and the main study (`fecon paper-revised`)
 takes its volatility only from Risk Lab SPY 5-minute realized variance;
@@ -266,7 +280,7 @@ Work done on the AMD machine (Radeon 8060S) with a parallel NVIDIA session
 | cuDNN vs native CUDA (NVIDIA benchmark, `scripts/compare_gru_backends.py` on the checkpoint branch) | cuDNN 5.2× faster. With TF32 on, final-loss gaps after 110 steps were 2e-5 to 3.2%; with TF32 off, 4e-7 to 3.4e-5 in five of six cases at the same speed. |
 | Remaining 2.6% case (five inputs, seed 33) | Not a bug. The same case reproduced on AMD (MIOpen vs native): runs agreed to ~1e-7 for 95 steps, split at a sharp turn in the loss at steps 96–99, then rejoined (3e-5 by step 200). Inputs were pure noise, which makes such turns likely. |
 | TF32 in the study | Now off for cuDNN and matrix products in `_require_cuda`; metadata records both flags. AMD forecasts unchanged to the last digit. NVIDIA GRU caches made with TF32 are refused by the reconstruction cache guard and need a fresh run. |
-| Cross-machine cuDNN vs MIOpen | **Not yet measured.** `scripts/compare_gpu_backends.py compare scripts/gpu-backend-reference/miopen` must be run on the NVIDIA machine. |
+| Cross-machine cuDNN vs MIOpen | Measured October 22 on the NVIDIA machine: same selected settings and epochs, largest relative forecast gap 1.7e-6, identical reported results in both Risk Lab studies (see Latest). |
 
 ### Volatility data access
 
@@ -483,8 +497,19 @@ the richer GRU's macro inputs end in 2020, so it was not extended.
   (`trial-logs/run-trial.sh` holds the commands). They predate `ebedece`'s
   missing-date and EWMA rules, so current code does not reproduce them. Rerunning elsewhere needs the Risk Lab download, whose source
   URL and hash are in `data/risklab-spy-20261022/manifest.json`.
-- **Open next steps:** run the cross-machine comparison on NVIDIA; rerun the
-  saved NVIDIA GRU stages with TF32 off; decide whether Risk Lab enters the
-  write-up (as an extension, not a replication); merge the branches; ask the
-  BU library about full TAQ; optionally test 2026 once CRSP returns cover it.
+- **Done October 22:** the cross-machine comparison; a full NVIDIA rerun with
+  TF32 off (`outputs/full-run-20261022` on that machine, superseding the older
+  NVIDIA GRU folders); Risk Lab as the main study's volatility source, described
+  as an extension of the paper, not a replication; the working branches merged
+  into `main`.
+- **Open next steps:** decide whether to delete `volatility-project-checkpoint`
+  (`eceb1cf`, 3 commits not in `main`; its content appears to have been carried
+  into `main` but has not been compared line by line); fix five low-severity
+  issues from the NVIDIA code review (a bare `KeyError` in `predict` when the
+  defensive asset is missing, a hard-coded "eight years" in the attribution
+  report, the missing 2007–09 row in the 2022–2025 table of `final-study.md`,
+  `uv sync --frozen` rather than `--locked` in CI, and little validation in the
+  realistic and reconstruction settings loaders); check the Google Doc draft
+  against the current results; ask the BU library about full TAQ; optionally
+  test 2026 once CRSP returns cover it.
 - **Write-up draft:** [Google Doc](https://docs.google.com/document/d/1aUVYdh1XzAlTyHhGPN4SLtOsYPSjuieeSwIQuM8PsnE/edit?usp=sharing).
