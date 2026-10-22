@@ -10,11 +10,11 @@ import pandas as pd
 import pytest
 
 from financial_economics import cli
-from financial_economics.paper import PaperSettings, prepare_paper_forecasts
-from financial_economics.paper_extension import (
+from financial_economics.studies.paper import PaperSettings, prepare_paper_forecasts
+from financial_economics.studies.extension import (
     ExtensionSettings, _allocation_change_signals, extension_portfolios, load_frozen_selection,
 )
-from financial_economics.return_data import ReturnData
+from financial_economics.datasets.returns import ReturnData
 
 
 def extension_fixture():
@@ -264,8 +264,8 @@ windows = ["2010:2010", "2011:2011"]
     raw = pd.DataFrame({"Date": calendar.strftime("%Y-%m-%d"), "Symbol": ".SPX", "bv": .0002})
     with ZipFile(archive, "w") as destination:
         destination.writestr("original.csv", raw.to_csv(index=False))
-    monkeypatch.setattr("financial_economics.paper_extension.load_returns", lambda *a, **kw: data)
-    monkeypatch.setattr("financial_economics.paper_extension.parse_french_factors", lambda _: data.factors)
+    monkeypatch.setattr("financial_economics.studies.extension.load_returns", lambda *a, **kw: data)
+    monkeypatch.setattr("financial_economics.studies.extension.parse_french_factors", lambda _: data.factors)
     output = tmp_path / "new-run"
     args = ["--config", str(config), "paper-extension", "--baseline-only", "--data-dir", str(source),
             "--oxford-archive", str(archive), "--output-dir", str(output)]

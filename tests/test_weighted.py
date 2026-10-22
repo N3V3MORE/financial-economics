@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from financial_economics.analysis import monthly_equal_weight, monthly_fixed_weight
+from financial_economics.evaluation.metrics import monthly_equal_weight, monthly_fixed_weight
 
 
 def example_returns():

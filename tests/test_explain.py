@@ -7,9 +7,9 @@ import pandas as pd
 import pytest
 
 from financial_economics import cli
-from financial_economics.analysis import (monthly_equal_weight, monthly_equal_weight_holdings,
+from financial_economics.evaluation.metrics import (monthly_equal_weight, monthly_equal_weight_holdings,
                                           performance_summary)
-from financial_economics.explain import bootstrap_differences, fund_contributions
+from financial_economics.evaluation.attribution import bootstrap_differences, fund_contributions
 
 
 def _returns(days=120):

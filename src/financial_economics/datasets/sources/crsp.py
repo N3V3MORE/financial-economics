@@ -103,8 +103,8 @@ def _saved_username():
     try:
         lines = path.read_text(encoding="utf-8").splitlines()
     except OSError:
-        raise WRDSError("WRDS_SAVED_LOGIN_REQUIRED: on Windows run python -m "
-                        "financial_economics.wrds_credentials; otherwise configure pgpass and WRDS_USERNAME.") from None
+        raise WRDSError("WRDS_SAVED_LOGIN_REQUIRED: on Windows run fecon "
+                        "wrds-credentials; otherwise configure pgpass and WRDS_USERNAME.") from None
     users = set()
     for line in lines:
         if not line.strip() or line.lstrip().startswith("#"):

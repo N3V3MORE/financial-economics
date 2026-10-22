@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from financial_economics.paper_fx import _parse_rates, currency_returns, local_currency_returns
+from financial_economics.datasets.sources.fx import _parse_rates, currency_returns, local_currency_returns
 
 
 def test_official_rate_parser_keeps_dates_and_skips_missing_quotes():

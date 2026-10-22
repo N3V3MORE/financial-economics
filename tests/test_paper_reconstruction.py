@@ -3,7 +3,7 @@
 import pandas as pd
 import pytest
 
-from financial_economics import paper_reconstruction as reconstruction
+from financial_economics.studies import replication as reconstruction
 
 
 def snapshot(directory, index_name=None, *, stage="classical", legacy_metadata=None):

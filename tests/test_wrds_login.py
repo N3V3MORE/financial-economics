@@ -6,7 +6,8 @@ from unittest.mock import Mock
 
 import pytest
 
-from financial_economics import wrds_credentials, wrds_source
+from financial_economics.datasets import credentials as wrds_credentials
+from financial_economics.datasets.sources import crsp as wrds_source
 
 
 @pytest.fixture

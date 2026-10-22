@@ -9,7 +9,7 @@ from scipy.signal import fftconvolve
 
 pytest.importorskip("arch", reason="Classical reconstruction tests require the reconstruction extra.")
 
-from financial_economics.paper_models import (
+from financial_economics.models.classical import (
     _arfima_forecast, _fractional_prediction, _fractional_weights, _garch_forecast,
     classical_forecasts,
 )
@@ -132,7 +132,7 @@ def test_invalid_dates_windows_and_failed_fits_are_explicit(monkeypatch):
         classical_forecasts(rows, bv, price_returns, **{**options, "window_end": "2010-01-01"})
     with pytest.raises(ValueError, match="observed BV and price returns"):
         classical_forecasts(rows, bv, price_returns.drop(rows.index[0]), **options)
-    monkeypatch.setattr("financial_economics.paper_models.minimize_scalar", lambda *args, **kwargs:
+    monkeypatch.setattr("financial_economics.models.classical.minimize_scalar", lambda *args, **kwargs:
                         SimpleNamespace(success=False, message="forced failure"))
     with pytest.raises(RuntimeError, match=f"arfima fit failed at {rows.index[0].date()}.*forced failure"):
         classical_forecasts(rows, bv, price_returns, **options)

@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from financial_economics import volatility_proxy as proxy
+from financial_economics.datasets import volatility as proxy
 
 
 def test_percentage_accuracy_is_not_correlation_and_missing_dates_count():

@@ -6,7 +6,7 @@ import json
 import pandas as pd
 import pytest
 
-from financial_economics.paper_realistic import _load_forecasts
+from financial_economics.studies.realistic import _load_forecasts
 
 
 INPUTS = {name: sha256(name.encode()).hexdigest()

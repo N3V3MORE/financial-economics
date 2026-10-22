@@ -1,6 +1,6 @@
 """One WRDS login in Windows Credential Manager; no credential files or logging.
 
-Run ``python -m financial_economics.wrds_credentials`` for native interactive
+Run ``fecon wrds-credentials`` for native interactive
 setup. Importing this module never loads credentials or displays a prompt.
 """
 

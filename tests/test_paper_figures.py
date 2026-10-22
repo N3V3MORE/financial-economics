@@ -4,10 +4,10 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from financial_economics.paper_evaluation import DECLINES, MODELS
-from financial_economics.paper_figures import (PUBLISHED_ASSETS, asset_comparison, drawdown_paths,
+from financial_economics.evaluation.replication import DECLINES, MODELS
+from financial_economics.reporting.figures import (PUBLISHED_ASSETS, asset_comparison, drawdown_paths,
                                                forecast_paths, quantile_profile)
-from financial_economics.paper_sources import ASSETS
+from financial_economics.datasets.sources.paper import ASSETS
 
 
 SETTINGS = {"monthly_multiplier": 22}

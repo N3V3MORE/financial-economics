@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from financial_economics import wrds_credentials as credentials
+from financial_economics.datasets import credentials as credentials
 
 
 USERNAME = "synthetic_用户🦉"

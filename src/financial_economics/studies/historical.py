@@ -1,6 +1,6 @@
 """Matched, positive, two-session forecasts and annual-risk portfolio diagnostics.
 
-Run ``python -m financial_economics.paper_revised --help``. Freeze a new run,
+Run ``fecon paper-revised --help``. Freeze a new run,
 then run classical, gru_univar_log, gru_multivar_log and evaluate sequentially.
 The volatility target is Risk Lab SPY 5-minute trade realized variance; dates it
 lacks stay missing, and no model treats observations either side of a gap as
@@ -10,7 +10,6 @@ Classical fitting/accounting are CPU-native; neural fitting requires cuda:0.
 """
 
 import argparse
-from financial_economics._layout import code_matches
 from itertools import combinations
 import json
 from pathlib import Path
@@ -434,7 +433,7 @@ def run(args):
         return
     protocol_path = root / "protocol.json"
     protocol = json.loads(protocol_path.read_text(encoding="utf-8"))
-    if (protocol["inputs"] != identity or not code_matches(protocol["code"], package_code_digests())
+    if (protocol["inputs"] != identity or protocol["code"] != package_code_digests()
             or protocol["forecast_settings"] != settings):
         raise ValueError("Inputs or calculation code changed after freezing; create a separate revised run.")
     protocol_digest = file_digest(protocol_path)

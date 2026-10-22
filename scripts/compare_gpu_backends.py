@@ -21,9 +21,9 @@ import time
 import numpy as np
 import pandas as pd
 
-from financial_economics.forecasting import prepare_forecasts, qlike
-from financial_economics.gru_forecasting import gru_forecasts
-from financial_economics.prediction_config import PredictionSettings
+from financial_economics.models.variance import prepare_forecasts, qlike
+from financial_economics.models.gpu import gru_forecasts
+from financial_economics.settings.prediction import PredictionSettings
 
 
 def synthetic_returns():

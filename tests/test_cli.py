@@ -3,7 +3,7 @@ import pandas as pd
 import pytest
 
 from financial_economics import cli
-from financial_economics.config import load_study
+from financial_economics.settings.study import load_study
 
 
 def test_analyze_creates_outputs_without_downloading(tmp_path, monkeypatch):

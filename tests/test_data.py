@@ -10,8 +10,8 @@ import pandas as pd
 import pytest
 import yfinance as yf
 
-from financial_economics.config import Study
-from financial_economics import data
+from financial_economics.settings.study import Study
+from financial_economics.datasets import public as data
 
 
 def french_zip(observations=None):

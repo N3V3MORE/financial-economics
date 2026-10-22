@@ -4,8 +4,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from financial_economics.analysis import drawdowns, monthly_equal_weight
-from financial_economics.stress import (
+from financial_economics.evaluation.metrics import drawdowns, monthly_equal_weight
+from financial_economics.portfolio.declines import (
     compare_episodes,
     drawdown_episodes,
     rolling_correlations,

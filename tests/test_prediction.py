@@ -8,14 +8,14 @@ import pytest
 import statsmodels.api as sm
 from statsmodels.stats.multitest import multipletests
 
-from financial_economics.config import Study
-from financial_economics.costs import dynamic_costed_path, monthly_costed_path
-from financial_economics.explain import resample_rows
-from financial_economics.forecasting import ewma_forecasts, prepare_forecasts, qlike
-from financial_economics.prediction import run_prediction
-from financial_economics.prediction_config import PredictionSettings
-from financial_economics.prediction_inference import infer_prediction
-from financial_economics.return_data import ReturnData
+from financial_economics.settings.study import Study
+from financial_economics.portfolio.execution import dynamic_costed_path, monthly_costed_path
+from financial_economics.evaluation.attribution import resample_rows
+from financial_economics.models.variance import ewma_forecasts, prepare_forecasts, qlike
+from financial_economics.portfolio.prediction import run_prediction
+from financial_economics.settings.prediction import PredictionSettings
+from financial_economics.evaluation.prediction import infer_prediction
+from financial_economics.datasets.returns import ReturnData
 
 
 @pytest.mark.parametrize("cost", [0, 10, 25])

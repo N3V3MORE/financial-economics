@@ -5,9 +5,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from financial_economics.config import load_study
-from financial_economics.forecasting import ewma_forecasts, prepare_forecasts, qlike
-from financial_economics.prediction_config import PredictionSettings, load_prediction
+from financial_economics.settings.study import load_study
+from financial_economics.models.variance import ewma_forecasts, prepare_forecasts, qlike
+from financial_economics.settings.prediction import PredictionSettings, load_prediction
 
 
 def test_trading_dates_and_inputs_cross_year_without_using_future_returns():

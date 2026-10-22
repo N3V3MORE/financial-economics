@@ -6,12 +6,12 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from financial_economics.forecasting import prepare_forecasts
-from financial_economics.gru_forecasting import (
+from financial_economics.models.variance import prepare_forecasts
+from financial_economics.models.gpu import (
     _annual_splits, _gpu_metadata, _native_rnn, _record_rnn_dispatch, _require_cuda,
     _training_scale, _uses_native_rnn, gru_forecasts,
 )
-from financial_economics.prediction_config import PredictionSettings
+from financial_economics.settings.prediction import PredictionSettings
 
 
 def test_annual_refits_group_issue_dates_and_only_use_available_targets():
@@ -44,7 +44,7 @@ def test_training_scaling_cannot_use_future_returns():
 
 def test_missing_cuda_fails_clearly_without_cpu_fallback(monkeypatch):
     fake_torch = SimpleNamespace(cuda=SimpleNamespace(is_available=lambda: False))
-    monkeypatch.setattr("financial_economics.gru_forecasting.importlib.import_module",
+    monkeypatch.setattr("financial_economics.models.gpu.importlib.import_module",
                         lambda name: fake_torch)
     with pytest.raises(RuntimeError, match=r"CUDA:0.*CPU fallback is disabled") as error:
         _require_cuda()
@@ -55,7 +55,7 @@ def test_missing_pytorch_guidance_covers_cuda_and_rocm(monkeypatch):
     def missing(name):
         raise ImportError("Synthetic missing PyTorch")
 
-    monkeypatch.setattr("financial_economics.gru_forecasting.importlib.import_module", missing)
+    monkeypatch.setattr("financial_economics.models.gpu.importlib.import_module", missing)
     with pytest.raises(RuntimeError, match=r"prediction extra.*NVIDIA CUDA.*AMD ROCm"):
         _require_cuda()
 

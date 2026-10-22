@@ -3,11 +3,10 @@
 Run all commands below from the project root. Configuration, data and output paths
 are relative to that root, even though this reference lives in `docs/`.
 
-All old module and CLI entrypoints are retained. The command examples below keep
-the original module names and arguments. Implementations now live in responsibility
-groups; see [Project structure](structure.md). The original flat source tree and
-file names retained below describe compatibility entrypoints, rather than the
-canonical implementation layout. No methods, features or studies were removed.
+Every command runs through `fecon`. Staged studies once run as
+`python -m financial_economics.<module>` are `fecon` subcommands with the same
+arguments. Implementations live in responsibility groups; see
+[Project structure](structure.md). No methods, features or studies were removed.
 
 This page preserves the former README's command and reference content, including
 its dated results and environment checks. Those records describe their stated
@@ -129,7 +128,7 @@ rerun. On Windows, save the WRDS username and password through the local
 Windows sign-in dialog once:
 
 ```powershell
-uv run --extra wrds python -m financial_economics.wrds_credentials
+uv run --extra wrds fecon wrds-credentials
 ```
 
 This stores a generic credential named `financial-economics:wrds` in Windows
@@ -477,11 +476,11 @@ for a new data vintage; retain the existing Oxford archive described above.
 
 ```powershell
 uv sync --frozen --extra prediction --extra reconstruction
-uv run --extra prediction --extra reconstruction python -c "from financial_economics.paper_sources import download_sources; download_sources('data/paper-public-new')"
-uv run --extra prediction --extra reconstruction python -c "from financial_economics.paper_fx import download_fx; download_fx('data/paper-fx-new')"
+uv run --extra prediction --extra reconstruction python -c "from financial_economics.datasets.sources.paper import download_sources; download_sources('data/paper-public-new')"
+uv run --extra prediction --extra reconstruction python -c "from financial_economics.datasets.sources.fx import download_fx; download_fx('data/paper-fx-new')"
 $reconstructionArgs = @('--data-dir', 'data/paper-public-new', '--fx-dir', 'data/paper-fx-new', '--oxford-archive', 'data/paper-source-20261020/oxfordman-20220301.zip', '--output-dir', 'outputs/paper-public-new')
 foreach ($stage in @('classical', 'gru_univar', 'gru_multivar', 'evaluate')) {
-    uv run --extra prediction --extra reconstruction python -m financial_economics.paper_reconstruction $stage @reconstructionArgs
+    uv run --extra prediction --extra reconstruction fecon paper-reconstruction $stage @reconstructionArgs
     if ($LASTEXITCODE -ne 0) { break }
 }
 ```
@@ -492,8 +491,8 @@ downloaded directly from EIA. Use a new macro snapshot and a new combined
 source directory:
 
 ```powershell
-uv run --frozen --extra prediction-rocm --extra reconstruction --extra wrds python -m financial_economics.paper_macro_sources --output-dir data/paper-macro-wrds-eia-20261021
-uv run --frozen --extra prediction-rocm --extra reconstruction --extra wrds python -c "from financial_economics.paper_sources import download_sources; download_sources('data/paper-wrds-eia-20261021', macro_dir='data/paper-macro-wrds-eia-20261021')"
+uv run --frozen --extra prediction-rocm --extra reconstruction --extra wrds fecon paper-macro-sources --output-dir data/paper-macro-wrds-eia-20261021
+uv run --frozen --extra prediction-rocm --extra reconstruction --extra wrds python -c "from financial_economics.datasets.sources.paper import download_sources; download_sources('data/paper-wrds-eia-20261021', macro_dir='data/paper-macro-wrds-eia-20261021')"
 ```
 
 Pass the combined directory as `--data-dir` to every reconstruction stage.
@@ -527,7 +526,7 @@ reset-before, while its executed Keras/TensorFlow settings are unpublished.
 
 ### Revised matched study after the methodology audit
 
-`financial_economics.paper_revised` corrects the practical limitations of the
+`fecon paper-revised` corrects the practical limitations of the
 historical reconstruction while retaining its original files and outputs.
 The saved October 21 revision used identical 22-observation histories,
 beginning October 3, 2000. Current runs again use the last 22 trading
@@ -571,7 +570,7 @@ All 27 portfolio comparisons enter one Holm family and remain exploratory.
 ```powershell
 $revisedArgs = @('--data-dir', 'data/paper-wrds-eia-20261021', '--returns-dir', 'data/protection-long-wrds-20261021', '--risklab-dir', 'data/risklab-spy-20261022', '--output-dir', 'outputs/revised-study-new')
 foreach ($stage in @('freeze', 'classical', 'gru_univar_log', 'gru_multivar_log', 'evaluate')) {
-    uv run --extra prediction --extra reconstruction python -m financial_economics.paper_revised $stage @revisedArgs
+    uv run --extra prediction --extra reconstruction fecon paper-revised $stage @revisedArgs
     if ($LASTEXITCODE -ne 0) { break }
 }
 ```
@@ -600,7 +599,7 @@ requires a validated consistent volatility source, not an undocumented splice.
 
 ### Estimated Oxford-like measurements and later-year test
 
-`financial_economics.volatility_proxy` estimates same-day Oxford-like volatility
+`fecon volatility-proxy` estimates same-day Oxford-like volatility
 from public [Risk Lab](https://dachxiu.chicagobooth.edu/) intraday measures.
 The current comparison adds IVV and VOO to SPY, flags gross trade/quote
 disagreements and tests 78 mappings, including constrained combinations.
@@ -632,15 +631,15 @@ has 7,743 dates through October 9, 2026, including all 1,003 dates in 2022–202
 
 **This substitute is not approved for a new training/backtest run.** The proxy
 command returns a failure status when either accuracy requirement fails, and
-`proxy_study` rejects both this result and legacy runs lacking the new daily
+`fecon proxy-study` rejects both this result and legacy runs lacking the new daily
 check. Passing an older average-only gate is insufficient.
 
 ```powershell
-uv run python -m financial_economics.volatility_proxy --data-dir data/volatility-proxy-20261022 --prices-dir data/volatility-proxy-prices-20261022 --ivv-dir data/volatility-proxy-ivv-20261022 --voo-dir data/volatility-proxy-voo-20261022 --oxford-archive data/paper-source-20261020/oxfordman-20220301.zip --output-dir outputs/volatility-proxy-new
+uv run fecon volatility-proxy --data-dir data/volatility-proxy-20261022 --prices-dir data/volatility-proxy-prices-20261022 --ivv-dir data/volatility-proxy-ivv-20261022 --voo-dir data/volatility-proxy-voo-20261022 --oxford-archive data/paper-source-20261020/oxfordman-20220301.zip --output-dir outputs/volatility-proxy-new
 if ($LASTEXITCODE -eq 0) {
     $proxyArgs = @('--proxy-run', 'outputs/volatility-proxy-new', '--prices-dir', 'data/volatility-proxy-prices-20261022', '--returns-dir', 'data/protection-long-wrds-20261020', '--output-dir', 'outputs/proxy-study-new')
     foreach ($stage in @('freeze', 'forecast', 'evaluate')) {
-        uv run --extra prediction --extra reconstruction python -m financial_economics.proxy_study $stage @proxyArgs
+        uv run --extra prediction --extra reconstruction fecon proxy-study $stage @proxyArgs
         if ($LASTEXITCODE -ne 0) { break }
     }
 }
@@ -684,10 +683,10 @@ runs stay unchanged and reported.
 
 ```powershell
 foreach ($stage in @('gru_univar_log', 'gru_multivar_log', 'evaluate_fixed')) {
-    uv run --extra prediction --extra reconstruction python -m financial_economics.paper_reconstruction $stage @reconstructionArgs
+    uv run --extra prediction --extra reconstruction fecon paper-reconstruction $stage @reconstructionArgs
     if ($LASTEXITCODE -ne 0) { break }
 }
-uv run python -m financial_economics.paper_realistic --data-dir data/protection-long-wrds-20261020 --forecast-run outputs/paper-public-new --output-dir outputs/paper-realistic-new
+uv run fecon paper-realistic --data-dir data/protection-long-wrds-20261020 --forecast-run outputs/paper-public-new --output-dir outputs/paper-realistic-new
 ```
 
 `configs/paper-realistic.toml` was fixed before the realistic run. It reuses the saved
@@ -732,7 +731,7 @@ To compare trading schedules on these same saved forecasts, use separate runs:
 
 ```powershell
 foreach ($frequency in @('daily', 'weekly', 'monthly')) {
-    uv run python -m financial_economics.paper_realistic --data-dir data/protection-long-wrds-20261020 --forecast-run outputs/paper-reconstruction-20261021 --output-dir "outputs/paper-cadence-new-$frequency" --rebalance-frequency $frequency --skip-bootstrap
+    uv run fecon paper-realistic --data-dir data/protection-long-wrds-20261020 --forecast-run outputs/paper-reconstruction-20261021 --output-dir "outputs/paper-cadence-new-$frequency" --rebalance-frequency $frequency --skip-bootstrap
     if ($LASTEXITCODE -ne 0) { break }
 }
 ```
@@ -755,12 +754,12 @@ comparisons run sequentially on CPU without refitting or importing PyTorch.
 
 ### Redraw the paper's figures
 
-`paper_figures` redraws the paper's Figures 3–7 from a saved reconstruction
+`fecon paper-figures` redraws the paper's Figures 3–7 from a saved reconstruction
 run. It refits nothing, checks that the data snapshots and saved files are the
 ones that run used, and writes each PNG beside the `figure*.csv` it is drawn from:
 
 ```powershell
-uv run python -m financial_economics.paper_figures --run-dir outputs/paper-reconstruction-20261021 --data-dir data/paper-reconstruction-public-20261021 --fx-dir data/paper-reconstruction-fx-20261021 --oxford-archive data/paper-source-20261020/oxfordman-20220301.zip --output-dir outputs/paper-figures-new
+uv run fecon paper-figures --run-dir outputs/paper-reconstruction-20261021 --data-dir data/paper-reconstruction-public-20261021 --fx-dir data/paper-reconstruction-fx-20261021 --oxford-archive data/paper-source-20261020/oxfordman-20220301.zip --output-dir outputs/paper-figures-new
 ```
 
 `figure6_paper_check.png` puts each proxy's correlation with the S&P 500 and
@@ -782,8 +781,8 @@ proxies in local currency; it needs no FX snapshot. Add `--local-bonds` (and
 drop `--fx-dir`) to draw the figures from it.
 
 ```powershell
-uv run python -m financial_economics.paper_reconstruction evaluate_local --data-dir data/paper-reconstruction-public-20261021 --oxford-archive data/paper-source-20261020/oxfordman-20220301.zip --output-dir outputs/paper-reconstruction-20261021
-uv run python -m financial_economics.paper_figures --local-bonds --run-dir outputs/paper-reconstruction-20261021 --data-dir data/paper-reconstruction-public-20261021 --oxford-archive data/paper-source-20261020/oxfordman-20220301.zip --output-dir outputs/paper-figures-local-new
+uv run fecon paper-reconstruction evaluate_local --data-dir data/paper-reconstruction-public-20261021 --oxford-archive data/paper-source-20261020/oxfordman-20220301.zip --output-dir outputs/paper-reconstruction-20261021
+uv run fecon paper-figures --local-bonds --run-dir outputs/paper-reconstruction-20261021 --data-dir data/paper-reconstruction-public-20261021 --oxford-archive data/paper-source-20261020/oxfordman-20220301.zip --output-dir outputs/paper-figures-local-new
 ```
 
 **IEF in the realistic test.** IEF, the 7–10 year Treasury ETF, was the only
@@ -795,7 +794,7 @@ every existing portfolio and test in the new run matches the frozen run.
 
 ```powershell
 uv run --extra wrds fecon --config configs/paper-realistic-ief.toml download --source wrds --verify-monthly --data-dir data/protection-long-ief-wrds-20261021
-uv run python -m financial_economics.paper_realistic --config configs/paper-realistic-ief.toml --data-dir data/protection-long-ief-wrds-20261021 --forecast-run outputs/paper-reconstruction-20261021 --output-dir outputs/paper-realistic-ief-20261021
+uv run fecon paper-realistic --config configs/paper-realistic-ief.toml --data-dir data/protection-long-ief-wrds-20261021 --forecast-run outputs/paper-reconstruction-20261021 --output-dir outputs/paper-realistic-ief-20261021
 ```
 
 ## See the original phase results
@@ -818,55 +817,22 @@ data/snapshot/                     Downloaded inputs, saved locally
     |
     v
 src/financial_economics/           Python code
-    |-- config.py                 Read the study settings
-    |-- data.py                   Download, save, and validate the inputs
-    |-- wrds_source.py            Private CRSP extracts and monthly reconciliation
-    |-- wrds_credentials.py       Keep one WRDS login in Windows Credential Manager
-    |-- return_data.py            Provider-independent returns and complete months
-    |-- analysis.py               Calculate returns, risk, and market exposure
-    |-- report.py                 Write Phase 1 tables, charts, and the summary
-    |-- stress.py                 Find SPY declines and compare recoveries
-    |-- stress_report.py          Write the Phase 2 report
-    |-- comparison.py             Fit the SPY + cash portfolio and compare
-    |-- comparison_report.py      Write the Phase 3 report
-    |-- costs.py                  Deduct self-financing ETF trading fees
-    |-- fund_checks.py            Compare removals, additions, periods, and costs
-    |-- protection_config.py      Frozen protection-study settings
-    |-- protection.py             Fixed additions, costs, periods, and beta controls
-    |-- protection_inference.py   Thirteen HAC/Holm tests and paired bootstrap
-    |-- protection_report.py      Protection tables, three figures, and run metadata
-    |-- explain.py                Resample the comparison and split gains by fund
-    |-- explain_report.py         Write the Phase 4 report
-    |-- page.py                   Write the one-page summary of all four phases
-    |
-    |   Volatility prediction
-    |-- forecasting.py            Calendar alignment and EWMA variance forecasts
-    |-- gru_forecasting.py        CUDA GRU variance forecasts with annual refits
-    |-- prediction_config.py      Frozen prediction-experiment settings
-    |-- prediction.py             Target-volatility portfolios from issued forecasts
-    |-- prediction_inference.py   Paired forecast and portfolio tests
-    |-- prediction_report.py      Prediction tables, figures, and run metadata
-    |
-    |   Kaczmarek et al. (2022) replication and extensions
-    |-- paper.py                  Closer GRU-UNIVAR replication on Oxford-Man BV
-    |-- paper_gru.py              Its two-layer CUDA GRU
-    |-- paper_extension.py        Same forecasts with delays, fees, and cash income
-    |-- paper_sources.py          Public substitutes for the paper's U.S. series
-    |-- paper_macro_sources.py    Keep WRDS/FRED yields and EIA Brent when FRED is unavailable
-    |-- paper_fx.py               Dated FX, or local currency, for the foreign bonds
-    |-- paper_models.py           ARFIMA, GARCH, and GJR-GARCH forecasts
-    |-- paper_networks.py         Raw-BV GRUs for the full rebuild
-    |-- paper_networks_log.py     Post hoc log-BV GRUs
-    |-- paper_evaluation.py       Paper-style scores for all models and assets
-    |-- paper_reconstruction.py   Run and reuse the rebuild's stages
-    |-- paper_realistic.py        Realistic trading test of the saved forecasts
-    |-- paper_figures.py          Redraw the paper's Figures 3–7
-    |-- paper_revised.py          Matched, positive, two-session forecasts and annual-risk diagnostics
-    |-- volatility_proxy.py       Estimate Oxford-like volatility from public intraday measures
-    |-- proxy_study.py            Exploratory 2022-2025 SPY/cash test on those estimates
+    |-- settings/                 Read study and frozen experiment settings
+    |-- datasets/                 Download, save, and validate inputs: public and CRSP
+    |                             snapshots, returns, WRDS login, paper sources, FX,
+    |                             WRDS/EIA macro series, Risk Lab and proxy volatility
+    |-- models/                   EWMA and classical forecasts, daily and paper GRUs
+    |-- portfolio/                Fees, SPY/cash controls, declines, fund checks,
+    |                             target-volatility portfolios
+    |-- evaluation/               Metrics, attribution, paired tests, paper-style scores
+    |-- studies/                  Paper, extension, rebuild, realistic, revised,
+    |                             proxy, Risk Lab and protection studies
+    |-- reporting/                Phase reports, prediction and protection outputs,
+    |                             paper figures, and the one-page summary
     |
     |-- provenance.py             File hashes, git state, and timestamps for run records
-    |-- cli.py                    Connect the commands
+    |-- _layout.py                Map provenance file names to grouped modules
+    |-- cli.py                    Connect the fecon commands
     |-- __main__.py               Support python -m financial_economics
     +-- __init__.py                Identify the Python package
     |
@@ -882,13 +848,14 @@ outputs/page/index.html            One page with the main charts and numbers
 The rebuild reuses saved forecasts only while `paper_sources.py`, `paper.py`,
 `forecasting.py`, `paper_models.py`, `paper_networks.py`,
 `paper_networks_log.py`, `paper_gru.py` and `gru_forecasting.py` keep the hashes
-recorded with those forecasts. Editing any of them means retraining the GPU
+recorded with those forecasts. These are provenance names for files now in
+`datasets/`, `studies/` and `models/`; [Project structure](structure.md) maps each. Editing any of them means retraining the GPU
 stages, so they are kept as frozen and excluded from style-only lint rules.
 
 | Other files | Purpose |
 |---|---|
 | `tests/` | Check calculations, data validation, and the commands using synthetic examples |
-| `scripts/` | The independent protection verifier and the supplement workbook refresher |
+| `scripts/` | The independent protection verifier, the supplement workbook refresher and the GPU backend comparison |
 | `supplement/` | The supplemental Excel workbook and the one-month T-bill cash illustration (R Markdown, its CSV, and a static HTML summary) |
 | `configs/` | Frozen settings for each study; each command reads one through `--config` |
 | [docs/results-explained.md](results-explained.md) | What the study has found, in plain language |
@@ -899,7 +866,7 @@ stages, so they are kept as frozen and excluded from style-only lint rules.
 | `.github/workflows/tests.yml` | Run tests on Windows and Linux in GitHub Actions |
 | [CONTRIBUTING.md](../CONTRIBUTING.md) | Collaborator access, branches, and pull requests |
 
-To change **what is studied**, edit `configs/study.toml`. To change **how results are calculated**, start in `analysis.py`, `stress.py`, `comparison.py`, or `explain.py`. To change **how results are presented**, start in the matching `*_report.py` file.
+To change **what is studied**, edit `configs/study.toml`. To change **how results are calculated**, start in `evaluation/metrics.py`, `portfolio/declines.py`, `portfolio/controls.py`, or `evaluation/attribution.py`. To change **how results are presented**, start in the matching module under `reporting/`.
 
 ## Current settings and assumptions
 

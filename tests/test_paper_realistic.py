@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from financial_economics.paper_realistic import (_tests, delayed_signals, realistic_portfolios,
+from financial_economics.studies.realistic import (_tests, delayed_signals, realistic_portfolios,
                                                  sharpe_difference_test)
 
 
@@ -55,7 +55,7 @@ def test_revised_rules_use_annual_units_common_entry_and_terminal_costs():
 
 
 def test_terminal_sale_charges_actual_drifted_etf_value():
-    from financial_economics.costs import dynamic_costed_path
+    from financial_economics.portfolio.execution import dynamic_costed_path
 
     dates = pd.bdate_range("2020-01-02", periods=2)
     returns = pd.DataFrame({"SPY": [1., 0.], "RF": [0., 0.]}, index=dates)

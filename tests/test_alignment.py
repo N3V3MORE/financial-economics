@@ -1,6 +1,6 @@
 import pandas as pd
 import pytest
-from financial_economics.explain import bootstrap_differences, fund_contributions
+from financial_economics.evaluation.attribution import bootstrap_differences, fund_contributions
 
 
 def test_alignment_is_explicit():

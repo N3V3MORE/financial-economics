@@ -1,24 +1,39 @@
 """Download once, then analyze the saved snapshot without network access."""
 
 import argparse
+from importlib import import_module
 from pathlib import Path
 import sys
 
-from .analysis import monthly_equal_weight, performance_summary, prices_to_returns
-from .config import load_study
-from .data import align_sample, download_snapshot, load_snapshot
-from .report import write_outputs
-from .stress import compare_episodes, drawdown_episodes, rolling_correlations
+from .evaluation.metrics import monthly_equal_weight, performance_summary, prices_to_returns
+from .settings.study import load_study
+from .datasets.public import align_sample, download_snapshot, load_snapshot
+from .reporting.baseline import write_outputs
+from .portfolio.declines import compare_episodes, drawdown_episodes, rolling_correlations
+
+# Staged studies and source tools parse their own options; fecon passes everything
+# after the command name through to the module's main().
+MODULE_COMMANDS = {
+    "paper-reconstruction": ("studies.replication", "Run full paper reconstruction stages"),
+    "paper-realistic": ("studies.realistic", "Run realistic trading tests on saved reconstruction forecasts"),
+    "paper-revised": ("studies.historical", "Run the matched historical methodology revision stages"),
+    "proxy-study": ("studies.proxy", "Run the later-year study on an accepted estimated proxy"),
+    "risklab-study": ("studies.recent", "Run the later-year Risk Lab study stages"),
+    "paper-figures": ("reporting.figures", "Rebuild paper figures from a saved reconstruction run"),
+    "paper-macro-sources": ("datasets.sources.macro", "Save WRDS/FRED yields and EIA Brent snapshots"),
+    "volatility-proxy": ("datasets.volatility", "Estimate the diagnostic Oxford-like volatility proxy"),
+    "wrds-credentials": ("datasets.credentials", "Save your WRDS login with the native Windows dialog"),
+}
 
 
 def _predict(args, study):
     from tempfile import TemporaryDirectory
 
-    from .forecasting import ewma_forecasts, prepare_forecasts
-    from .prediction import run_prediction
-    from .prediction_config import load_prediction
-    from .prediction_report import load_forecast_run, write_prediction
-    from .return_data import load_returns
+    from .models.variance import ewma_forecasts, prepare_forecasts
+    from .portfolio.prediction import run_prediction
+    from .settings.prediction import load_prediction
+    from .reporting.prediction import load_forecast_run, write_prediction
+    from .datasets.returns import load_returns
 
     if args.defensive_asset not in study.tickers:
         raise ValueError(f"Defensive asset {args.defensive_asset} is absent from the study's [assets]. "
@@ -56,7 +71,7 @@ def _predict(args, study):
         if args.ewma_only:
             finish(forecasts)
         else:
-            from .gru_forecasting import gru_forecasts
+            from .models.gpu import gru_forecasts
 
             destination.parent.mkdir(parents=True, exist_ok=True)
             with TemporaryDirectory(prefix=".prediction-models-", dir=destination.parent) as temporary:
@@ -70,6 +85,10 @@ def _predict(args, study):
 
 
 def main(argv: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else argv
+    if argv and argv[0] in MODULE_COMMANDS:
+        module = import_module(f".{MODULE_COMMANDS[argv[0]][0]}", __package__)
+        return module.main(argv[1:])
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, default=Path("configs/study.toml"))
     commands = parser.add_subparsers(dest="command", required=True)
@@ -134,12 +153,17 @@ def main(argv: list[str] | None = None) -> int:
     page = commands.add_parser("page", help="Write one HTML page from the saved phase outputs")
     page.add_argument("--outputs-dir", type=Path, default=Path("outputs"))
     page.add_argument("--output", type=Path, default=Path("outputs/page/index.html"))
+    for name, (_, help_text) in MODULE_COMMANDS.items():
+        commands.add_parser(name, help=f"{help_text} (options: fecon {name} --help)", add_help=False)
     args = parser.parse_args(argv)
+    if args.command in MODULE_COMMANDS:
+        parser.error(f"{args.command} takes its own options after the command name, "
+                     f"not the shared --config; see fecon {args.command} --help.")
 
     try:
         study = load_study(args.config)
         if args.command == "page":
-            from .page import write_page
+            from .reporting.page import write_page
 
             write_page(args.outputs_dir, args.output)
             print(f"Open: {args.output.resolve()}")
@@ -148,27 +172,27 @@ def main(argv: list[str] | None = None) -> int:
                 raise ValueError("--verify-monthly requires --source wrds for CRSP daily/monthly "
                                  "reconciliation; remove it to download public prices.")
             if args.source == "wrds":
-                from .wrds_source import download_wrds_snapshot
+                from .datasets.sources.crsp import download_wrds_snapshot
 
                 download_wrds_snapshot(study, args.data_dir, verify_monthly=args.verify_monthly)
             else:
                 download_snapshot(study, args.data_dir)
             print(f"Saved source snapshot: {args.data_dir.resolve()}")
         elif args.command == "paper-extension":
-            from .paper_extension import run_extension_command
+            from .studies.extension import run_extension_command
 
             run_extension_command(args, study)
         elif args.command == "paper":
-            from .paper import run_paper_command
+            from .studies.paper import run_paper_command
 
             run_paper_command(args, study)
         elif args.command == "predict":
             _predict(args, study)
         elif args.command == "protection":
-            from .protection import run_protection
-            from .protection_config import load_protection
-            from .protection_report import write_protection
-            from .return_data import load_returns
+            from .studies.protection import run_protection
+            from .settings.protection import load_protection
+            from .reporting.protection import write_protection
+            from .datasets.returns import load_returns
 
             if args.output_dir.exists() or args.output_dir.resolve().is_relative_to(args.data_dir.resolve()):
                 raise ValueError("Use a new output directory outside the source snapshot.")
@@ -187,7 +211,7 @@ def main(argv: list[str] | None = None) -> int:
             if args.output_dir.resolve().is_relative_to(args.data_dir.resolve()):
                 raise ValueError("Keep generated outputs outside the source snapshot.")
             if args.command == "fund-checks":
-                from .fund_checks import DEFAULT_WINDOWS, check_funds, write_fund_checks
+                from .portfolio.fund_checks import DEFAULT_WINDOWS, check_funds, write_fund_checks
 
                 windows = tuple(args.windows) if args.windows else DEFAULT_WINDOWS
                 costs = tuple(args.costs_bps)
@@ -200,8 +224,8 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"Results: {args.output_dir.resolve()}")
                 return 0
             elif args.command == "explain":
-                from .explain import explain_comparison
-                from .explain_report import write_explain_outputs
+                from .evaluation.attribution import explain_comparison
+                from .reporting.attribution import write_explain_outputs
 
                 result = explain_comparison(
                     returns, factors["RF"], study.benchmark, args.bond_fund,
@@ -212,8 +236,8 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"Sharpe difference, mix minus {sharpe.reference}: {sharpe.estimate:+.3f} "
                       f"(95% range {sharpe.ci_low:+.3f} to {sharpe.ci_high:+.3f}).")
             elif args.command == "compare":
-                from .comparison import compare_portfolios
-                from .comparison_report import write_comparison_outputs
+                from .portfolio.controls import compare_portfolios
+                from .reporting.comparison import write_comparison_outputs
 
                 result = compare_portfolios(returns, factors["RF"], study.benchmark,
                                             args.evaluation_start)
@@ -230,7 +254,7 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"Frozen targets: {result.calibration['stock_weight']:.2%} "
                       f"{study.benchmark}, {result.calibration['cash_weight']:.2%} cash.")
             elif args.command == "stress":
-                from .stress_report import write_stress_outputs
+                from .reporting.stress import write_stress_outputs
 
                 seed = prices.index[prices.index < returns.index[0]][-1]
                 combined = returns.copy()

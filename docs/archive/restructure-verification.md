@@ -81,7 +81,7 @@ review, rather than claimed as part of the shared-engine replay.
 - Nine original package/module command entry points: help text, standard error
   and exit status exactly match the baseline.
 - All 23 original README fenced command blocks remain verbatim in
-  [the complete command reference](commands.md); local documentation links pass.
+  [the complete command reference](../commands.md); local documentation links pass.
 - Across 43 relocated implementations, 257 top-level function/class definitions
   are identical after import normalization. Eight changed definitions contain
   provenance/orchestration adjustments. No original definitions were removed.
@@ -106,7 +106,7 @@ execution, reload/pickle compatibility, incomplete backup inventory acceptance,
 missing decline-table comparison, zero-column index hashing, and overly broad
 provenance wording. The final code review reports no remaining concrete
 preservation blocker. The distinction between whole-package and selected-module
-provenance is documented in [the structure guide](structure.md).
+provenance is documented in [the structure guide](../structure.md).
 
 Major checkpoints are committed:
 

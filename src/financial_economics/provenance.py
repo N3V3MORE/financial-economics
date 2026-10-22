@@ -14,7 +14,7 @@ def file_digest(path):
 
 
 def package_code_digests():
-    """Actual SHA-256 of every nested implementation and compatibility entry point."""
+    """Actual SHA-256 of every package module and the relocation map."""
     return current_code_digests()
 
 

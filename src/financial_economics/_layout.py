@@ -1,10 +1,9 @@
-"""Resolve relocated sources and recognize one exact, reviewed source relocation.
+"""Map provenance names to module files and recognize one reviewed relocation.
 
-The manifest records real before/after byte hashes. New runs always record actual
-current hashes. Historical whole-package fingerprints are accepted only while the
-entire Python package matches the reviewed after-state; later edits invalidate that
-exception. A historical single-module digest is accepted while that module itself
-still matches its reviewed after-state, as selected-module provenance always did.
+Run records name modules by their original flat filenames (``paper_gru.py``);
+the manifest maps each to its grouped file and records the byte hashes from just
+before and after the reviewed move. A historical single-module digest from before
+the move is accepted while that module still matches its post-move hash.
 """
 
 from hashlib import sha256
@@ -31,36 +30,15 @@ def module_source(name):
     return resolved
 
 
-def _python_digests():
-    return {path.relative_to(PACKAGE_ROOT).as_posix(): sha256(path.read_bytes()).hexdigest()
-            for path in sorted(PACKAGE_ROOT.rglob("*.py"))}
-
-
 def current_code_digests():
-    """Hash nested implementations, entry points, helpers, and the relocation map."""
-    return _python_digests() | {
+    """Hash every package module, entry point and helper, plus the relocation map."""
+    return {path.relative_to(PACKAGE_ROOT).as_posix(): sha256(path.read_bytes()).hexdigest()
+            for path in sorted(PACKAGE_ROOT.rglob("*.py"))} | {
         "_relocation.json": sha256(RELOCATION_MANIFEST.read_bytes()).hexdigest()}
 
 
-def _reviewed_relocation():
-    manifest = _manifest()
-    return manifest if _python_digests() == manifest["after"] else None
-
-
-def code_matches(recorded, current):
-    """Compare exact fingerprints or the exact reviewed pre-relocation package."""
-    if recorded == current:
-        return True
-    manifest = _reviewed_relocation()
-    return bool(manifest and recorded == manifest["before"]
-                and current == current_code_digests())
-
-
 def relocated_digest_matches(name, recorded, current):
-    """Recognize a baseline module moved without changing its calculation code.
-
-    Only this module is compared, so edits elsewhere in the package do not affect it.
-    """
+    """Recognize a baseline module moved without changing its calculation code."""
     if recorded == current:
         return True
     manifest = _manifest()

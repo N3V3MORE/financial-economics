@@ -9,8 +9,10 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from financial_economics import cli, data, wrds_source as wrds
-from financial_economics.config import Study
+from financial_economics import cli
+from financial_economics.datasets import public as data
+from financial_economics.datasets.sources import crsp as wrds
+from financial_economics.settings.study import Study
 
 
 @pytest.fixture
@@ -136,7 +138,7 @@ def test_snapshot_preserves_sources_and_reloads_offline(sample, monkeypatch, tmp
     pd.testing.assert_frame_equal(loaded, expected)
     pd.testing.assert_frame_equal(loaded_factors, factors)
     assert loaded_manifest == manifest
-    from financial_economics import return_data
+    from financial_economics.datasets import returns as return_data
     monkeypatch.setattr(return_data, "prices_to_returns", lambda *a: pytest.fail("CRSP must be consumed directly"))
     direct = return_data.load_returns(study, destination)
     expected_raw = sample[3].pivot(index="date", columns="permno", values="total_return")
@@ -178,7 +180,7 @@ def test_verified_monthly_snapshot_roundtrip(sample, monkeypatch, tmp_path):
     manifest = wrds.download_wrds_snapshot(study, destination, verify_monthly=True)
     assert manifest["coverage"]["fund_months"] == 2
     assert set(manifest["files"]) == wrds.SNAPSHOT_FILES | {wrds.MONTHLY_FILE, wrds.QUERY_FILE}
-    from financial_economics.return_data import load_returns
+    from financial_economics.datasets.returns import load_returns
     loaded = load_returns(study, destination, verified_monthly=True)
     assert loaded.daily.index.equals(dates)
     # Even updating the file fingerprint cannot bypass the reconciliation itself.
@@ -252,7 +254,7 @@ def test_cli_selects_wrds_without_yahoo(sample, monkeypatch, tmp_path):
 
 
 def test_phase1_records_and_describes_the_actual_provider(sample, tmp_path):
-    from financial_economics.report import write_outputs
+    from financial_economics.reporting.baseline import write_outputs
 
     study, factors, _, _ = sample
     levels, _ = wrds.build_return_index(*sample)

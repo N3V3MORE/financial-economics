@@ -1,8 +1,8 @@
 import pandas as pd
 import pytest
-from financial_economics.config import Study
-from financial_economics.return_data import compound_months
-from financial_economics.wrds_source import validate_monthly_extract, WRDSError
+from financial_economics.settings.study import Study
+from financial_economics.datasets.returns import compound_months
+from financial_economics.datasets.sources.crsp import validate_monthly_extract, WRDSError
 
 
 def test_complete_months_and_monthly_reconciliation():

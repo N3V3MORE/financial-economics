@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from financial_economics.paper_gru import _cv_folds, _require_cuda, _training_scale, paper_gru_forecasts
+from financial_economics.models.paper_gru import _cv_folds, _require_cuda, _training_scale, paper_gru_forecasts
 
 
 def _prepared():
@@ -93,7 +93,7 @@ def test_tiny_cuda_refits_save_checkpoints_and_ignore_future_targets(tmp_path):
 
 
 def test_frozen_two_session_cuda_refits_skip_tuning_and_preserve_causality(tmp_path, monkeypatch):
-    from financial_economics.paper import prepare_paper_forecasts
+    from financial_economics.studies.paper import prepare_paper_forecasts
 
     try:
         torch, _ = _require_cuda()
@@ -105,7 +105,7 @@ def test_frozen_two_session_cuda_refits_skip_tuning_and_preserve_causality(tmp_p
     bv = pd.Series(.0001 * (2 + np.sin(np.arange(len(calendar)) / 7)), index=calendar)
     prepared = prepare_paper_forecasts(bv, calendar, lookback=3, horizon=2)
     settings, frozen = _settings(), {"hidden_size": 2, "epochs": 1}
-    monkeypatch.setattr("financial_economics.paper_gru._cv_folds",
+    monkeypatch.setattr("financial_economics.models.paper_gru._cv_folds",
                         lambda *args: pytest.fail("Frozen selection must not run cross-validation"))
     forecasts, tuning, metadata = paper_gru_forecasts(
         prepared, settings, calendar, tmp_path / "frozen", progress=lambda message: None,

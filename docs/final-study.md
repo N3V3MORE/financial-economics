@@ -8,7 +8,7 @@ Neural Network” ([paper](https://doi.org/10.1016/j.ribaf.2021.101610)).
 
 The original numerical results below remain the historical reconstruction.
 The later methodology audit is addressed by the matched revision in
-`financial_economics.paper_revised`; its changes are cross-referenced below.
+`fecon paper-revised`; its changes are cross-referenced below.
 It is a new exploratory calculation on previously inspected history.
 
 ## The research goal

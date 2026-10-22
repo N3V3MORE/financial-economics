@@ -4,8 +4,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from financial_economics.analysis import monthly_equal_weight, monthly_fixed_weight
-from financial_economics.comparison import compare_portfolios, stock_exposure
+from financial_economics.evaluation.metrics import monthly_equal_weight, monthly_fixed_weight
+from financial_economics.portfolio.controls import compare_portfolios, stock_exposure
 
 
 def sample():

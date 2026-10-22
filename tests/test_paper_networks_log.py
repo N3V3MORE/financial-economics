@@ -2,9 +2,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from financial_economics.forecasting import ForecastData
-from financial_economics.paper_networks import _require_cuda
-from financial_economics.paper_networks_log import _log_inputs, _log_scale, reconstruct_log_gru
+from financial_economics.models.variance import ForecastData
+from financial_economics.models.networks import _require_cuda
+from financial_economics.models.log_networks import _log_inputs, _log_scale, reconstruct_log_gru
 
 
 def _prepared(channels=5):

@@ -6,7 +6,7 @@ import json
 import pandas as pd
 import pytest
 
-from financial_economics.paper_sources import _load_macro_snapshot, download_sources, load_sources
+from financial_economics.datasets.sources.paper import _load_macro_snapshot, download_sources, load_sources
 
 
 def _snapshot(tmp_path, *, symbol="DAAA", units="percent per year", duplicate=False):
@@ -38,7 +38,7 @@ def test_alternative_rejects_changed_series_units_or_duplicate_dates(tmp_path, k
 def test_alternative_rejects_modified_data_before_price_download(tmp_path, monkeypatch):
     folder = _snapshot(tmp_path)
     (folder / "observations.csv").write_text("changed", encoding="utf-8")
-    monkeypatch.setattr("financial_economics.paper_sources.urlopen",
+    monkeypatch.setattr("financial_economics.datasets.sources.paper.urlopen",
                         lambda *args, **kwargs: pytest.fail("Prices must not be fetched for invalid macro data"))
     with pytest.raises(ValueError, match="hash mismatch"):
         download_sources(tmp_path / "prices", macro_dir=folder)
@@ -66,8 +66,8 @@ def test_alternative_copies_and_hashes_raw_inputs_without_contacting_fred(tmp_pa
         requested.append(request.full_url)
         return BytesIO(raw)
 
-    monkeypatch.setattr("financial_economics.paper_sources.urlopen", fetch)
-    monkeypatch.setattr("financial_economics.paper_sources.YAHOO", {"equity_price": ("^GSPC", "S&PCOMP(PI)", "test")})
+    monkeypatch.setattr("financial_economics.datasets.sources.paper.urlopen", fetch)
+    monkeypatch.setattr("financial_economics.datasets.sources.paper.YAHOO", {"equity_price": ("^GSPC", "S&PCOMP(PI)", "test")})
     destination = tmp_path / "prices"
     download_sources(destination, macro_dir=macro)
     frame, metadata = load_sources(destination)

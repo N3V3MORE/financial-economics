@@ -4,8 +4,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from financial_economics.forecasting import ForecastData
-from financial_economics.paper_networks import _require_cuda, _training_scale, reconstruct_gru
+from financial_economics.models.variance import ForecastData
+from financial_economics.models.networks import _require_cuda, _training_scale, reconstruct_gru
 
 
 def _prepared(channels=5):
@@ -86,7 +86,7 @@ def test_tiny_cuda_raw_bv_refits_use_past_labels_and_save_independent_layers(tmp
 
 def test_network_pipeline_requires_cuda_without_creating_checkpoints(tmp_path, monkeypatch):
     fake_torch = SimpleNamespace(cuda=SimpleNamespace(is_available=lambda: False))
-    monkeypatch.setattr("financial_economics.gru_forecasting.importlib.import_module", lambda name: fake_torch)
+    monkeypatch.setattr("financial_economics.models.gpu.importlib.import_module", lambda name: fake_torch)
     prepared, calendar = _prepared()
     with pytest.raises(RuntimeError, match=r"CUDA:0.*CPU fallback is disabled"):
         reconstruct_gru(prepared, calendar, tmp_path / "missing_cuda", model_name="gru_multivar", folds=2)

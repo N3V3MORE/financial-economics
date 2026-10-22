@@ -1,6 +1,6 @@
 """Redraw the paper's Figures 3-7 from a saved U.S. reconstruction run.
 
-Example: python -m financial_economics.paper_figures --help
+Example: fecon paper-figures --help
 Reads verified outputs only; nothing is refitted. Every PNG is drawn from its
 saved figure_*.csv table, with no hidden plotting calculations.
 """

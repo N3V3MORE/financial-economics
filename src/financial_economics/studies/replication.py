@@ -1,6 +1,6 @@
 """Run isolated, reusable stages of the public-data U.S. reconstruction.
 
-Example: python -m financial_economics.paper_reconstruction classical --help
+Example: fecon paper-reconstruction classical --help
 Classical fits are CPU-native; GRU fits require cuda:0 via CUDA or ROCm, without CPU fallback.
 """
 

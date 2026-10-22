@@ -5,7 +5,7 @@ import json
 import pandas as pd
 import pytest
 
-from financial_economics.paper_sources import _past_values, _yahoo_close
+from financial_economics.datasets.sources.paper import _past_values, _yahoo_close
 
 
 def test_past_levels_preserve_observations_and_reject_future_or_stale_fill():

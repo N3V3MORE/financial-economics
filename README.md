@@ -55,7 +55,7 @@ with those inputs present and a new output directory:
 ```powershell
 $revisedArgs = @('--data-dir', 'data/paper-wrds-eia-20261021', '--returns-dir', 'data/protection-long-wrds-20261021', '--risklab-dir', 'data/risklab-spy-20261022', '--output-dir', 'outputs/revised-study-new')
 foreach ($stage in @('freeze', 'classical', 'gru_univar_log', 'gru_multivar_log', 'evaluate')) {
-    uv run --extra prediction --extra reconstruction python -m financial_economics.paper_revised $stage @revisedArgs
+    uv run --extra prediction --extra reconstruction fecon paper-revised $stage @revisedArgs
     if ($LASTEXITCODE -ne 0) { break }
 }
 ```
@@ -70,18 +70,19 @@ The later-year Risk Lab trial retains its separate staged entrypoint. Inspect it
 existing flags before running it against local sources:
 
 ```sh
-python -m financial_economics.risklab_study --help
+fecon risklab-study --help
 ```
 
 ## Code and development
 
 Implementation now follows seven responsibility groups: `datasets`, `settings`,
-`models`, `portfolio`, `evaluation`, `studies` and `reporting`. All old module and
-CLI entrypoints are retained, including `fecon`, `python -m financial_economics`
-and the existing module invocations. No methods, features or studies were removed.
-Configurations remain in `configs/`; existing snapshot paths, output paths and
-formats stay unchanged. [Project structure](docs/structure.md) maps every moved
-module to its canonical implementation.
+`models`, `portfolio`, `evaluation`, `studies` and `reporting`. Every study and
+source tool runs through `fecon` (or `python -m financial_economics`); the staged
+studies that were once run as separate modules are now `fecon` subcommands with the
+same options. No methods, features or studies were removed. Configurations remain
+in `configs/`; existing snapshot paths, output paths and formats stay unchanged.
+[Project structure](docs/structure.md) maps every former flat module to its
+grouped implementation.
 
 Use [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow and locked
 checks. Keep downloaded data and generated results local in the ignored `data/`

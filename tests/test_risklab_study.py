@@ -5,8 +5,8 @@ import pandas as pd
 import pytest
 
 from financial_economics.provenance import file_digest
-from financial_economics.risklab_study import univariate_inputs
-from financial_economics.volatility_proxy import load_risklab_bv
+from financial_economics.studies.recent import univariate_inputs
+from financial_economics.datasets.volatility import load_risklab_bv
 
 
 def test_missing_risklab_dates_stay_missing_and_targets_are_actual_t_plus_two():
@@ -47,7 +47,7 @@ def test_risklab_volatility_becomes_daily_variance_in_oxford_units(tmp_path):
 
 
 def test_history_before_2000_uses_french_dates_then_the_existing_calendar():
-    from financial_economics.risklab_study import market_calendar
+    from financial_economics.studies.recent import market_calendar
     observations = pd.DataFrame({"equity_price": 1.}, index=pd.bdate_range("2000-01-03", "2020-12-31"))
     returns = pd.DataFrame(index=pd.bdate_range("2020-06-01", "2025-12-31"))
     french = pd.bdate_range("1995-12-01", "2001-01-31")
@@ -63,8 +63,8 @@ def test_history_before_2000_uses_french_dates_then_the_existing_calendar():
 def test_defensive_assets_are_optional_and_default_matches_the_stock_cash_pilot():
     from pathlib import Path
 
-    from financial_economics.proxy_study import portfolio_settings
-    from financial_economics.risklab_study import trial_portfolio_settings
+    from financial_economics.studies.proxy import portfolio_settings
+    from financial_economics.studies.recent import trial_portfolio_settings
     config = Path("configs/paper-realistic.toml")
     assert trial_portfolio_settings(config, False) == portfolio_settings(config)
     defensive = trial_portfolio_settings(config, True)

@@ -7,8 +7,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from financial_economics import proxy_study as study
-from financial_economics.return_data import ReturnData
+from financial_economics.studies import proxy as study
+from financial_economics.datasets.returns import ReturnData
 
 
 def args_fixture(tmp_path):

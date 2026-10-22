@@ -5,12 +5,12 @@ import pytest
 import statsmodels.api as sm
 from statsmodels.stats.multitest import multipletests
 
-from financial_economics.config import Study, load_study
-from financial_economics.protection_config import ProtectionSettings, load_protection
-from financial_economics.protection_inference import infer_protection, describe_funds
-from financial_economics.protection import run_protection
-from financial_economics.return_data import ReturnData
-from financial_economics.explain import resample_rows
+from financial_economics.settings.study import Study, load_study
+from financial_economics.settings.protection import ProtectionSettings, load_protection
+from financial_economics.evaluation.protection import infer_protection, describe_funds
+from financial_economics.studies.protection import run_protection
+from financial_economics.datasets.returns import ReturnData
+from financial_economics.evaluation.attribution import resample_rows
 from pathlib import Path
 
 
@@ -84,7 +84,7 @@ def test_pipeline_preserves_monthly_identity_columns_and_fees(tmp_path):
     assert fees.query('cost_bps == 0').fees_per_initial_dollar.eq(0).all()
     assert (fees.query('cost_bps == 10').fees_per_initial_dollar > 0).any()
     assert result.tables["performance"].portfolio.nunique() == 6
-    from financial_economics.protection_report import write_protection
+    from financial_economics.reporting.protection import write_protection
     output = tmp_path / "results"
     write_protection(result, study, settings, {"sources": {"prices": {"provider": "Synthetic test"}}},
                      output, Path("configs/protection.toml"))

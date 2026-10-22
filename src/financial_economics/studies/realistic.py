@@ -1,6 +1,6 @@
 """Realistic trading test of saved reconstruction forecasts on one ETF snapshot.
 
-Example: python -m financial_economics.paper_realistic --help
+Example: fecon paper-realistic --help
 A forecast issued at close t trades at close t+1 and earns the t+2 return.
 Fees, observed cash income and past-only stress thresholds apply. Forecasts are
 never refitted. Portfolio accounting, HAC tests and the bootstrap run on CPU.

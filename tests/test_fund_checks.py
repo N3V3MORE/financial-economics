@@ -6,11 +6,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from financial_economics.analysis import monthly_equal_weight, monthly_fixed_weight
-from financial_economics.comparison import compare_portfolios
-from financial_economics.config import Study
-from financial_economics.costs import monthly_costed_path
-from financial_economics.fund_checks import check_funds, write_fund_checks
+from financial_economics.evaluation.metrics import monthly_equal_weight, monthly_fixed_weight
+from financial_economics.portfolio.controls import compare_portfolios
+from financial_economics.settings.study import Study
+from financial_economics.portfolio.execution import monthly_costed_path
+from financial_economics.portfolio.fund_checks import check_funds, write_fund_checks
 from financial_economics import cli
 
 

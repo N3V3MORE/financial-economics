@@ -9,10 +9,10 @@ import pandas as pd
 import pytest
 
 from financial_economics import cli
-from financial_economics.config import load_study
-from financial_economics.forecasting import ewma_forecasts, prepare_forecasts
-from financial_economics.prediction_config import load_prediction
-from financial_economics.return_data import ReturnData
+from financial_economics.settings.study import load_study
+from financial_economics.models.variance import ewma_forecasts, prepare_forecasts
+from financial_economics.settings.prediction import load_prediction
+from financial_economics.datasets.returns import ReturnData
 
 
 @pytest.fixture
@@ -47,9 +47,9 @@ windows = ["2017:2018"]
         assert kwargs == {"verified_monthly": True}
         return data
 
-    monkeypatch.setattr("financial_economics.return_data.load_returns", load_verified)
+    monkeypatch.setattr("financial_economics.datasets.returns.load_returns", load_verified)
     monkeypatch.setitem(sys.modules, "torch", None)
-    monkeypatch.setitem(sys.modules, "financial_economics.gru_forecasting", None)
+    monkeypatch.setitem(sys.modules, "financial_economics.models.gpu", None)
     study = load_study(config)
     settings = load_prediction(config, study)
     args = ["--config", str(config), "predict", "--data-dir", str(tmp_path / "snapshot")]
@@ -139,9 +139,9 @@ def test_missing_defensive_asset_fails_before_data_or_forecast_work(offline_pred
                                                                   monkeypatch, capsys):
     config, _, _, _, args = offline_prediction
     config.write_text(config.read_text(encoding="utf-8").replace('GLD = "Gold"\n', ""), encoding="utf-8")
-    monkeypatch.setattr("financial_economics.return_data.load_returns",
+    monkeypatch.setattr("financial_economics.datasets.returns.load_returns",
                         lambda *_args, **_kwargs: pytest.fail("Must validate before loading data"))
-    monkeypatch.setattr("financial_economics.forecasting.prepare_forecasts",
+    monkeypatch.setattr("financial_economics.models.variance.prepare_forecasts",
                         lambda *_args: pytest.fail("Must validate before preparing forecasts"))
     output = tmp_path / "missing-asset"
     assert cli.main([*args, "--output-dir", str(output), "--defensive-asset", "GLD"]) == 1

@@ -6,7 +6,6 @@ portfolios. Neural fitting requires cuda:0; EWMA/accounting are CPU-native.
 """
 
 import argparse
-from financial_economics._layout import code_matches
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -94,7 +93,7 @@ def run(args):
         return
     protocol_path = root / "protocol.json"
     frozen = json.loads(protocol_path.read_text(encoding="utf-8"))
-    if (frozen["inputs"] != inputs or not code_matches(frozen["code"], package_code_digests())
+    if (frozen["inputs"] != inputs or frozen["code"] != package_code_digests()
             or frozen["forecast_settings"] != FORECAST_SETTINGS or frozen["portfolio_settings"] != settings):
         raise ValueError("Proxy inputs, settings or calculation code changed after freezing.")
     destination = root / args.stage

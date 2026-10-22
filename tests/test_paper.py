@@ -9,10 +9,10 @@ import pandas as pd
 import pytest
 
 from financial_economics import cli
-from financial_economics.paper import (
+from financial_economics.studies.paper import (
     PaperSettings, load_bipower, load_paper_settings, paper_portfolios, prepare_paper_forecasts,
 )
-from financial_economics.return_data import ReturnData
+from financial_economics.datasets.returns import ReturnData
 
 
 def write_archive(path, dates, values):
@@ -132,10 +132,10 @@ lookback = 3
     returns = pd.DataFrame({"SPY": .01 * np.sin(np.arange(len(dates))),
                             "TLT": .002, "GLD": -.001}, index=dates)
     factors = pd.DataFrame({"RF": .001, "Mkt-RF": returns.SPY}, index=dates)
-    monkeypatch.setattr("financial_economics.paper.load_returns", lambda *a, **kw:
+    monkeypatch.setattr("financial_economics.studies.paper.load_returns", lambda *a, **kw:
                         ReturnData(returns, factors, dates[0], {}))
-    monkeypatch.setattr("financial_economics.paper.parse_french_factors", lambda _: factors)
-    monkeypatch.setattr("financial_economics.paper_gru.paper_gru_forecasts",
+    monkeypatch.setattr("financial_economics.studies.paper.parse_french_factors", lambda _: factors)
+    monkeypatch.setattr("financial_economics.models.paper_gru.paper_gru_forecasts",
                         lambda *a, **kw: pytest.fail("Baseline must not train"))
     destination = tmp_path / "new-run"
     args = ["--config", str(config), "paper", "--baseline-only", "--data-dir", str(source),

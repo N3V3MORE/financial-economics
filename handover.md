@@ -14,7 +14,7 @@ merged into `main`. See [October 22: GPU, data access and the Risk Lab
 trial](#october-22-gpu-data-access-and-the-risk-lab-trial).
 
 The methodology audit now has a separate matched implementation:
-`financial_economics.paper_revised`, with frozen settings in
+`fecon paper-revised`, with frozen settings in
 `outputs/revised-study-20261021/protocol.json`. It retains the original
 reconstruction and labels the revised historical comparisons exploratory.
 See the cross-reference table in `docs/final-study.md` and the runnable
@@ -269,7 +269,7 @@ was converted to daily variance in Oxford units (vol²/252) and used for every
 date: no Oxford labels, missing dates never filled. It was chosen before any
 results: closest to Oxford, no missing values, while quote-based series had
 implausible spikes (up to 890% annualized). Code: `load_risklab_bv`, a
-`--risklab-dir` option in `paper_revised`, and `risklab_study` (2022–2025;
+`--risklab-dir` option in `fecon paper-revised`, and `fecon risklab-study` (2022–2025;
 options `--defensive-assets` and `--history-start`).
 
 **Data checks.** Over 5,539 shared days Risk Lab and Oxford volatility levels
@@ -381,7 +381,7 @@ the richer GRU's macro inputs end in 2020, so it was not extended.
     (`scripts/compare_gru_backends.py`, `benchmarks/gru/*.json`), ending `eceb1cf`.
   - `miopen-gru-training`: from `5503ea0`; MIOpen default (`38772b1`),
     the cleanup session's shared provenance helpers and move of run configs
-    into `configs/` (`7066349`, logged in `docs/cleanup-log.md`), the
+    into `configs/` (`7066349`, logged in `docs/archive/cleanup-log.md`), the
     cross-machine comparison script (`9fb9959`) and TF32 off (`52c9745`).
   - `risklab-volatility-trial`: from `miopen-gru-training`; the
     Risk Lab trial (`ea3b4f1`, `60e5b36`) and this handover update.

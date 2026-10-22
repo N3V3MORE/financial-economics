@@ -7,8 +7,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from financial_economics.paper_evaluation import MODELS, _forecast_scores, _metrics, evaluate_paper
-from financial_economics.paper_sources import ASSETS
+from financial_economics.evaluation.replication import MODELS, _forecast_scores, _metrics, evaluate_paper
+from financial_economics.datasets.sources.paper import ASSETS
 
 
 def fixture():

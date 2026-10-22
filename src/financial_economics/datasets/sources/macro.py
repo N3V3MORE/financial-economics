@@ -1,6 +1,6 @@
 """Retain WRDS/FRED yields and official EIA Brent when direct FRED is unavailable.
 
-Run with ``python -m financial_economics.paper_macro_sources --output-dir PATH``.
+Run with ``fecon paper-macro-sources --output-dir PATH``.
 Downloads make one read-only WRDS query, retain raw evidence, and never fill
 missing observations or overwrite an existing snapshot.
 """

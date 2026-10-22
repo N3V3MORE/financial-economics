@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from financial_economics.analysis import (
+from financial_economics.evaluation.metrics import (
     capm_summary,
     drawdowns,
     monthly_equal_weight,

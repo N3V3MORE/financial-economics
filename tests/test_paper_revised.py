@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from financial_economics import paper_revised as revised
+from financial_economics.studies import historical as revised
 
 
 def inputs_fixture():
@@ -172,7 +172,7 @@ def test_freeze_never_overwrites_and_changed_code_requires_new_run(tmp_path, mon
 
 
 def test_staged_revision_evaluates_complete_returns_and_joint_exploratory_tests(tmp_path, monkeypatch):
-    from financial_economics.return_data import ReturnData
+    from financial_economics.datasets.returns import ReturnData
 
     observations, bv, _ = inputs_fixture()
     # A complete calendar year is required for the conditional monthly tests.
@@ -256,7 +256,7 @@ def test_issue_dates_whose_history_spans_a_missing_session_are_skipped():
 
 
 def test_segmented_arfima_matches_the_ungapped_estimator_and_never_bridges_gaps():
-    from financial_economics.paper_models import _arfima_forecast, _fractional_prediction
+    from financial_economics.models.classical import _arfima_forecast, _fractional_prediction
 
     _, bv, calendar = inputs_fixture()
     window = bv.iloc[:400]

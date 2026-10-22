@@ -7,9 +7,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from financial_economics import paper_macro_sources as macro
-from financial_economics.paper_sources import load_sources
-from financial_economics.wrds_source import WRDSError
+from financial_economics.datasets.sources import macro as macro
+from financial_economics.datasets.sources.paper import load_sources
+from financial_economics.datasets.sources.crsp import WRDSError
 
 
 def eia_html(rows, headers=("Week Of", "Mon", "Tue", "Wed", "Thu", "Fri")):

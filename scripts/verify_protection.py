@@ -7,8 +7,8 @@ import numpy as np
 import pandas as pd
 from scipy.stats import t
 
-from financial_economics.config import load_study
-from financial_economics.return_data import load_returns
+from financial_economics.settings.study import load_study
+from financial_economics.datasets.returns import load_returns
 
 
 def close(actual, expected):
