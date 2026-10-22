@@ -1,6 +1,8 @@
 """Draw the figures behind the Risk Lab findings summary from saved, hash-verified runs.
 
-Reads only finished outputs; it never fits a model. Example:
+Reads only finished outputs; it never fits a model. The three trial-* runs live on
+the local branch archive/trial-runs-20261022; restore them first with
+``git archive archive/trial-runs-20261022 outputs | tar -x``. Example:
 
     python scripts/make_findings_figures.py --main-run outputs/revised-risklab-20261022 \
         --late-run outputs/risklab-2022-2025-20261022 \

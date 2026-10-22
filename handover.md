@@ -394,7 +394,7 @@ the richer GRU's macro inputs end in 2020, so it was not extended.
 
 ## Where things are
 
-- **Branches (October 22, on GitHub):** `main` is `5db250c` and contains the
+- **Branches (October 22, on GitHub):** `main` contains the
   MIOpen default (`38772b1`), shared provenance helpers and the move of run
   configs into `configs/` (`7066349`, logged in `docs/archive/cleanup-log.md`),
   the cross-machine comparison script (`9fb9959`), TF32 off (`52c9745`), the
@@ -476,9 +476,12 @@ the richer GRU's macro inputs end in 2020, so it was not extended.
   training, using `.venv/Scripts/python.exe -m pytest -q -W error` with a
   workspace temporary directory. GPU tests skip without compatible CUDA or
   ROCm. `.venv/Scripts/ruff.exe check` passed.
-- **Trial outputs and logs (AMD machine only, ignored by Git):**
-  `outputs/trial-*-20261022` and `outputs/trial-logs/` (`run-trial.sh` holds
-  the commands). Rerunning elsewhere needs the Risk Lab download, whose source
+- **Trial outputs and logs (AMD machine only):** archived on the local branch
+  `archive/trial-runs-20261022`, never pushed because they contain returns
+  derived from licensed WRDS/CRSP data. Restore them byte for byte into
+  `outputs/` with `git archive archive/trial-runs-20261022 outputs | tar -x`
+  (`trial-logs/run-trial.sh` holds the commands). They predate `ebedece`'s
+  missing-date and EWMA rules, so current code does not reproduce them. Rerunning elsewhere needs the Risk Lab download, whose source
   URL and hash are in `data/risklab-spy-20261022/manifest.json`.
 - **Open next steps:** run the cross-machine comparison on NVIDIA; rerun the
   saved NVIDIA GRU stages with TF32 off; decide whether Risk Lab enters the
