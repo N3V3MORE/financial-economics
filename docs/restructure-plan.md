@@ -52,3 +52,11 @@ copies and report findings rather than editing the checkout.
 5. Address every material adversarial finding and repeat affected checks before
    declaring completion. Preserve a record of unavailable historical runs rather
    than claiming they were reproduced.
+
+## Completion evidence
+
+All implementation and verification steps are complete. See
+[Restructuring verification](restructure-verification.md) for the protected-file
+comparison, explicit live-job transitions, exact 877 saved-run and 450 synthetic
+table comparisons, 485 passing tests, packaging/command checks, adversarial fixes
+and coverage limits. No research feature or method changed.

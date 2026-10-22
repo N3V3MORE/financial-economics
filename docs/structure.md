@@ -40,8 +40,10 @@ are covered by regression tests. This support lives in `_compat.py`.
 
 `_layout.py` resolves original logical source names to their implementation
 files. `_relocation.json` records the exact source hashes before and after this
-reviewed move. New runs record the actual nested implementation, entry-point,
-helper and mapping hashes. A historical whole-package fingerprint is accepted
+reviewed move. Runs using whole-package provenance record the actual nested
+implementation, entry-point, helper and mapping hashes. Workflows with selected-
+module provenance retain that convention and hash the relocated implementation
+files. A historical whole-package fingerprint is accepted
 only while the entire Python package matches the reviewed after-state; later
 code changes invalidate that exception. Existing retired GPU-math fingerprints
 remain rejected. The original saved metadata is never rewritten.
