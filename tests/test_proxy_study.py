@@ -41,7 +41,7 @@ def test_proxy_stages_keep_all_later_returns_and_estimated_target_labels(tmp_pat
         bv, {"final_test_missing_dates": [], "calibration_last_label": "2013-12-31"}))
     monkeypatch.setattr(study, "load_daily_measures", lambda _: (pd.DataFrame(index=calendar), {}))
     monkeypatch.setattr(study, "identities", lambda _: {"fixed": "inputs"})
-    monkeypatch.setattr(study, "_code_identity", lambda: {"fixed": "code"})
+    monkeypatch.setattr(study, "package_code_digests", lambda: {"fixed": "code"})
     monkeypatch.setattr(study, "load_study", lambda _: None)
     monkeypatch.setattr(study, "load_returns", lambda *a, **k: ReturnData(daily, factors, calendar[0], {}))
 

@@ -6,8 +6,7 @@ missing observations or overwrite an existing snapshot.
 """
 
 import argparse
-from datetime import UTC, datetime
-from hashlib import sha256
+from datetime import datetime
 from html.parser import HTMLParser
 import json
 from pathlib import Path
@@ -18,6 +17,7 @@ from urllib.request import Request, urlopen
 import numpy as np
 import pandas as pd
 
+from .provenance import file_digest, utc_now
 from .wrds_source import WRDSError, connect_wrds
 
 
@@ -183,13 +183,13 @@ def download_macro_sources(destination):
                           "difference": "positive Brent spot price instead of WTI; avoids negative-price logarithms",
                           "units": "USD per barrel", "observations": len(oil),
                           "first": str(oil.index[0].date()), "last": str(oil.index[-1].date())}
-        metadata = {"created_at_utc": datetime.now(UTC).isoformat(), "sources": sources,
+        metadata = {"created_at_utc": utc_now(), "sources": sources,
                     "limitations": ["Contemporary historical snapshots are not point-in-time vintages",
                                     "WRDS inputs are licensed/private; retain raw observations locally",
                                     "WRDS FRB/FRED mirror has its own update vintage; current FRED byte equivalence is unverified",
                                     "DAAA has different credit quality and maturity from TRUCBYC",
                                     "EIA Brent replaces the direct FRED transport for DCOILBRENTEU"],
-                    "files": {path.name: sha256(path.read_bytes()).hexdigest() for path in output.iterdir()}}
+                    "files": {path.name: file_digest(path) for path in output.iterdir()}}
         (output / "manifest.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
         if destination.exists():
             raise FileExistsError("Macro-source destination appeared during download; refusing overwrite.")

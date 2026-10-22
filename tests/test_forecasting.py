@@ -71,7 +71,7 @@ def test_future_evaluation_returns_cannot_change_earlier_forecasts_or_selection(
 
 
 def test_prediction_config_preserves_snapshot_identity_and_freezes_valid_settings():
-    path = Path(__file__).resolve().parents[1] / "prediction.toml"
+    path = Path(__file__).resolve().parents[1] / "configs" / "prediction.toml"
     study = load_study(path)
     original = load_study(path.with_name("protection-long.toml"))
     assert study.settings() == original.settings()

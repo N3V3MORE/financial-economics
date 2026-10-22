@@ -54,8 +54,8 @@ Each control uses only returns before its evaluation period.
 
 ```sh
 uv run fecon fund-checks --data-dir data/public-review-20261019 --output-dir outputs/fund-checks-original
-uv run fecon --config study-commodities.toml download --data-dir data/commodities-20261020
-uv run fecon --config study-commodities.toml fund-checks --additions DBC --data-dir data/commodities-20261020 --output-dir outputs/fund-checks-commodities
+uv run fecon --config configs/study-commodities.toml download --data-dir data/commodities-20261020
+uv run fecon --config configs/study-commodities.toml fund-checks --additions DBC --data-dir data/commodities-20261020 --output-dir outputs/fund-checks-commodities
 ```
 
 The first command uses the recovered eight-fund snapshot. The other two use
@@ -83,8 +83,8 @@ means a shallower loss. This is a historical check, not a fund-ranking rule.
 
 The expanded study asks which funds help in stock-market declines **relative
 to cash**, and what growth and risk come with that choice. It preserves the
-original eight-fund work below. The frozen settings are in `protection.toml`
-(14 funds, 2015–2025) and `protection-long.toml` (SPY/TLT/GLD/DBC, 2007–2025).
+original eight-fund work below. The frozen settings are in `configs/protection.toml`
+(14 funds, 2015–2025) and `configs/protection-long.toml` (SPY/TLT/GLD/DBC, 2007–2025).
 Read the measured findings in [results-explained.md](docs/results-explained.md#which-additions-earned-their-place-relative-to-cash).
 
 The October 20, 2026 source decision was **WRDS / CRSP CIZ for both samples**.
@@ -96,12 +96,12 @@ No provider splice, missing-return filling, or public-data fallback was needed.
 
 ```sh
 uv sync --extra wrds
-uv run --extra wrds fecon --config protection.toml download --source wrds --verify-monthly --data-dir data/protection-wrds-20261020
-uv run --extra wrds fecon --config protection-long.toml download --source wrds --verify-monthly --data-dir data/protection-long-wrds-20261020
-uv run fecon --config protection.toml protection --data-dir data/protection-wrds-20261020 --output-dir outputs/protection-main-final
-uv run fecon --config protection-long.toml protection --data-dir data/protection-long-wrds-20261020 --output-dir outputs/protection-long-final
-uv run python scripts/verify_protection.py --config protection.toml --data-dir data/protection-wrds-20261020 --output-dir outputs/protection-main-final
-uv run python scripts/verify_protection.py --config protection-long.toml --data-dir data/protection-long-wrds-20261020 --output-dir outputs/protection-long-final
+uv run --extra wrds fecon --config configs/protection.toml download --source wrds --verify-monthly --data-dir data/protection-wrds-20261020
+uv run --extra wrds fecon --config configs/protection-long.toml download --source wrds --verify-monthly --data-dir data/protection-long-wrds-20261020
+uv run fecon --config configs/protection.toml protection --data-dir data/protection-wrds-20261020 --output-dir outputs/protection-main-final
+uv run fecon --config configs/protection-long.toml protection --data-dir data/protection-long-wrds-20261020 --output-dir outputs/protection-long-final
+uv run python scripts/verify_protection.py --config configs/protection.toml --data-dir data/protection-wrds-20261020 --output-dir outputs/protection-main-final
+uv run python scripts/verify_protection.py --config configs/protection-long.toml --data-dir data/protection-long-wrds-20261020 --output-dir outputs/protection-long-final
 ```
 
 Skip downloads when those snapshots already exist. Downloads and protection
@@ -166,7 +166,7 @@ Repository documentation contains aggregate findings, not licensed observations.
 
 ## Predict volatility, then compare ETF protection with cash
 
-`prediction.toml` extends the retained 2007–2025 SPY/TLT/GLD/DBC snapshot.
+`configs/prediction.toml` extends the retained 2007–2025 SPY/TLT/GLD/DBC snapshot.
 It adapts Kaczmarek, Będowska-Sójka, Grobelny and Perez (2022), “False Safe
 Haven Assets: Evidence From the Target Volatility Strategy Based on Recurrent
 Neural Network” ([paper](https://doi.org/10.1016/j.ribaf.2021.101610)).
@@ -179,14 +179,14 @@ EWMA selects one decay; the one-layer GRU selects hidden size and learning
 rate from the frozen small grid and averages five fixed seeds. Training ends
 in 2014, validation covers 2015–2016, and historical evaluation covers
 2017–2025. Annual refits use available targets only. GRU epochs are frozen
-after validation. All settings are explicit in `prediction.toml`.
+after validation. All settings are explicit in `configs/prediction.toml`.
 
 ```sh
-uv run fecon --config prediction.toml predict --ewma-only --data-dir data/protection-long-wrds-20261020 --output-dir outputs/prediction-ewma
+uv run fecon --config configs/prediction.toml predict --ewma-only --data-dir data/protection-long-wrds-20261020 --output-dir outputs/prediction-ewma
 uv sync --frozen --extra prediction
-uv run --extra prediction fecon --config prediction.toml predict --data-dir data/protection-long-wrds-20261020 --output-dir outputs/prediction-core
-uv run fecon --config prediction.toml predict --forecast-run outputs/prediction-core --defensive-asset GLD --data-dir data/protection-long-wrds-20261020 --output-dir outputs/prediction-gold
-uv run fecon --config prediction.toml predict --forecast-run outputs/prediction-core --defensive-asset DBC --data-dir data/protection-long-wrds-20261020 --output-dir outputs/prediction-commodities
+uv run --extra prediction fecon --config configs/prediction.toml predict --data-dir data/protection-long-wrds-20261020 --output-dir outputs/prediction-core
+uv run fecon --config configs/prediction.toml predict --forecast-run outputs/prediction-core --defensive-asset GLD --data-dir data/protection-long-wrds-20261020 --output-dir outputs/prediction-gold
+uv run fecon --config configs/prediction.toml predict --forecast-run outputs/prediction-core --defensive-asset DBC --data-dir data/protection-long-wrds-20261020 --output-dir outputs/prediction-commodities
 ```
 
 Skip downloads when the retained snapshot exists. Default `predict` trains
@@ -267,7 +267,7 @@ Previously inspected histories remain retrospective evidence, not unseen data.
 
 ## Closer replication of the paper's simpler GRU
 
-`paper.toml` and `fecon paper` keep the existing `predict` experiment intact.
+`configs/paper.toml` and `fecon paper` keep the existing `predict` experiment intact.
 This is a **partial GRU-UNIVAR replication with ETF substitutes**, not a claim
 to reproduce the paper's multivariate model or all thirteen assets.
 
@@ -289,8 +289,8 @@ before annual expanding refits for 2010–2020. This explicit small search is
 our choice because the authors' exact tuning settings/code are unavailable.
 
 ```sh
-uv run fecon --config paper.toml paper --baseline-only --oxford-archive data/paper-source-20261020/oxfordman-20220301.zip --data-dir data/protection-long-wrds-20261020 --output-dir outputs/paper-baseline
-uv run --extra prediction fecon --config paper.toml paper --oxford-archive data/paper-source-20261020/oxfordman-20220301.zip --data-dir data/protection-long-wrds-20261020 --output-dir outputs/paper-gru
+uv run fecon --config configs/paper.toml paper --baseline-only --oxford-archive data/paper-source-20261020/oxfordman-20220301.zip --data-dir data/protection-long-wrds-20261020 --output-dir outputs/paper-baseline
+uv run --extra prediction fecon --config configs/paper.toml paper --oxford-archive data/paper-source-20261020/oxfordman-20220301.zip --data-dir data/protection-long-wrds-20261020 --output-dir outputs/paper-gru
 ```
 
 Training requires verified `cuda:0` through CUDA or ROCm; no CPU fallback.
@@ -325,14 +325,14 @@ numerical comparison. No statistical superiority claim or new report is generate
 
 ## Extend the original volatility measure through 2021
 
-`paper-extension.toml` keeps Oxford SPX bipower variation and adds realistic
+`configs/paper-extension.toml` keeps Oxford SPX bipower variation and adds realistic
 trading assumptions. Evaluation covers 2010–2021; outputs also separate
 2010–2020, 2021, and the earlier experiment's overlapping 2017–2021 dates.
 The archive ends in February 2022, so this version makes no full 2022–2025 claim.
 
 ```sh
-uv run fecon --config paper-extension.toml paper-extension --baseline-only --oxford-archive data/paper-source-20261020/oxfordman-20220301.zip --data-dir data/protection-long-wrds-20261020 --output-dir outputs/paper-extension-baseline
-uv run --extra prediction fecon --config paper-extension.toml paper-extension --selection-run outputs/paper-gru-20261020 --oxford-archive data/paper-source-20261020/oxfordman-20220301.zip --data-dir data/protection-long-wrds-20261020 --output-dir outputs/paper-extension
+uv run fecon --config configs/paper-extension.toml paper-extension --baseline-only --oxford-archive data/paper-source-20261020/oxfordman-20220301.zip --data-dir data/protection-long-wrds-20261020 --output-dir outputs/paper-extension-baseline
+uv run --extra prediction fecon --config configs/paper-extension.toml paper-extension --selection-run outputs/paper-gru-20261020 --oxford-archive data/paper-source-20261020/oxfordman-20220301.zip --data-dir data/protection-long-wrds-20261020 --output-dir outputs/paper-extension
 ```
 
 `--selection-run` verifies the saved pre-2010 tuning evidence, then reuses its
@@ -368,8 +368,8 @@ To compare daily and weekly SPY/cash trading with the same saved forecasts,
 run each schedule into a new directory:
 
 ```sh
-uv run fecon --config paper-extension.toml paper-extension --forecast-run outputs/paper-extension-gru-20261020 --oxford-archive data/paper-source-20261020/oxfordman-20220301.zip --data-dir data/protection-long-wrds-20261020 --cash-only --rebalance-frequency daily --output-dir outputs/paper-frequency-daily-20261021
-uv run fecon --config paper-extension.toml paper-extension --forecast-run outputs/paper-extension-gru-20261020 --oxford-archive data/paper-source-20261020/oxfordman-20220301.zip --data-dir data/protection-long-wrds-20261020 --cash-only --rebalance-frequency weekly --output-dir outputs/paper-frequency-weekly-20261021
+uv run fecon --config configs/paper-extension.toml paper-extension --forecast-run outputs/paper-extension-gru-20261020 --oxford-archive data/paper-source-20261020/oxfordman-20220301.zip --data-dir data/protection-long-wrds-20261020 --cash-only --rebalance-frequency daily --output-dir outputs/paper-frequency-daily-20261021
+uv run fecon --config configs/paper-extension.toml paper-extension --forecast-run outputs/paper-extension-gru-20261020 --oxford-archive data/paper-source-20261020/oxfordman-20220301.zip --data-dir data/protection-long-wrds-20261020 --cash-only --rebalance-frequency weekly --output-dir outputs/paper-frequency-weekly-20261021
 ```
 
 Daily remains the default; `[extension].rebalance_frequency` can also set it.
@@ -386,7 +386,7 @@ CPU-native portfolio accounting and do not import PyTorch or retrain models.
 To skip small target changes, use the fixed five-percentage-point experiment:
 
 ```sh
-uv run fecon --config paper-extension.toml paper-extension --forecast-run outputs/paper-extension-gru-20261020 --oxford-archive data/paper-source-20261020/oxfordman-20220301.zip --data-dir data/protection-long-wrds-20261020 --cash-only --rebalance-frequency daily --min-allocation-change 0.05 --output-dir outputs/paper-allocation-change-5pp-20261021
+uv run fecon --config configs/paper-extension.toml paper-extension --forecast-run outputs/paper-extension-gru-20261020 --oxford-archive data/paper-source-20261020/oxfordman-20220301.zip --data-dir data/protection-long-wrds-20261020 --cash-only --rebalance-frequency daily --min-allocation-change 0.05 --output-dir outputs/paper-allocation-change-5pp-20261021
 ```
 
 After the first eligible entry, trade to the full new stock target only when
@@ -404,7 +404,7 @@ filtering is enabled. Five points is an illustrative fixed choice, not an
 optimized threshold; these previously examined years are not fresh validation.
 
 The research settings are frozen at local tag `frozen-gru-study-20261021`.
-The baseline is the explicit daily, zero-filter rule in `paper-extension.toml`:
+The baseline is the explicit daily, zero-filter rule in `configs/paper-extension.toml`:
 90th-percentile past-only stress threshold, 20% defensive cap and the existing
 risk/cost/cash scenarios. Reuse `outputs/paper-extension-gru-20261020`, with
 two GRU layers, 32 hidden units, 17 epochs and seeds 11/22/33. Its forecast
@@ -415,7 +415,7 @@ the model configuration's 2021 endpoint and all original forecasts.
 
 ## Reconstruct the paper's U.S. experiment
 
-`paper-reconstruction.toml` fixes the five published model families: ARFIMA,
+`configs/paper-reconstruction.toml` fixes the five published model families: ARFIMA,
 GARCH, GJR-GARCH, GRU-UNIVAR and GRU-MULTIVAR. The separate reconstruction
 uses 22-day histories, pre-2010 neural selection, annual GRU refits, daily
 classical refits and the 2010–2020 test period. Each model has a stock/cash
@@ -652,7 +652,7 @@ foreach ($stage in @('gru_univar_log', 'gru_multivar_log', 'evaluate_fixed')) {
 uv run python -m financial_economics.paper_realistic --data-dir data/protection-long-wrds-20261020 --forecast-run outputs/paper-public-new --output-dir outputs/paper-realistic-new
 ```
 
-`paper-realistic.toml` was fixed before the realistic run. It reuses the saved
+`configs/paper-realistic.toml` was fixed before the realistic run. It reuses the saved
 forecasts with no refitting, on verified WRDS/CRSP SPY, TLT, GLD and DBC total
 returns with French daily cash income. Reuse requires every selected forecast
 stage to record matching, valid SHA-256 hashes for its source manifest,
@@ -750,14 +750,14 @@ uv run python -m financial_economics.paper_figures --local-bonds --run-dir outpu
 
 **IEF in the realistic test.** IEF, the 7–10 year Treasury ETF, was the only
 proxy that helped all five models in the paper-style rebuild, but the frozen
-realistic test held only TLT, GLD and DBC. `paper-realistic-ief.toml` copies
-`paper-realistic.toml` and adds IEF as a descriptive secondary asset. Its WRDS
+realistic test held only TLT, GLD and DBC. `configs/paper-realistic-ief.toml` copies
+`configs/paper-realistic.toml` and adds IEF as a descriptive secondary asset. Its WRDS
 snapshot reproduces the existing SPY, TLT, GLD and DBC returns exactly, and
 every existing portfolio and test in the new run matches the frozen run.
 
 ```powershell
-uv run --extra wrds fecon --config paper-realistic-ief.toml download --source wrds --verify-monthly --data-dir data/protection-long-ief-wrds-20261021
-uv run python -m financial_economics.paper_realistic --config paper-realistic-ief.toml --data-dir data/protection-long-ief-wrds-20261021 --forecast-run outputs/paper-reconstruction-20261021 --output-dir outputs/paper-realistic-ief-20261021
+uv run --extra wrds fecon --config configs/paper-realistic-ief.toml download --source wrds --verify-monthly --data-dir data/protection-long-ief-wrds-20261021
+uv run python -m financial_economics.paper_realistic --config configs/paper-realistic-ief.toml --data-dir data/protection-long-ief-wrds-20261021 --forecast-run outputs/paper-reconstruction-20261021 --output-dir outputs/paper-realistic-ief-20261021
 ```
 
 ## See the original phase results
@@ -773,7 +773,7 @@ Open `outputs/page/index.html` in a browser. It is a single file with no outside
 ## Find your way around
 
 ```text
-study.toml                         Your ETFs, dates, and calculation settings
+configs/study.toml                 Your ETFs, dates, and calculation settings
     |
     v
 data/snapshot/                     Downloaded inputs, saved locally
@@ -783,6 +783,7 @@ src/financial_economics/           Python code
     |-- config.py                 Read the study settings
     |-- data.py                   Download, save, and validate the inputs
     |-- wrds_source.py            Private CRSP extracts and monthly reconciliation
+    |-- wrds_credentials.py       Keep one WRDS login in Windows Credential Manager
     |-- return_data.py            Provider-independent returns and complete months
     |-- analysis.py               Calculate returns, risk, and market exposure
     |-- report.py                 Write Phase 1 tables, charts, and the summary
@@ -813,6 +814,7 @@ src/financial_economics/           Python code
     |-- paper_gru.py              Its two-layer CUDA GRU
     |-- paper_extension.py        Same forecasts with delays, fees, and cash income
     |-- paper_sources.py          Public substitutes for the paper's U.S. series
+    |-- paper_macro_sources.py    Keep WRDS/FRED yields and EIA Brent when FRED is unavailable
     |-- paper_fx.py               Dated FX, or local currency, for the foreign bonds
     |-- paper_models.py           ARFIMA, GARCH, and GJR-GARCH forecasts
     |-- paper_networks.py         Raw-BV GRUs for the full rebuild
@@ -821,6 +823,9 @@ src/financial_economics/           Python code
     |-- paper_reconstruction.py   Run and reuse the rebuild's stages
     |-- paper_realistic.py        Realistic trading test of the saved forecasts
     |-- paper_figures.py          Redraw the paper's Figures 3–7
+    |-- paper_revised.py          Matched, positive, two-session forecasts and annual-risk diagnostics
+    |-- volatility_proxy.py       Estimate Oxford-like volatility from public intraday measures
+    |-- proxy_study.py            Exploratory 2022-2025 SPY/cash test on those estimates
     |
     |-- provenance.py             File hashes, git state, and timestamps for run records
     |-- cli.py                    Connect the commands
@@ -846,8 +851,8 @@ stages, so they are kept as frozen and excluded from style-only lint rules.
 |---|---|
 | `tests/` | Check calculations, data validation, and the commands using synthetic examples |
 | `scripts/` | The independent protection verifier and the supplement workbook refresher |
-| `supplement/` | The supplemental Excel workbook and the one-month T-bill cash illustration (R Markdown, its CSV, and rendered page) |
-| `*.toml` | Frozen settings for each study; each command reads one through `--config` |
+| `supplement/` | The supplemental Excel workbook and the one-month T-bill cash illustration (R Markdown, its CSV, and a static HTML summary) |
+| `configs/` | Frozen settings for each study; each command reads one through `--config` |
 | [docs/results-explained.md](docs/results-explained.md) | What the study has found, in plain language |
 | [docs/methodology.md](docs/methodology.md) | Formulas, sources, assumptions, and interpretation |
 | [docs/phase-1.md](docs/phase-1.md), [phase-2.md](docs/phase-2.md), [phase-3.md](docs/phase-3.md), [phase-4.md](docs/phase-4.md) | Each part's question, method, outputs, and checks |
@@ -856,11 +861,11 @@ stages, so they are kept as frozen and excluded from style-only lint rules.
 | `.github/workflows/tests.yml` | Run tests on Windows and Linux in GitHub Actions |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Collaborator access, branches, and pull requests |
 
-To change **what is studied**, edit `study.toml`. To change **how results are calculated**, start in `analysis.py`, `stress.py`, `comparison.py`, or `explain.py`. To change **how results are presented**, start in the matching `*_report.py` file.
+To change **what is studied**, edit `configs/study.toml`. To change **how results are calculated**, start in `analysis.py`, `stress.py`, `comparison.py`, or `explain.py`. To change **how results are presented**, start in the matching `*_report.py` file.
 
 ## Current settings and assumptions
 
-The study selects SPY, QQQ, VNQ, GLD, XLE, XLY, VIG, and TLT for January 1, 2010 through December 31, 2025. The exact settings live in `study.toml`.
+The study selects SPY, QQQ, VNQ, GLD, XLE, XLY, VIG, and TLT for January 1, 2010 through December 31, 2025. The exact settings live in `configs/study.toml`.
 
 - CAGR measures compounded growth; volatility measures total return variability. Sharpe uses daily excess returns.
 - The equal-weight portfolio resets monthly, with weights drifting between resets. Phases 1–4 omit costs and taxes; `fund-checks` includes explicit trading-cost scenarios and omits taxes.

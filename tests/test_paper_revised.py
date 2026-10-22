@@ -156,7 +156,7 @@ def test_freeze_never_overwrites_and_changed_code_requires_new_run(tmp_path, mon
     config.write_text('[reconstruction]\nlookback=3\n', encoding="utf-8")
     monkeypatch.setattr(revised, "_input_identity", lambda _: {"source": "fixed"})
     monkeypatch.setattr(revised, "_portfolio_settings", lambda _: {"risk_mode": "annual"})
-    monkeypatch.setattr(revised, "_code_identity", lambda: {"model": "original"})
+    monkeypatch.setattr(revised, "package_code_digests", lambda: {"model": "original"})
     args = Namespace(stage="freeze", config=config, output_dir=tmp_path / "run", data_dir=tmp_path / "source",
                      returns_dir=tmp_path / "returns", oxford_archive=tmp_path / "bv.zip")
     revised.run(args)
@@ -165,7 +165,7 @@ def test_freeze_never_overwrites_and_changed_code_requires_new_run(tmp_path, mon
     assert "history_calendar_days" not in frozen["forecast_settings"]
     with pytest.raises(ValueError, match="never overwritten"):
         revised.run(args)
-    monkeypatch.setattr(revised, "_code_identity", lambda: {"model": "changed"})
+    monkeypatch.setattr(revised, "package_code_digests", lambda: {"model": "changed"})
     args.stage = "classical"
     with pytest.raises(ValueError, match="changed after freezing"):
         revised.run(args)
@@ -196,7 +196,7 @@ def test_staged_revision_evaluates_complete_returns_and_joint_exploratory_tests(
                       'evaluation_start="2010-01-01"\nevaluation_end="2011-12-31"\ndm_hac_lags=5\n',
                       encoding="utf-8")
     monkeypatch.setattr(revised, "_input_identity", lambda _: {"source": "verified"})
-    monkeypatch.setattr(revised, "_code_identity", lambda: {"code": "frozen"})
+    monkeypatch.setattr(revised, "package_code_digests", lambda: {"code": "frozen"})
     monkeypatch.setattr(revised, "_portfolio_settings", lambda _: portfolio)
     monkeypatch.setattr(revised, "load_sources", lambda _: (observations, {}))
     monkeypatch.setattr(revised, "load_bipower", lambda *a: bv)

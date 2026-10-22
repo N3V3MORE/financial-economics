@@ -5,7 +5,6 @@ import json
 from pathlib import Path
 import platform
 import shutil
-import subprocess
 from tempfile import TemporaryDirectory
 
 import matplotlib
@@ -16,7 +15,7 @@ import numpy as np
 import pandas as pd
 
 from .forecasting import qlike
-from .provenance import file_digest, git_dirty, git_head, utc_now
+from .provenance import directory_digests, file_digest, git_state, package_code_digests, utc_now
 
 
 def load_forecast_run(directory, study, settings, manifest):
@@ -217,19 +216,13 @@ def write_prediction(result, study, settings, manifest, directory, config_path,
             shutil.copytree(Path(checkpoints), output / "checkpoints")
         provider = manifest.get("sources", {}).get("prices", {}).get("provider", "Unspecified provider")
         _figures(output, result, provider)
-        try:
-            commit = git_head()
-            dirty = git_dirty()
-        except (OSError, subprocess.CalledProcessError):
-            commit, dirty = "unavailable", None
-        module_dir = Path(__file__).parent
+        commit, dirty = git_state()
         metadata = {"created_at_utc": utc_now(),
                     "study": study.settings(), "prediction": settings.settings(),
                     "source_manifest": manifest, **result.metadata, **model_metadata,
                     "git_commit": commit, "git_dirty": dirty,
                     "config_sha256": file_digest(Path(config_path)),
-                    "code_sha256": {path.name: file_digest(path)
-                                    for path in sorted(module_dir.glob("*.py"))},
+                    "code_sha256": package_code_digests(),
                     "versions": {"python": platform.python_version(), **{name: version(name) for name in
                                  ("numpy", "pandas", "statsmodels", "matplotlib", "financial-economics")}},
                     "inference": {"primary_family_size": 3 if result.metadata["primary_inference"] else 0,
@@ -239,8 +232,7 @@ def write_prediction(result, study, settings, manifest, directory, config_path,
                     "figure_sources": {"forecast_accuracy.png": "figure_forecast_accuracy.csv",
                                        "growth_drawdowns.png": "figure_growth_drawdowns.csv",
                                        "protection.png": "figure_protection.csv"},
-                    "files": {path.relative_to(output).as_posix(): file_digest(path)
-                              for path in sorted(output.rglob("*")) if path.is_file()}}
+                    "files": directory_digests(output)}
         (output / "run.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
         if directory.exists():
             raise FileExistsError(f"Prediction output already exists: {directory}")

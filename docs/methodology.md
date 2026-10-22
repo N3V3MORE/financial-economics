@@ -2,7 +2,7 @@
 
 ## Scope and data
 
-The study uses the fixed instruments and dates in `study.toml`. These are retrospective choices of surviving instruments, not a rule for selecting funds using information available at the start of 2010. The study does not generalize automatically to all ETFs.
+The study uses the fixed instruments and dates in `configs/study.toml`. These are retrospective choices of surviving instruments, not a rule for selecting funds using information available at the start of 2010. The study does not generalize automatically to all ETFs.
 
 Yahoo Finance's `Adj Close`, retrieved through yfinance with `auto_adjust=False`, supplies the adjusted price series. This is a provider snapshot, not unmodified exchange data. Distributions and splits are reflected in its adjustments; do not add dividends again. Provider corrections may change a later download.
 
@@ -60,7 +60,7 @@ Raw snapshots and generated outputs are ignored by Git. The tests use synthetic 
 
 ## Expanded protection study: frozen design
 
-`protection.toml` freezes the union of the original eight funds and Jake's
+`configs/protection.toml` freezes the union of the original eight funds and Jake's
 twelve: SPY plus QQQ, IWF, SCHG, VUG, XLK, ARKK, XLE, XLY, VNQ, VIG, TLT,
 GLD, and DBC. January 2015–December 2025 is the common comparison; the
 2007–2025 SPY/TLT/GLD/DBC sample is separate and descriptive. The equal-weight

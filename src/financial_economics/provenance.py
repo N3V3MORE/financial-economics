@@ -11,6 +11,27 @@ def file_digest(path):
     return sha256(Path(path).read_bytes()).hexdigest()
 
 
+def package_code_digests():
+    """SHA-256 of every module in this package, keyed by file name."""
+    return {path.name: file_digest(path) for path in sorted(Path(__file__).parent.glob("*.py"))}
+
+
+def directory_digests(directory):
+    """SHA-256 of every file under a directory, keyed by its POSIX relative path."""
+    directory = Path(directory)
+    return {path.relative_to(directory).as_posix(): file_digest(path)
+            for path in sorted(directory.rglob("*")) if path.is_file()}
+
+
+def verify_files(directory, files, message):
+    """Raise ValueError(message) unless each recorded file is inside directory with its recorded SHA-256."""
+    directory = Path(directory).resolve()
+    for name, digest in files.items():
+        path = (directory / name).resolve()
+        if not path.is_relative_to(directory) or file_digest(path) != digest:
+            raise ValueError(message)
+
+
 def _git(*args):
     return subprocess.check_output(["git", *args], text=True).strip()
 
@@ -25,6 +46,14 @@ def git_head():
 
 def git_dirty():
     return bool(_git("status", "--porcelain"))
+
+
+def git_state():
+    """Commit and dirty flag, or ("unavailable", None) when git cannot be read."""
+    try:
+        return git_head(), git_dirty()
+    except (OSError, subprocess.CalledProcessError):
+        return "unavailable", None
 
 
 def utc_now():

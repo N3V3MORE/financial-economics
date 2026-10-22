@@ -81,9 +81,6 @@ select = ["E4", "E7", "E9", "F", "B", "UP", "RUF"]
 ignore = ["RUF001", "RUF002", "RUF003"]
 
 [tool.ruff.lint.per-file-ignores]
-# Matplotlib must select its non-interactive backend before pyplot is imported.
-"src/financial_economics/*_report.py" = ["E402"]
-"src/financial_economics/paper_figures.py" = ["E402"]
 # ctypes structures must declare _fields_ as plain class-level lists.
 "src/financial_economics/wrds_credentials.py" = ["RUF012"]
 # Saved reconstruction caches are reused only while these forecasting files keep

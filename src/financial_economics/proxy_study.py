@@ -17,8 +17,8 @@ from statsmodels.stats.multitest import multipletests
 from .config import load_study
 from .forecasting import ForecastData
 from .paper_realistic import _performance, _tests, load_realistic_settings, realistic_portfolios, sharpe_difference_test
-from .paper_revised import COSTS_BPS, _code_identity, _read_stage, matched_gru
-from .provenance import file_digest, utc_now
+from .paper_revised import COSTS_BPS, _read_stage, matched_gru
+from .provenance import directory_digests, file_digest, package_code_digests, utc_now
 from .return_data import load_returns
 from .volatility_proxy import load_accepted_proxy, load_daily_measures
 
@@ -75,7 +75,7 @@ def run(args):
     if args.stage == "freeze":
         if root.exists():
             raise ValueError("Freeze requires a new directory; outputs are never overwritten.")
-        frozen = {"created_at_utc": utc_now(), "inputs": inputs, "code": _code_identity(),
+        frozen = {"created_at_utc": utc_now(), "inputs": inputs, "code": package_code_digests(),
                   "forecast_settings": FORECAST_SETTINGS, "portfolio_settings": settings,
                   "model_choice": "single existing 32/32 architecture; no new width search; epochs selected on pre-2021 stopping blocks",
                   "target": "all dates are estimated BV, never presented as newly observed Oxford data",
@@ -93,7 +93,7 @@ def run(args):
         return
     protocol_path = root / "protocol.json"
     frozen = json.loads(protocol_path.read_text(encoding="utf-8"))
-    if (frozen["inputs"] != inputs or frozen["code"] != _code_identity()
+    if (frozen["inputs"] != inputs or frozen["code"] != package_code_digests()
             or frozen["forecast_settings"] != FORECAST_SETTINGS or frozen["portfolio_settings"] != settings):
         raise ValueError("Proxy inputs, settings or calculation code changed after freezing.")
     destination = root / args.stage
@@ -150,8 +150,7 @@ def run(args):
             table.to_csv(output / f"{name}.csv", index=not isinstance(table.index, pd.RangeIndex))
         record = {"created_at_utc": utc_now(), "stage": args.stage, "protocol_sha256": protocol_digest,
                   "model": metadata, "proxy_missing_dates_in_validation": proxy_metadata["final_test_missing_dates"],
-                  "files": {path.relative_to(output).as_posix(): file_digest(path)
-                            for path in sorted(output.rglob("*")) if path.is_file()}}
+                  "files": directory_digests(output)}
         (output / "run.json").write_text(json.dumps(record, indent=2, default=str) + "\n", encoding="utf-8")
         output.rename(destination)
     print(f"Saved proxy study stage: {destination}", flush=True)
@@ -163,7 +162,7 @@ def main(argv=None):
     parser.add_argument("--proxy-run", type=Path, required=True)
     parser.add_argument("--prices-dir", type=Path, required=True)
     parser.add_argument("--returns-dir", type=Path, required=True)
-    parser.add_argument("--portfolio-config", type=Path, default=Path("paper-realistic.toml"))
+    parser.add_argument("--portfolio-config", type=Path, default=Path("configs/paper-realistic.toml"))
     parser.add_argument("--output-dir", type=Path, required=True)
     args = parser.parse_args(argv)
     try:

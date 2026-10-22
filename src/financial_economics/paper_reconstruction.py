@@ -218,7 +218,7 @@ def run(args):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("stage", choices=(*STAGES, *LOG_STAGES, "evaluate", "evaluate_fixed", "evaluate_local"))
-    parser.add_argument("--config", type=Path, default=Path("paper-reconstruction.toml"))
+    parser.add_argument("--config", type=Path, default=Path("configs/paper-reconstruction.toml"))
     parser.add_argument("--data-dir", type=Path, required=True)
     parser.add_argument("--fx-dir", type=Path, help="Official H.10 snapshot; required for evaluation only")
     parser.add_argument("--oxford-archive", type=Path, required=True)

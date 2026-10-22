@@ -12,7 +12,7 @@ from financial_economics.paper_sources import ASSETS
 
 
 def fixture():
-    with Path("paper-reconstruction.toml").open("rb") as source:
+    with Path("configs/paper-reconstruction.toml").open("rb") as source:
         settings = tomllib.load(source)["reconstruction"]
     dates = pd.bdate_range("2010-01-04", periods=10)
     returns = pd.DataFrame({"EQUITY": [.1, -.08, .04, -.02, .03, -.01, .02, -.03, .01, -.02],

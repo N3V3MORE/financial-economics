@@ -15,7 +15,7 @@ from .costs import dynamic_costed_path
 from .data import parse_french_factors
 from .paper import load_bipower, load_paper_settings, prepare_paper_forecasts
 from .paper_realistic import _stress_thresholds
-from .provenance import file_digest, git_dirty, git_head, utc_now
+from .provenance import directory_digests, file_digest, git_dirty, git_head, package_code_digests, utc_now
 from .return_data import compound_months, load_returns
 
 
@@ -363,10 +363,8 @@ def run_extension_command(args, study):
                     "git_commit": git_head(),
                     "git_dirty": git_dirty(),
                     "config_sha256": file_digest(args.config),
-                    "code_sha256": {path.name: file_digest(path)
-                                    for path in sorted(Path(__file__).parent.glob("*.py"))},
-                    "files": {path.relative_to(output).as_posix(): file_digest(path)
-                              for path in sorted(output.rglob("*")) if path.is_file()}}
+                    "code_sha256": package_code_digests(),
+                    "files": directory_digests(output)}
         (output / "run.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
         if destination.exists():
             raise FileExistsError("Extension output already exists.")

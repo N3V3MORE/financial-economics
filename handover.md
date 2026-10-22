@@ -81,8 +81,8 @@ WRDS data is licensed. Raw data and outputs stay local and are ignored by Git.
 
 ## Key decisions
 
-- **Rules before results.** Every configuration (`paper-reconstruction.toml`,
-  `paper-realistic.toml` and the earlier ones) was fixed before its run.
+- **Rules before results.** Every configuration (`configs/paper-reconstruction.toml`,
+  `configs/paper-realistic.toml` and the earlier ones) was fixed before its run.
   Model settings were chosen with pre-2010 data only.
 - **Two versions of the paper.** The rebuild copies the paper's idealized
   rules: zero fees, zero cash interest, same-close trading, full-test stress

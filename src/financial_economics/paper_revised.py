@@ -28,7 +28,7 @@ from .paper_networks_log import _fit, _log_inputs, _log_predictions, _log_scale
 from .paper_realistic import (_declines, _performance, _tests, load_realistic_settings,
                               realistic_portfolios, sharpe_difference_test)
 from .paper_sources import _past_values, load_sources
-from .provenance import file_digest, git_dirty, git_head, utc_now
+from .provenance import directory_digests, file_digest, git_dirty, git_head, package_code_digests, utc_now, verify_files
 from .return_data import load_returns
 
 
@@ -233,10 +233,6 @@ def two_step_classical(rows, bv, price_returns, settings, progress=print):
     return result, pd.DataFrame(records)
 
 
-def _code_identity():
-    return {path.name: file_digest(path) for path in sorted(Path(__file__).parent.glob("*.py"))}
-
-
 def _input_identity(args):
     return {name: file_digest(path) for name, path in {
         "reconstruction_config": args.config, "portfolio_config": args.portfolio_config,
@@ -257,10 +253,7 @@ def _read_stage(root, stage, protocol_digest):
     metadata = json.loads((directory / "run.json").read_text(encoding="utf-8"))
     if metadata.get("protocol_sha256") != protocol_digest:
         raise ValueError("Revised stages must share the exact frozen protocol.")
-    for relative, digest in metadata["files"].items():
-        target = (directory / relative).resolve()
-        if not target.is_relative_to(directory.resolve()) or file_digest(target) != digest:
-            raise ValueError("Revised stage file does not match its saved hash.")
+    verify_files(directory, metadata["files"], "Revised stage file does not match its saved hash.")
     frame = pd.read_csv(directory / "forecasts.csv", index_col=0, parse_dates=True, float_precision="round_trip")
     for name in frame:
         if name.endswith("_asof") or name in ("trade_date", "return_date", "history_first", "history_last"):
@@ -280,7 +273,7 @@ def run(args):
     if args.stage == "freeze":
         if root.exists():
             raise ValueError("Freeze requires a new output directory; runs are never overwritten.")
-        protocol = {"created_at_utc": utc_now(), "inputs": identity, "code": _code_identity(),
+        protocol = {"created_at_utc": utc_now(), "inputs": identity, "code": package_code_digests(),
                     "forecast_settings": settings, "portfolio_settings": portfolio_settings,
                     "forecast_horizon": 2, "external_feature_lag_sessions": 1,
                     "evaluation_status": "exploratory revision of previously inspected historical data",
@@ -299,7 +292,7 @@ def run(args):
         return
     protocol_path = root / "protocol.json"
     protocol = json.loads(protocol_path.read_text(encoding="utf-8"))
-    if (protocol["inputs"] != identity or protocol["code"] != _code_identity()
+    if (protocol["inputs"] != identity or protocol["code"] != package_code_digests()
             or protocol["forecast_settings"] != settings):
         raise ValueError("Inputs or calculation code changed after freezing; create a separate revised run.")
     protocol_digest = file_digest(protocol_path)
@@ -378,8 +371,7 @@ def run(args):
             frame.to_csv(output / f"{name}.csv", index=not isinstance(frame.index, pd.RangeIndex))
         metadata = {"created_at_utc": utc_now(), "stage": args.stage, "protocol_sha256": protocol_digest,
                     "quality": quality, "model": model_metadata,
-                    "files": {path.relative_to(output).as_posix(): file_digest(path)
-                              for path in sorted(output.rglob("*")) if path.is_file()}}
+                    "files": directory_digests(output)}
         (output / "run.json").write_text(json.dumps(metadata, indent=2, default=str) + "\n", encoding="utf-8")
         output.rename(destination)
     print(f"Saved revised stage: {destination}", flush=True)
@@ -388,8 +380,8 @@ def run(args):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("stage", choices=("freeze", *STAGES))
-    parser.add_argument("--config", type=Path, default=Path("paper-reconstruction.toml"))
-    parser.add_argument("--portfolio-config", type=Path, default=Path("paper-realistic.toml"))
+    parser.add_argument("--config", type=Path, default=Path("configs/paper-reconstruction.toml"))
+    parser.add_argument("--portfolio-config", type=Path, default=Path("configs/paper-realistic.toml"))
     parser.add_argument("--data-dir", type=Path, required=True)
     parser.add_argument("--returns-dir", type=Path, required=True)
     parser.add_argument("--oxford-archive", type=Path, required=True)

@@ -3,7 +3,6 @@ from importlib.metadata import version
 import json
 from pathlib import Path
 import platform
-import subprocess
 from tempfile import TemporaryDirectory
 
 import matplotlib
@@ -13,7 +12,7 @@ from matplotlib.ticker import PercentFormatter
 import numpy as np
 import pandas as pd
 
-from .provenance import file_digest, git_dirty, git_head, utc_now
+from .provenance import file_digest, git_state, package_code_digests, utc_now
 
 
 def _save(fig, output, name):
@@ -135,16 +134,11 @@ def write_protection(result, study, settings, manifest, directory, config_path):
             table.to_csv(output / f"{name}.csv", index=indexed, float_format="%.17g", na_rep="NA")
         provider = manifest.get("sources", {}).get("prices", {}).get("provider", "Unspecified provider")
         _figures(output, study, settings, provider)
-        try:
-            commit = git_head()
-            dirty = git_dirty()
-        except (OSError, subprocess.CalledProcessError):
-            commit, dirty = "unavailable", None
-        module_dir = Path(__file__).parent
+        commit, dirty = git_state()
         run = {"created_at_utc": utc_now(), "study": study.settings(),
                "protection": settings.settings(), "source_manifest": manifest, **result.metadata,
                "git_commit": commit, "git_dirty": dirty,
-               "code_sha256": {p.name: file_digest(p) for p in sorted(module_dir.glob("*.py"))},
+               "code_sha256": package_code_digests(),
                "config_sha256": file_digest(Path(config_path)),
                "versions": {"python": platform.python_version(), **{name: version(name) for name in
                             ["numpy", "pandas", "statsmodels", "matplotlib", "financial-economics"]}},

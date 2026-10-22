@@ -15,7 +15,7 @@ import pandas as pd
 from scipy.optimize import minimize
 
 from .paper import load_bipower
-from .provenance import file_digest, utc_now
+from .provenance import file_digest, utc_now, verify_files
 
 
 FIELDS = ("permno", "date", "trade_qmle", "trade_order", "trade_se", "trade_rv5", "trade_rv15",
@@ -438,10 +438,7 @@ def load_accepted_proxy(directory):
     """Load only a hash-verified proxy that passed its stated accuracy/coverage gate."""
     directory = Path(directory)
     metadata = json.loads((directory / "run.json").read_text(encoding="utf-8"))
-    for name, digest in metadata["files"].items():
-        path = (directory / name).resolve()
-        if not path.is_relative_to(directory.resolve()) or file_digest(path) != digest:
-            raise ValueError("Proxy output does not match its recorded byte hashes.")
+    verify_files(directory, metadata["files"], "Proxy output does not match its recorded byte hashes.")
     if not metadata.get("passes_90_percent_volatility_gate"):
         raise ValueError("Proxy did not pass the 90% volatility accuracy and coverage gate.")
     if not metadata.get("passes_requested_accuracy_gate"):

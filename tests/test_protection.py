@@ -58,10 +58,10 @@ def test_undefined_is_not_zero_and_all_rows_stay_joint():
 
 
 def test_config_freezes_all_thirteen_tests():
-    study = load_study(Path("protection.toml"))
-    settings = load_protection(Path("protection.toml"), study)
+    study = load_study(Path("configs/protection.toml"))
+    settings = load_protection(Path("configs/protection.toml"), study)
     assert len(study.tickers) == 14 and settings.resamples == 10000
-    assert set(settings.fixed_portfolios["original_eight"]) == set(load_study(Path("study.toml")).tickers)
+    assert set(settings.fixed_portfolios["original_eight"]) == set(load_study(Path("configs/study.toml")).tickers)
 
 
 def test_pipeline_preserves_monthly_identity_columns_and_fees(tmp_path):
@@ -87,12 +87,12 @@ def test_pipeline_preserves_monthly_identity_columns_and_fees(tmp_path):
     from financial_economics.protection_report import write_protection
     output = tmp_path / "results"
     write_protection(result, study, settings, {"sources": {"prices": {"provider": "Synthetic test"}}},
-                     output, Path("protection.toml"))
+                     output, Path("configs/protection.toml"))
     assert len(list(output.glob("*.png"))) == 3
     figure = pd.read_csv(output / "figure_protection.csv")
     original = result.tables["fund_conditions"].query("condition == 'negative_spy'")
     np.testing.assert_allclose(figure.mean_minus_cash, original.mean_minus_cash)
     with pytest.raises(FileExistsError):
-        write_protection(result, study, settings, {}, output, Path("protection.toml"))
+        write_protection(result, study, settings, {}, output, Path("configs/protection.toml"))
     with pytest.raises(ValueError, match="dates"):
         run_protection(replace(data, factors=factors.iloc[1:]), study, settings)

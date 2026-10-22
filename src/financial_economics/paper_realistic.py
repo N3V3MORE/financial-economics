@@ -445,7 +445,7 @@ def run(args):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--config", type=Path, default=Path("paper-realistic.toml"))
+    parser.add_argument("--config", type=Path, default=Path("configs/paper-realistic.toml"))
     parser.add_argument("--data-dir", type=Path, required=True, help="Verified WRDS/CRSP ETF snapshot")
     parser.add_argument("--forecast-run", type=Path, required=True, help="Reconstruction output directory")
     parser.add_argument("--output-dir", type=Path, required=True)

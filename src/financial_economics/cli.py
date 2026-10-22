@@ -71,7 +71,7 @@ def _predict(args, study):
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--config", type=Path, default=Path("study.toml"))
+    parser.add_argument("--config", type=Path, default=Path("configs/study.toml"))
     commands = parser.add_subparsers(dest="command", required=True)
     download = commands.add_parser("download", help="Save a new source snapshot")
     download.add_argument("--data-dir", type=Path, default=Path("data/snapshot"))

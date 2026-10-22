@@ -334,7 +334,7 @@ longer check in `outputs/protection-long-final`. Each contains three PNG
 figures, their source tables, the full comparison tables, and `run.json`.
 Source extracts and detailed paths stay private and outside Git. The earlier
 original-eight outputs remain in `outputs/reproduced` and are reproducible
-with the original `study.toml` and its saved public snapshot.
+with the original `configs/study.toml` and its saved public snapshot.
 
 For the paper and professor discussion, lead with the distinction between
 **growth, protection relative to cash, and protection that changes by period**.
