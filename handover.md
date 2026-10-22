@@ -13,6 +13,10 @@ subcommands with their original options (`fecon paper-revised`,
 unchanged. Saved classical and GRU reconstruction stages remain reusable; saved
 matched-revision, proxy and Risk Lab runs need a fresh run because their
 whole-package code hash changed. See [Project structure](docs/structure.md).
+A full rerun on the AMD machine after the regrouping reproduced both final runs
+(`revised-risklab-20261022`, `risklab-2022-2025-20261022`) byte for byte: every
+forecast, table and all 81 GRU checkpoints; only timestamps and code hashes in
+the run records differ. The 11 findings figures also regenerate identically.
 
 **Earlier (October 22, later session):** AMD GRU training now uses MIOpen,
 GPU training runs with TF32 off, and the main study (`fecon paper-revised`)
