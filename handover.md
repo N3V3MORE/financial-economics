@@ -416,13 +416,14 @@ the richer GRU's macro inputs end in 2020, so it was not extended.
   Risk Lab trial (`ea3b4f1`, `60e5b36`), the Risk Lab main study (`ebedece`) and
   the grouped code layout (`971ca91`…`5db250c`). `miopen-gru-training`,
   `risklab-volatility-trial` and `volatility-prediction` are fully
-  merged. Still unmerged:
-  - `volatility-project-checkpoint` (`eceb1cf`): checkpoint `5503ea0`, then
-    the NVIDIA session's README/handover refresh and its GRU backend benchmark
-    (`scripts/compare_gru_backends.py`, `benchmarks/gru/*.json`). It edits
-    `README.md`, `handover.md` and modules under their former flat names, so
-    port it onto the grouped layout rather than merging it directly.
-  - `Possible-Future-Ideas-for-Depth` (`5d3c16a`).
+  merged. Still unmerged: `Possible-Future-Ideas-for-Depth` (`5d3c16a`).
+  `volatility-project-checkpoint` was deleted locally and on GitHub on
+  October 22 (tip `eceb1cf`). Compared with `main`, the only thing it held was a
+  GPU training-speed benchmark (`scripts/compare_gru_backends.py` and two
+  `benchmarks/gru/*.json` NVIDIA timing results). Its README/handover edits
+  described the old layout and are superseded. Recover it with
+  `git branch volatility-project-checkpoint eceb1cf` while that commit
+  still exists locally.
 - **Frozen GRU study tag:** `frozen-gru-study-20261021`, a local tag on the
   machine that made it; it is not on GitHub or on this machine.
 - **Fresh snapshot recorded on the AMD machine:** `data/protection-long-wrds-20261021` contained
@@ -501,10 +502,9 @@ the richer GRU's macro inputs end in 2020, so it was not extended.
   TF32 off (`outputs/full-run-20261022` on that machine, superseding the older
   NVIDIA GRU folders); Risk Lab as the main study's volatility source, described
   as an extension of the paper, not a replication; the working branches merged
-  into `main`.
-- **Open next steps:** decide whether to delete `volatility-project-checkpoint`
-  (`eceb1cf`, 3 commits not in `main`; its content appears to have been carried
-  into `main` but has not been compared line by line); fix five low-severity
+  into `main`; `volatility-project-checkpoint` deleted (tip `eceb1cf`,
+  held only the GPU timing benchmark).
+- **Open next steps:** fix five low-severity
   issues from the NVIDIA code review (a bare `KeyError` in `predict` when the
   defensive asset is missing, a hard-coded "eight years" in the attribution
   report, the missing 2007–09 row in the 2022–2025 table of `final-study.md`,
