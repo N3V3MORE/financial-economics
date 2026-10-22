@@ -44,26 +44,31 @@ def _gpu_metadata(torch, *, native_rnn=False, rnn_autograd_nodes=()):
                 "gpu": torch.cuda.get_device_name(0), "torch_version": str(torch.__version__),
                 "cuda_version": str(cuda) if cuda is not None else None,
                 "hip_version": str(hip) if hip is not None else None,
-                # On ROCm the cudnn namespace controls MIOpen, not NVIDIA cuDNN.
+                # PyTorch's cudnn namespace controls NVIDIA cuDNN on CUDA and MIOpen on ROCm.
                 "cudnn_available": bool(cudnn.is_available()) if not hip else False,
                 "cudnn_enabled": bool(cudnn.enabled) if not hip else None,
                 "cudnn_version": cudnn.version() if not hip else None,
+                "miopen_available": bool(cudnn.is_available()) if hip else False,
+                "miopen_enabled": bool(cudnn.enabled) if hip else None,
+                "miopen_version": cudnn.version() if hip else None,
                 "rnn_autograd_nodes": nodes,
                 "rnn_dispatch_observation": "first gradient-enabled forward per saved fitted model; "
                                             "inference dispatch not observed",
                 "rnn_backend_selection": "native GPU; vendor RNN disabled" if native_rnn
                                          else "PyTorch dispatch according to enabled libraries and inputs",
-                "cudnn_used": None}
+                "cudnn_used": False if hip else None, "miopen_used": None if hip else False}
+    vendor, used = ("MIOpen", "miopen_used") if hip else ("cuDNN", "cudnn_used")
+    native = "native ROCm/HIP" if hip else "native CUDA"
+    vendor_node = "MiopenRnnBackward" if hip else "CudnnRnnBackward"
     if native_rnn:
-        metadata["rnn_backend"] = ("native ROCm/HIP; MIOpen disabled" if hip
-                                   else "native CUDA; cuDNN disabled")
-        metadata["cudnn_used"] = False
-    elif nodes and all(name.startswith("CudnnRnnBackward") for name in nodes) and not hip:
-        metadata["rnn_backend"] = "cuDNN (observed training forward)"
-        metadata["cudnn_used"] = True
-    elif nodes and all(name.startswith("StackBackward") for name in nodes) and not hip:
-        metadata["rnn_backend"] = "native CUDA (observed training forward)"
-        metadata["cudnn_used"] = False
+        metadata["rnn_backend"] = f"{native}; {vendor} disabled"
+        metadata[used] = False
+    elif nodes and all(name.startswith(vendor_node) for name in nodes):
+        metadata["rnn_backend"] = f"{vendor} (observed training forward)"
+        metadata[used] = True
+    elif nodes and all(name.startswith("StackBackward") for name in nodes):
+        metadata["rnn_backend"] = f"{native} (observed training forward)"
+        metadata[used] = False
     else:
         metadata["rnn_backend"] = "unknown; no recognized training dispatch evidence"
     return metadata
@@ -88,12 +93,16 @@ def _native_rnn(torch):
 
 
 def _uses_native_rnn(torch):
-    """ROCm needs PyTorch's native GPU RNN because MIOpen's Windows compiler fails."""
-    return bool(getattr(torch.version, "hip", None))
+    """Vendor RNN kernels by default; FINANCIAL_ECONOMICS_NATIVE_RNN=1 forces the native GPU path.
+
+    Windows MIOpen compiles its RNN kernels with the Visual Studio C++ headers, so ROCm
+    machines without the Build Tools can opt back into the native HIP path.
+    """
+    return os.environ.get("FINANCIAL_ECONOMICS_NATIVE_RNN") == "1"
 
 
 def _rnn_kernels(torch):
-    """cuDNN RNN kernels on NVIDIA CUDA; the native GPU path on ROCm."""
+    """cuDNN RNN kernels on NVIDIA CUDA and MIOpen on ROCm, unless the native path is forced."""
     return _native_rnn(torch) if _uses_native_rnn(torch) else nullcontext()
 
 

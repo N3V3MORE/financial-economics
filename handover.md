@@ -114,10 +114,12 @@ WRDS data is licensed. Raw data and outputs stay local and are ignored by Git.
 - **No data splicing.** Providers are never mixed within one return series;
   missing values are never filled.
 - **Scope.** An international robustness run was started, then removed as out of scope.
-- **cuDNN for GRU training.** On NVIDIA, all GRUs train with cuDNN (about
-  five times faster). The one-input paper GRU is built as two single-layer
+- **Vendor RNN kernels for GRU training.** GRUs train with the GPU vendor's
+  RNN library: cuDNN on NVIDIA (about five times faster) and MIOpen on AMD
+  ROCm (about two times faster). The one-input paper GRU is built as two single-layer
   GRUs, which is the same network, to avoid a Windows cuDNN shutdown crash.
-  Forecasts differ slightly from the earlier native-kernel runs.
+  Forecasts differ slightly from the earlier native-kernel runs. Setting
+  `FINANCIAL_ECONOMICS_NATIVE_RNN=1` forces PyTorch's native GPU RNN instead.
 
 ## Comparison with the paper (2010–2020, the paper's rules)
 
@@ -264,14 +266,26 @@ in other settings.
   are absent on this machine; the recorded checks were not repeated here.
 - **AMD training:** Radeon 8060S on Windows runs PyTorch 2.11.0 + ROCm 7.14.1.
   Native HIP GRU probes passed forward/backward, Adam updates, exact same-seed
-  repetition and checkpoint reload. MIOpen's Windows RNN compiler failed on
-  a missing `type_traits` header, so ROCm uses the native GPU RNN path.
+  repetition and checkpoint reload. MIOpen's Windows RNN compiler first failed
+  on a missing `type_traits` header: it borrows the C++ standard headers from
+  Visual Studio. Installing Visual Studio 2022 Build Tools (C++ workload and
+  Windows 11 SDK 10.0.26100) fixed it on 2026-10-22, so ROCm now trains with
+  MIOpen 3.5.2 by default. Without those Build Tools, set
+  `FINANCIAL_ECONOMICS_NATIVE_RNN=1` to keep the native HIP path. The first
+  MIOpen fit compiles its kernels (about 15 seconds); later runs use the cache.
+  With the project's deterministic settings, MIOpen repeated same-seed fits
+  exactly, and its forecasts stayed within 2e-7 relative of native HIP with
+  the same early-stopping epochs. Training steps were 1.9-2.5 times faster at
+  hidden sizes 16 and 32. Runs before this change used native HIP.
   Run and checkpoint metadata identify ROCm and its HIP version. Future runs
-  also separate NVIDIA cuDNN availability, enabled flag and version from
-  observed training-forward dispatch; inference dispatch remains unobserved.
+  also record NVIDIA cuDNN and AMD MIOpen availability, enabled flag and
+  version separately from observed training-forward dispatch; inference
+  dispatch remains unobserved.
   Archived run metadata stays unchanged. Exact reviewed metadata-only code
   hash transitions preserve retained raw/log forecast reuse; arbitrary model
-  changes still fail the cache guard.
+  changes still fail the cache guard. The MIOpen change to
+  `gru_forecasting.py` was reviewed as metadata-only for those caches, which
+  were trained with NVIDIA cuDNN; both earlier reviewed digests still match.
   That AMD environment included the locked `prediction-rocm`, `reconstruction`
   and `wrds` extras; use `prediction-rocm` in AMD training commands. This
   machine's current validation uses NVIDIA CUDA.

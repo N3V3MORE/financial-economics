@@ -218,13 +218,17 @@ and [PyTorch's HIP device semantics](https://docs.pytorch.org/docs/2.11/notes/hi
 An earlier October 21 local validation passed 335 tests, including seven GPU
 tests, with warnings treated as errors. Separate model probes verified
 forward/backward computation, Adam updates, exact same-seed repetition and
-checkpoint reload on Radeon 8060S. ROCm GRUs use native HIP operations to
-avoid the observed Windows MIOpen compiler failure. Run and checkpoint
-metadata record the actual runtime and HIP version. Future runs also record
-NVIDIA cuDNN availability, its enabled flag and version separately from
-observed training-forward dispatch. Inference dispatch is not observed;
-unrecognized training evidence is labelled unknown. ROCm's native HIP path
-is identified separately, and archived runs gain no invented metadata.
+checkpoint reload on Radeon 8060S. ROCm GRUs train with MIOpen, about twice
+as fast as native HIP. On Windows, MIOpen compiles its RNN kernels with the
+C++ headers from Visual Studio 2022 Build Tools (C++ workload and Windows 11
+SDK). Without them it fails with `'type_traits' file not found`; set
+`FINANCIAL_ECONOMICS_NATIVE_RNN=1` to train with native HIP operations
+instead. Run and checkpoint metadata record the actual runtime and HIP
+version. Future runs also record NVIDIA cuDNN and AMD MIOpen availability,
+enabled flag and version separately from observed training-forward
+dispatch. Inference dispatch is not observed; unrecognized training evidence
+is labelled unknown. Native GPU paths are identified separately, and
+archived runs gain no invented metadata.
 Deterministic training does not imply identical forecasts across different
 GPU runtimes.
 
@@ -294,8 +298,8 @@ This small GRU is built as two single-layer GRUs with dropout between them,
 which equals one two-layer GRU with the same starting weights. cuDNN's own
 two-layer dropout crashes Windows processes at shutdown, so this shape lets
 NVIDIA GPUs use cuDNN (about five times faster; forecasts differ slightly
-from the October 2026 native-kernel runs). ROCm keeps native HIP kernels to
-avoid MIOpen compilation failures. The EWMA baseline,
+from the October 2026 native-kernel runs). ROCm uses MIOpen in the same
+way. The EWMA baseline,
 calendar preparation, and portfolio accounting are CPU-native. SPY, TLT,
 and GLD total returns substitute for the paper's Datastream indices. Each
 model runs a stock/cash portfolio and nine threshold/cap combinations per
@@ -427,7 +431,8 @@ On NVIDIA GPUs these GRUs train with cuDNN, about five times faster than
 native kernels; repeated runs match each other, but forecasts differ slightly
 from the October 21, 2026 run, which used native kernels. Their two
 single-layer GRUs keep dropout outside cuDNN, avoiding the shutdown crash
-described above. ROCm keeps native HIP kernels.
+described above. ROCm trains them with MIOpen, about twice as fast as
+native HIP; runs before October 22, 2026 used native HIP.
 These results compare complete model configurations; isolating the value
 of extra inputs requires a separate study with matched training histories
 and validation folds. The existing settings and forecasts are preserved.

@@ -22,15 +22,19 @@ STAGES = ("classical", "gru_univar", "gru_multivar")
 LOG_STAGES = ("gru_univar_log", "gru_multivar_log")
 
 # Exact reviewed transitions add dispatch provenance only; model math is unchanged.
-# Any later edit requires a fresh review and cannot pass these fixed digest pairs.
+# Any later edit requires a fresh review and cannot pass these fixed digests.
+# Each file maps its reviewed original digests to the one current digest. The later
+# gru_forecasting.py review records MIOpen flags and makes it the ROCm default; NVIDIA
+# cuDNN training, which produced the archived caches, is unchanged.
 METADATA_ONLY_CODE_TRANSITIONS = {
-    "gru_forecasting.py": ("e55887f5c820fc4467f45c9762f193110b3193617de188933e1ca59d36fffd41",
-                           "5be8eadf6d8ecc4fcef2599abf326d70de1a6488d2469622d39f388ed145dd83"),
-    "paper_gru.py": ("565e94d2bbd433118dc41fee67b849cf5504c3489f5f5a75dd528ce37bba2564",
+    "gru_forecasting.py": (("e55887f5c820fc4467f45c9762f193110b3193617de188933e1ca59d36fffd41",
+                            "5be8eadf6d8ecc4fcef2599abf326d70de1a6488d2469622d39f388ed145dd83"),
+                           "b2212cfc04e89aca6d0886edb780c0dbf35a57d84cbe1a478323d141d37bb213"),
+    "paper_gru.py": (("565e94d2bbd433118dc41fee67b849cf5504c3489f5f5a75dd528ce37bba2564",),
                      "b0dee9a9a30a773ddd79405fe22124ca56156022729d516c509894da90f951da"),
-    "paper_networks.py": ("0018d3d7645ac02e9031a2a4bc87c812bdb48d81ed3cfa3b76ecac7b7d24184e",
+    "paper_networks.py": (("0018d3d7645ac02e9031a2a4bc87c812bdb48d81ed3cfa3b76ecac7b7d24184e",),
                           "80ca9710081bed0aaee1d2dfc07c5546e98b3949d265798f7cbe16d12c073dd1"),
-    "paper_networks_log.py": ("6e132375daa7c3e2cf774a2924071ab97ff43abf126112c66cf6b86c1f36f5c6",
+    "paper_networks_log.py": (("6e132375daa7c3e2cf774a2924071ab97ff43abf126112c66cf6b86c1f36f5c6",),
                               "185a93030c3a780fe0d3ad16ab48578a126206b9e75d13cf52372a614d7c2865"),
 }
 
@@ -65,10 +69,12 @@ def _read_stage(directory, identity, stage):
                     if name != "paper_reconstruction.py"}
     compatible_code = {
         name: {"original_sha256": metadata["code"].get(name), "current_sha256": digest,
-               "reason": "reviewed metadata-only addition: cuDNN library flags/version and "
+               "reason": "reviewed metadata-only addition: cuDNN/MIOpen library flags/version and "
                          "first training-forward dispatch evidence; model math unchanged"}
         for name, digest in dependencies.items()
-        if (metadata["code"].get(name), digest) == METADATA_ONLY_CODE_TRANSITIONS.get(name)
+        if name in METADATA_ONLY_CODE_TRANSITIONS
+        and metadata["code"].get(name) in METADATA_ONLY_CODE_TRANSITIONS[name][0]
+        and digest == METADATA_ONLY_CODE_TRANSITIONS[name][1]
     }
     if (metadata["inputs"] != identity
             or any(metadata["code"].get(name) != digest and name not in compatible_code
