@@ -23,13 +23,11 @@ LOG_STAGES = ("gru_univar_log", "gru_multivar_log")
 
 # Exact reviewed transitions add dispatch provenance only; model math is unchanged.
 # Any later edit requires a fresh review and cannot pass these fixed digests.
-# Each file maps its reviewed original digests to the one current digest. The later
-# gru_forecasting.py review records MIOpen flags and makes it the ROCm default; NVIDIA
-# cuDNN training, which produced the archived caches, is unchanged.
+# Each file maps its reviewed original digests to the one current digest.
+# gru_forecasting.py has no entry: turning off NVIDIA TF32 changed cuDNN training math,
+# so GRU stages cached by any earlier version (e55887f5..., 5be8eadf..., b2212cfc...)
+# need a fresh run.
 METADATA_ONLY_CODE_TRANSITIONS = {
-    "gru_forecasting.py": (("e55887f5c820fc4467f45c9762f193110b3193617de188933e1ca59d36fffd41",
-                            "5be8eadf6d8ecc4fcef2599abf326d70de1a6488d2469622d39f388ed145dd83"),
-                           "b2212cfc04e89aca6d0886edb780c0dbf35a57d84cbe1a478323d141d37bb213"),
     "paper_gru.py": (("565e94d2bbd433118dc41fee67b849cf5504c3489f5f5a75dd528ce37bba2564",),
                      "b0dee9a9a30a773ddd79405fe22124ca56156022729d516c509894da90f951da"),
     "paper_networks.py": (("0018d3d7645ac02e9031a2a4bc87c812bdb48d81ed3cfa3b76ecac7b7d24184e",),

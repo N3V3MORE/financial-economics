@@ -75,6 +75,24 @@ def test_metadata_only_transitions_never_accept_the_current_digest_as_an_origina
         assert originals and current not in originals and len(set(originals)) == len(originals)
 
 
+
+@pytest.mark.parametrize("retired", [
+    "e55887f5c820fc4467f45c9762f193110b3193617de188933e1ca59d36fffd41",
+    "5be8eadf6d8ecc4fcef2599abf326d70de1a6488d2469622d39f388ed145dd83",
+    "b2212cfc04e89aca6d0886edb780c0dbf35a57d84cbe1a478323d141d37bb213",
+])
+@pytest.mark.parametrize("stage", ["gru_univar", "gru_multivar_log"])
+def test_gru_caches_from_before_tf32_was_disabled_need_a_fresh_run(tmp_path, monkeypatch, stage, retired):
+    assert "gru_forecasting.py" not in reconstruction.METADATA_ONLY_CODE_TRANSITIONS
+    current = reconstruction._code_hashes(stage)
+    assert current["gru_forecasting.py"] != retired
+    archived = current | {"gru_forecasting.py": retired}
+    with monkeypatch.context() as archiving:
+        archiving.setattr(reconstruction, "_code_hashes", lambda _: archived)
+        _, identity = snapshot(tmp_path, stage=stage)
+    with pytest.raises(ValueError, match="inputs or model code changed"):
+        reconstruction._read_stage(tmp_path, identity, stage)
+
 @pytest.mark.parametrize("stage", ["gru_univar", "gru_multivar_log"])
 def test_metadata_compatibility_still_rejects_arbitrary_code_or_file_changes(tmp_path, monkeypatch, stage):
     _, identity = snapshot(tmp_path, stage=stage, legacy_metadata=-1)

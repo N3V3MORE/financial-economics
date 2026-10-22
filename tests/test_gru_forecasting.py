@@ -76,7 +76,8 @@ def test_gpu_metadata_records_the_runtime_behind_the_cuda_api(runtime, cuda, hip
     torch = SimpleNamespace(__version__="2.11.0", version=SimpleNamespace(cuda=cuda, hip=hip),
                             cuda=SimpleNamespace(get_device_name=device_name),
                             backends=SimpleNamespace(cudnn=SimpleNamespace(
-                                enabled=True, is_available=lambda: True, version=lambda: 91002)))
+                                enabled=True, is_available=lambda: True, version=lambda: 91002, allow_tf32=False),
+                                cuda=SimpleNamespace(matmul=SimpleNamespace(allow_tf32=False))))
     metadata = _gpu_metadata(torch, native_rnn=native_rnn)
     assert metadata["backend"] == f"{runtime}-required PyTorch"
     assert metadata["device"] == "cuda:0" and requested_devices == [0]
@@ -91,6 +92,7 @@ def test_gpu_metadata_records_the_runtime_behind_the_cuda_api(runtime, cuda, hip
     assert metadata["cudnn_used"] is (False if native_rnn or hip else None)
     assert metadata["miopen_used"] is (False if native_rnn or not hip else None)
     assert metadata["rnn_autograd_nodes"] == []
+    assert metadata["cudnn_allow_tf32"] is False and metadata["matmul_allow_tf32"] is False
     if native_rnn:
         assert metadata["rnn_backend"] == rnn_backend
     else:
@@ -112,7 +114,8 @@ def test_vendor_rnn_use_requires_dispatch_evidence_even_when_enabled(hip, node, 
     torch = SimpleNamespace(__version__="2.11.0", version=SimpleNamespace(cuda=None if hip else "13.0", hip=hip),
                             cuda=SimpleNamespace(get_device_name=lambda _: "synthetic GPU"),
                             backends=SimpleNamespace(cudnn=SimpleNamespace(
-                                enabled=True, is_available=lambda: True, version=lambda: 91002)))
+                                enabled=True, is_available=lambda: True, version=lambda: 91002, allow_tf32=False),
+                                cuda=SimpleNamespace(matmul=SimpleNamespace(allow_tf32=False))))
     model = SimpleNamespace()
     output = SimpleNamespace(grad_fn=type(node, (), {})() if node else None)
     _record_rnn_dispatch(model, output)
@@ -190,6 +193,8 @@ def test_tiny_cuda_pipeline_saves_checkpoints_and_preserves_earlier_forecasts(tm
     pd.testing.assert_frame_equal(tuning, changed_tuning)
     assert metadata["refit_epochs"] == changed_metadata["refit_epochs"]
     assert metadata["device"] == "cuda:0"
+    # Full float32 precision on NVIDIA: TF32 must be off for every GPU fit.
+    assert metadata["cudnn_allow_tf32"] is False and metadata["matmul_allow_tf32"] is False
     assert metadata["backend"] == ("ROCm-required PyTorch" if torch.version.hip else "CUDA-required PyTorch")
     assert metadata["hip_version"] == torch.version.hip
     vendor = "MIOpen" if torch.version.hip else "cuDNN"

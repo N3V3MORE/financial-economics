@@ -230,7 +230,12 @@ dispatch. Inference dispatch is not observed; unrecognized training evidence
 is labelled unknown. Native GPU paths are identified separately, and
 archived runs gain no invented metadata.
 Deterministic training does not imply identical forecasts across different
-GPU runtimes.
+GPU runtimes. GPU training runs in full float32 precision: NVIDIA's TF32
+mode is off for cuDNN and matrix products, and run metadata records both
+flags. Saved reconstruction GRU stages made before October 22, 2026 used
+TF32 on NVIDIA and need a fresh run. To check how closely two GPUs agree,
+run `scripts/compare_gpu_backends.py compare scripts/gpu-backend-reference/miopen`
+on the second machine.
 
 The current suite passes 392 tests with warnings treated as errors, including
 the matched-model GPU checks on NVIDIA CUDA. The earlier 335-test result above is

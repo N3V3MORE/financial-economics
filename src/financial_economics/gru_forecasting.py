@@ -30,6 +30,10 @@ def _require_cuda():
     torch.use_deterministic_algorithms(True)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
+    # Full float32 precision: NVIDIA TF32 rounds cuDNN RNN and matmul inputs to a 10-bit
+    # mantissa, which widened cuDNN-versus-native training gaps without speeding these GRUs.
+    torch.backends.cudnn.allow_tf32 = False
+    torch.backends.cuda.matmul.allow_tf32 = False
     return torch, device
 
 
@@ -51,6 +55,8 @@ def _gpu_metadata(torch, *, native_rnn=False, rnn_autograd_nodes=()):
                 "miopen_available": bool(cudnn.is_available()) if hip else False,
                 "miopen_enabled": bool(cudnn.enabled) if hip else None,
                 "miopen_version": cudnn.version() if hip else None,
+                "cudnn_allow_tf32": bool(cudnn.allow_tf32),
+                "matmul_allow_tf32": bool(torch.backends.cuda.matmul.allow_tf32),
                 "rnn_autograd_nodes": nodes,
                 "rnn_dispatch_observation": "first gradient-enabled forward per saved fitted model; "
                                             "inference dispatch not observed",

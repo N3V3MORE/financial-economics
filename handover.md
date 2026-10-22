@@ -120,6 +120,19 @@ WRDS data is licensed. Raw data and outputs stay local and are ignored by Git.
   GRUs, which is the same network, to avoid a Windows cuDNN shutdown crash.
   Forecasts differ slightly from the earlier native-kernel runs. Setting
   `FINANCIAL_ECONOMICS_NATIVE_RNN=1` forces PyTorch's native GPU RNN instead.
+- **Full float32 precision (TF32 off).** From 2026-10-22, GPU training turns
+  off NVIDIA's TF32 mode for cuDNN and matrix products; run metadata records
+  both flags. On the RTX 5060 Ti benchmark this narrowed cuDNN-versus-native
+  training gaps 10-1,000 fold at the same speed. AMD forecasts are unchanged
+  to the last digit. NVIDIA GRU forecasts made earlier used TF32, so saved
+  reconstruction GRU stages need a fresh run; the cache guard now refuses them.
+- **Comparing results across GPUs.** Runs on different GPUs or libraries are
+  not expected to match exactly. Treat one setup as the reference for headline
+  results and the others as robustness checks. Judge agreement on what is
+  reported (QLIKE, Holm decisions, portfolio figures), not raw forecast digits,
+  against the spread between seeds. A training curve can briefly separate at a
+  sharp turn even with TF32 off: the GPU-backend benchmark's five-input seed-33
+  case split at steps 96-99 on both NVIDIA and AMD, then rejoined.
 
 ## Comparison with the paper (2010–2020, the paper's rules)
 
@@ -284,8 +297,9 @@ in other settings.
   Archived run metadata stays unchanged. Exact reviewed metadata-only code
   hash transitions preserve retained raw/log forecast reuse; arbitrary model
   changes still fail the cache guard. The MIOpen change to
-  `gru_forecasting.py` was reviewed as metadata-only for those caches, which
-  were trained with NVIDIA cuDNN; both earlier reviewed digests still match.
+  `gru_forecasting.py` was first reviewed as metadata-only for those caches,
+  which were trained with NVIDIA cuDNN. Turning TF32 off then changed NVIDIA
+  training math, so GRU stages cached before it need a fresh run.
   That AMD environment included the locked `prediction-rocm`, `reconstruction`
   and `wrds` extras; use `prediction-rocm` in AMD training commands. This
   machine's current validation uses NVIDIA CUDA.
