@@ -28,8 +28,8 @@ erode most models' before-fee edge. The GRUs forecast volatility best under
 QLIKE, significantly so against EWMA and GARCH, but that did not turn into
 reliably better portfolios. Long Treasuries were the worst storm-day asset in
 2022–2025, when bonds fell with stocks. These conclusions hold with Oxford-Man
-or Risk Lab data; the sign of timing's 2022–2025 Sharpe advantage does not
-survive a change in missing-date handling.
+or Risk Lab data. The sign of timing's 2022–2025 Sharpe advantage, however, does
+not survive a change in missing-date handling.
 
 ## 1. Is Risk Lab a fair substitute for Oxford-Man?
 
@@ -59,7 +59,7 @@ forecast is issued until 22 complete sessions are available again.
 
 ![Accuracy rank by target and loss](figures/risklab/03_accuracy_rank_by_metric.png)
 
-Two review points are addressed here:
+Two measurement choices change the ranking:
 
 - **Different targets (Hansen–Lunde).** GARCH and GJR forecast close-to-close
   variance, which includes the overnight move; the other models forecast
@@ -78,7 +78,7 @@ Results, 2011–2020, 2,447 days with both targets observed:
 | Variance MSE | ARFIMA | GJR, then GARCH | None |
 | Volatility MSE (not robust) | One-input GRU | One-input GRU | GRU beats GARCH and GJR (intraday) |
 
-The reviewer's reversal reproduces: variance MSE favours ARFIMA, volatility
+The ranking flips with the loss: variance MSE favours ARFIMA, volatility
 MSE the GRU. On the close-to-close target GARCH and GJR rank first and second
 by variance MSE, so their poor intraday showing was partly a target mismatch.
 The defensible claim is the narrow one: **the one-input GRU has the lowest
@@ -118,7 +118,7 @@ slow 2015–16 fall (EWMA −13.9% against −10.2%).
 
 Before fees every timing strategy beats its fixed mix (Sharpe 0.86–0.88
 against 0.80). Costs erode that: at 0.25% per dollar traded only EWMA, which
-trades least, stays ahead (0.82 against 0.79); GARCH and GJR fall to 0.63.
+trades least, stays ahead (0.82 against 0.79). GARCH and GJR fall to 0.63.
 
 ## 5. Did the safe assets help? (2022–2025)
 
@@ -137,10 +137,10 @@ but no test survives Holm adjustment.
 ## 6. What changes with the missing-date rule
 
 Risk Lab lacks 8 market days in 2000–2020 (including February 5–9, 2018) and
-20 scattered days in 2021–2025. The review asked that no model treat
-observations either side of a gap as adjacent lags. The current code issues a
-forecast only when all 22 history sessions are observed; ARFIMA restarts its
-filter at every gap. In 2011–2020 that skips 71 of about 2,500 issue dates.
+20 scattered days in 2021–2025. In the main runs no model treats observations
+either side of a gap as adjacent lags: the current code issues a forecast only
+when all 22 history sessions are observed, and ARFIMA restarts its filter at
+every gap. In 2011–2020 that skips 71 of about 2,500 issue dates.
 In 2022–2025 it removes a fresh signal on 30% of days, because each scattered
 gap blocks the next 22 sessions; the portfolio then holds its last position.
 
@@ -182,20 +182,26 @@ Non-significance does not establish equivalence.
   with bipower variation, so this is an extension of the paper, not a
   replication. Cite the October 22, 2026 download and the hash in its manifest.
 - The missing 2018 crash week is unlikely to be random.
-- 2022–2025 had already been examined in an earlier pilot; only data after
+- 2022–2025 had already been examined in an earlier pilot. Only data after
   2025 would be untouched.
 - Taxes are excluded; fees are scenarios.
 
 ## Reproduce
 
-Runs (AMD machine; `data/` and `outputs/` stay local):
+These commands produced the main 2011–2020 and 2022–2025 runs on an AMD GPU; the
+Oxford-Man comparison in section 1 uses the October 22 trial runs. Run them in an
+environment with the `prediction-rocm` (or `prediction`) and `reconstruction`
+extras, for example after `uv sync --frozen --extra prediction-rocm --extra
+reconstruction` and activating `.venv`. The original runs named the list `$args`;
+it is `$inputs` here because `$args` is reserved in PowerShell. `data/` and
+`outputs/` stay local.
 
 ```powershell
-$args = @('--data-dir', 'data/paper-wrds-eia-20261021', '--returns-dir', 'data/protection-long-wrds-20261021', '--risklab-dir', 'data/risklab-spy-20261022')
+$inputs = @('--data-dir', 'data/paper-wrds-eia-20261021', '--returns-dir', 'data/protection-long-wrds-20261021', '--risklab-dir', 'data/risklab-spy-20261022')
 foreach ($s in 'freeze', 'classical', 'gru_univar_log', 'gru_multivar_log', 'evaluate') {
-    fecon paper-revised $s @args --output-dir outputs/revised-risklab-20261022 }
+    fecon paper-revised $s @inputs --output-dir outputs/revised-risklab-20261022 }
 foreach ($s in 'freeze', 'forecast', 'evaluate') {
-    fecon risklab-study $s @args --defensive-assets --output-dir outputs/risklab-2022-2025-20261022 }
+    fecon risklab-study $s @inputs --defensive-assets --output-dir outputs/risklab-2022-2025-20261022 }
 ```
 
 Figures: the command in the docstring of `scripts/make_findings_figures.py`.

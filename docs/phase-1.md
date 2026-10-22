@@ -34,7 +34,7 @@ The universe is a retrospective selection of surviving funds. Results apply to t
 
 ## Later phases
 
-[Phase 2](phase-2.md) now compares benchmark-defined downturns and recovery, with changing correlations. Remaining extensions include efficient-frontier optimization and CAL construction, chronological out-of-sample evaluation with transaction costs, and optional factor-model extensions. Crypto, leveraged/volatility products, DCF, and dividend-discount valuation remain separate extensions.
+[Phase 2](phase-2.md) now compares benchmark-defined downturns and recovery, with changing correlations. Possible extensions include efficient-frontier optimization and CAL construction, chronological out-of-sample evaluation with transaction costs, and factor models. Crypto, leveraged/volatility products, DCF, and dividend-discount valuation could be later extensions.
 
 ## Status
 
@@ -47,4 +47,4 @@ Implemented and locally verified on October 15, 2026:
 - All four rendered figures were inspected for labels, units, clipping, and readability.
 - GitHub Actions is configured for Windows and Linux; its execution status is reported on the pull request.
 
-Downloaded snapshots and generated outputs remain local and ignored by Git. Each collaborator can reproduce the study using the README commands.
+Downloaded snapshots and generated outputs stay local and are ignored by Git. Each collaborator can reproduce the study using the README commands.

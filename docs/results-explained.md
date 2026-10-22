@@ -11,14 +11,14 @@ multiple-testing adjustment**. Gold had the most promising observed result,
 but substantial uncertainty remains. Bonds' protection changed sharply by
 period; growth funds added growth rather than protection on this measure.
 The [expanded findings below](#which-additions-earned-their-place-relative-to-cash)
-use 2015–2025 and a separate 2007–2025 check. The original 2010–2025 public-data
-results remain the motivation and are preserved in the following sections.
+use 2015–2025 and a separate 2007–2025 check. The earlier 2010–2025 public-data
+results, which motivated that study, follow.
 
 The eight-fund mix was calmer than SPY over the historical sample. Phase 3 shows
 why that alone is not enough to call it a better portfolio: holding some cash
 also reduces stock-market risk, and that simpler alternative performed well.
 
-These numbers describe the retained snapshot. Reproduce the supporting reports
+These numbers describe the saved snapshot. Reproduce the supporting reports
 with `fecon analyze`, `fecon stress`, and `fecon compare`.
 
 ## How the three phases connect
@@ -186,7 +186,7 @@ DBC and the original eight funds were downloaded together on October 20, so
 both sides of this comparison use the same prices and dates. The common-fund
 metrics differ from the recovered snapshot by less than 0.001 percentage
 points. Source manifests, full daily returns, and all comparison rows are
-retained in `outputs/fund-checks-original` and `outputs/fund-checks-commodities`.
+saved in `outputs/fund-checks-original` and `outputs/fund-checks-commodities`.
 The original reruns are in `outputs/reproduced/phase1` through `phase4`.
 
 ## Earlier removal-study follow-up
@@ -310,7 +310,7 @@ allowed 0–100% SPY range. Training betas ranged from 0.464 to 1.105; realized
 portfolio betas in evaluation ranged from 0.547 to 1.257. Consequently these
 controls do not all match the portfolios' realized stock exposure, let alone
 every form of risk. Their estimates, targets, realized exposures, and results
-are retained rather than concealed behind a generic “risk matched” label.
+are reported in full instead of behind a generic “risk matched” label.
 
 ## Evidence, limits, and the next decision
 
@@ -318,7 +318,7 @@ Both samples passed exact daily coverage and CRSP daily/monthly reconciliation.
 The maximum differences were 0.0555 basis points for the main sample and
 0.0433 for the longer sample, below the one-basis-point threshold. No public
 fallback or provider splice was used. Historical identifiers, ETF classifications,
-duplicates, flags, units, and source hashes were checked. Two existing
+duplicates, flags, units, and source hashes were checked. Two earlier
 alignment bugs were repaired: cash dates must match portfolio dates, and
 contribution weights are aligned by both date and asset.
 

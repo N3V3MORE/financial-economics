@@ -2,13 +2,13 @@
 
 ## Objective
 
-Ask whether the existing equal-weight mix held up better than SPY during major declines, and whether gold and long-duration bonds moved differently from equities as market conditions changed.
+Ask whether the Phase 1 equal-weight mix held up better than SPY during major declines, and whether gold and long-duration bonds moved differently from equities as market conditions changed.
 
 ## Scope
 
-Use the retained Phase 1 daily returns and the same monthly portfolio. Select every non-overlapping SPY episode reaching a 10% decline from a previous peak. Compare losses over identical dates, measure recovery from the common SPY trough, and plot correlations using 63 trailing daily observations.
+Use the Phase 1 daily returns and the same monthly portfolio. Select every non-overlapping SPY episode reaching a 10% decline from a previous peak. Compare losses over identical dates, measure recovery from the common SPY trough, and plot correlations using 63 trailing daily observations.
 
-There is no new fund selection, optimized weighting, transaction-cost model, or out-of-sample trading test in this phase. The selected funds, dates, zero-cost assumption, and monthly rebalancing rule remain the Phase 1 baseline.
+There is no new fund selection, optimized weighting, transaction-cost model, or out-of-sample trading test in this phase. The funds, dates, zero-cost assumption, and monthly rebalancing rule are those of Phase 1.
 
 ## Method
 
@@ -25,7 +25,7 @@ The 10% threshold defines the historical sample; it is not an entry signal. Peak
 
 1. **Episode calculations:** test selection, common-window returns, recovery dates, and unfinished episodes on small synthetic paths.
 2. **Outputs:** add an offline command, inspectable CSVs, same-date loss and recovery figures, rolling correlations, and a plain-language report with recorded settings and definitions.
-3. **Verification:** run the retained real snapshot, inspect figures, independently check selected episodes, and repeat the analysis offline to check reproducibility.
+3. **Verification:** run the saved real snapshot, inspect figures, independently check selected episodes, and repeat the analysis offline to check reproducibility.
 
 ## Done when
 
@@ -59,15 +59,15 @@ Outputs are `episodes.csv`, `episode_comparison.csv`, `rolling_correlations.csv`
 Implemented and locally verified on October 15, 2026:
 
 - All 63 synthetic and workflow tests passed with warnings treated as errors.
-- The retained, hash-checked snapshot produced eight qualifying SPY episodes and sixteen comparison rows across 4,024 daily observations.
-- An independent reconstruction from the retained adjusted prices matched the monthly portfolio, all episode dates and losses, recovery dates and durations, and censoring. Checks using `numpy.corrcoef` agreed with 109 selected trailing windows across all eight correlation series to within 6e-13.
+- The hash-checked snapshot produced eight qualifying SPY episodes and sixteen comparison rows across 4,024 daily observations.
+- An independent reconstruction from the saved adjusted prices matched the monthly portfolio, all episode dates and losses, recovery dates and durations, and censoring. Checks using `numpy.corrcoef` agreed with 109 selected trailing windows across all eight correlation series to within 6e-13.
 - An offline repeat reproduced all three CSVs, run metadata, and the summary byte for byte in the locked environment.
 - All three figures were inspected for readable dates, units, legends, and clipping.
 
 The mix lost less over all eight common peak-to-trough windows. It regained the common starting value sooner in seven episodes and on the same date in the 2022 episode. These results do not isolate diversification from differences in market exposure, and do not estimate future protection.
 
-Verification was local on Windows. The branch has not been pushed, so hosted checks have not run for these changes.
+Verification was local on Windows. Hosted checks had not run when this phase was written.
 
 ## After Phase 2
 
-[Phase 3](phase-3.md) compares the existing mix with a SPY/cash portfolio whose target is calibrated using 2010–2017 and frozen for evaluation over 2018–2025. It reuses this phase's 10% SPY episode and recovery definitions. Because the dataset and funds had already been inspected, the comparison is a chronological historical evaluation. Trading costs and taxes remain zero for this controlled comparison; optimization and cost modelling remain later work.
+[Phase 3](phase-3.md) compares the equal-weight mix with a SPY/cash portfolio whose target is calibrated using 2010–2017 and frozen for evaluation over 2018–2025. It reuses this phase's 10% SPY episode and recovery definitions. Because the dataset and funds had already been inspected, the comparison is a chronological historical evaluation. Trading costs and taxes are zero in this controlled comparison. Optimization and cost modelling are later work.

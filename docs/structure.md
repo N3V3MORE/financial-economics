@@ -1,18 +1,14 @@
 # Project structure
 
-The implementation is organized by responsibility under
-`src/financial_economics/`. Every study and source tool runs through `fecon`
-(or `python -m financial_economics`). The staged studies and source tools that were
-once run as `python -m financial_economics.<module>` are `fecon` subcommands with
-the same options, listed below. The former flat module names are no longer
-importable; they survive only as provenance names in run records.
+The code in `src/financial_economics/` is grouped by responsibility. Every study
+and data tool runs through `fecon` (or `python -m financial_economics`). Studies
+that used to run as `python -m financial_economics.<module>` are now `fecon`
+subcommands with the same options, listed below. The old flat module names are no
+longer importable. They appear only as file names in older run records.
 
-This is a move and import refactor. No methods, features or studies were removed.
-Calculations, model settings, training rules, random seeds, calendars, allocation
-rules, fees and statistical conventions retain their existing behavior. The
-original phases, protection study, daily-return prediction experiment, paper
-replications, extensions, methodology revision and Risk Lab work remain available.
-The project does not introduce a new model or study in this restructuring.
+The regrouping in October 2026 moved code without changing any calculation. A full
+rerun of the two final Risk Lab studies afterwards matched the saved results byte
+for byte, apart from timestamps and code hashes in the run records.
 
 ## Responsibility groups
 
@@ -26,17 +22,16 @@ The project does not introduce a new model or study in this restructuring.
 | `studies/` | Experiment orchestration and staged workflows |
 | `reporting/` | Tables, charts, reports and the original combined page |
 
-`datasets` is separate from local downloaded snapshots in the repository's `data/`
-directory. The CLI stays at the package root in `cli.py`; `__main__.py` supports
-`python -m financial_economics`, and `fecon` is the installed command. Shared
-provenance helpers remain at the root in `provenance.py`.
+The `datasets` package is code. Downloaded snapshots live in the top-level `data/`
+directory. The command line is `cli.py`, installed as `fecon`, and `__main__.py`
+lets `python -m financial_economics` run it too. Run-record helpers are in
+`provenance.py`.
 
 ## Provenance after the move
 
-Run records name modules by their original flat filenames, for example
-`paper_gru.py`. `_layout.py` maps each name to its grouped file, and
-`_relocation.json` records each file's exact hash just before and after the
-reviewed move. Whole-package provenance records the hash of every package module
+Run records name modules by their old flat filenames, for example `paper_gru.py`.
+`_layout.py` maps each name to its grouped file, and `_relocation.json` records
+each file's hash just before and after the move. Whole-package provenance records the hash of every package module
 and the mapping file, so any code change requires a fresh run, as before the move.
 Selected-module provenance (the reconstruction's saved forecasts) accepts a
 pre-move digest while that module still matches its own post-move hash, so edits
@@ -48,10 +43,9 @@ identities survive Windows/Linux checkouts and wheel installation.
 
 ## Module map
 
-Each former name below is relative to `financial_economics`, as is each module.
-For example, the former `paper_revised` is now `studies.historical` and runs as
-`fecon paper-revised` with its original options. The complete command reference
-is in [Commands and study reference](commands.md).
+Names below are relative to `financial_economics`. For example, the old
+`paper_revised` is now `studies.historical` and runs as `fecon paper-revised`. Every
+command is in [Commands and study reference](commands.md).
 
 | `fecon` subcommand | Module |
 |---|---|
@@ -157,17 +151,17 @@ is in [Commands and study reference](commands.md).
 | `pyproject.toml`, `uv.lock` | Package entrypoints, dependencies, extras and locked environment |
 | `.github/workflows/tests.yml` | Windows and Linux CI checks |
 
-The module move does not relocate configurations, snapshots or saved results.
-Run commands from the project root so their existing relative paths keep working.
+Run commands from the project root: configuration, data and output paths are
+relative to it.
 
 ## Where to start a change
 
 Follow source transport or validation into `datasets`, configuration loading into
 `settings`, forecasts into `models`, allocation and fees into `portfolio`, and
 metrics or tests of economic claims into `evaluation`. Study sequencing belongs
-in `studies`; presentation belongs in `reporting`. Keep the existing experiment
-boundaries explicit when making changes: the paper's idealized reconstruction,
-the realistic trading test and the matched revision answer different questions.
+in `studies` and presentation in `reporting`. Keep the experiments apart when
+making changes: the paper's idealized reconstruction, the realistic trading test
+and the matched revision answer different questions.
 
 Follow [CONTRIBUTING.md](../CONTRIBUTING.md) for the development workflow. Run
 synthetic tests without contacting providers. For commands, source requirements,

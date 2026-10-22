@@ -148,7 +148,7 @@ provider label through the entire run. Never combine the providers' returns.
 
 `load_returns` supplies validated daily returns, aligned factors, an initial
 valuation date, and provenance. CRSP returns are consumed directly. Its
-normalized total-return index exists only to preserve legacy command support.
+normalized total-return index exists only so older commands keep working.
 Version-1 public snapshots and earlier version-2 WRDS snapshots still load;
 the protection command requires the extra monthly check for WRDS sources.
 
@@ -184,7 +184,7 @@ Repository documentation contains aggregate findings, not licensed observations.
 
 ## Predict volatility, then compare ETF protection with cash
 
-`configs/prediction.toml` extends the retained 2007–2025 SPY/TLT/GLD/DBC snapshot.
+`configs/prediction.toml` extends the saved 2007–2025 SPY/TLT/GLD/DBC snapshot.
 It adapts Kaczmarek, Będowska-Sójka, Grobelny and Perez (2022), “False Safe
 Haven Assets: Evidence From the Target Volatility Strategy Based on Recurrent
 Neural Network” ([paper](https://doi.org/10.1016/j.ribaf.2021.101610)).
@@ -207,7 +207,7 @@ uv run fecon --config configs/prediction.toml predict --forecast-run outputs/pre
 uv run fecon --config configs/prediction.toml predict --forecast-run outputs/prediction-core --defensive-asset DBC --data-dir data/protection-long-wrds-20261020 --output-dir outputs/prediction-commodities
 ```
 
-Skip downloads when the retained snapshot exists. Default `predict` trains
+Skip downloads when the saved snapshot exists. Default `predict` trains
 on **cuda:0** through NVIDIA CUDA or AMD ROCm, verifies effective device
 placement, and stops if a compatible GPU is unavailable; it never retries
 training on CPU. PyTorch uses the same `cuda` device API for ROCm.
@@ -290,7 +290,7 @@ Previously inspected histories remain retrospective evidence, not unseen data.
 
 ## Closer replication of the paper's simpler GRU
 
-`configs/paper.toml` and `fecon paper` keep the existing `predict` experiment intact.
+`configs/paper.toml` and `fecon paper` leave the `predict` experiment as it is.
 This is a **partial GRU-UNIVAR replication with ETF substitutes**, not a claim
 to reproduce the paper's multivariate model or all thirteen assets.
 
@@ -369,7 +369,7 @@ architecture was selected through 2009. That calibration is known before
 evaluation session stays in cash. Later annual thresholds use forecasts
 issued strictly before the preceding annual close, with no test-period quantiles.
 
-The main comparison retains the paper's scaling, earns observed cash interest,
+The main comparison keeps the paper's scaling, earns observed cash interest,
 and charges 10 bps per ETF dollar bought or sold. Fixed sensitivities use
 0/25 bps, zero cash income at 10 bps, and the earlier 10% annual risk target.
 Each model runs stock/cash plus separate TLT, GLD, and DBC variants at one
@@ -382,10 +382,10 @@ run without importing PyTorch or retraining. Saved model settings, source
 hashes, and forecast bytes must agree. The CSV outputs include period metrics,
 turnover/fees, monthly returns, and defensive-asset comparisons in negative-SPY
 months. `benchmark_performance.csv` gives SPY's gross buy-and-hold comparison.
-Subperiod fee totals retain the original full-run capital denominator.
+Subperiod fee totals use the full-run capital denominator.
 These are descriptive historical results; 2021 is an additional
-historical year, not untouched evidence. The original `paper` command and
-archived replication results remain available separately.
+historical year, not untouched evidence. The original `paper` command and its
+archived replication results are separate from this extension.
 
 To compare daily and weekly SPY/cash trading with the same saved forecasts,
 run each schedule into a new directory:
@@ -428,13 +428,13 @@ optimized threshold; these previously examined years are not fresh validation.
 
 The research settings are frozen at local tag `frozen-gru-study-20261021`.
 The baseline is the explicit daily, zero-filter rule in `configs/paper-extension.toml`:
-90th-percentile past-only stress threshold, 20% defensive cap and the existing
-risk/cost/cash scenarios. Reuse `outputs/paper-extension-gru-20261020`, with
+90th-percentile past-only stress threshold, 20% defensive cap and the
+risk/cost/cash scenarios already in that file. Reuse `outputs/paper-extension-gru-20261020`, with
 two GRU layers, 32 hidden units, 17 epochs and seeds 11/22/33. Its forecast
 SHA-256 is `d59ed175760713b1ae7077df3f38cc894cab32bdbd46b56a67a5f765596aaac4`.
-The saved weekly and five-point runs remain fixed sensitivity comparisons.
-The final safe-haven check uses the existing `2010:2020` window, preserving
-the model configuration's 2021 endpoint and all original forecasts.
+The saved weekly and five-point runs are fixed sensitivity comparisons.
+The final safe-haven check uses the `2010:2020` window and keeps the model
+configuration's 2021 endpoint and all original forecasts.
 
 ## Reconstruct the paper's U.S. experiment
 
@@ -458,7 +458,7 @@ described above. ROCm trains them with MIOpen, about twice as fast as
 native HIP; runs before October 22, 2026 used native HIP.
 These results compare complete model configurations; isolating the value
 of extra inputs requires a separate study with matched training histories
-and validation folds. The existing settings and forecasts are preserved.
+and validation folds.
 
 The original paper and appendix are available in the
 [author's university dissertation](https://bip.ue.poznan.pl/download/attachment/1848/rozprawa-doktorska-mgr-t-kaczmarka.pdf#page=180).
@@ -472,7 +472,7 @@ it unsuitable as an assumed same-day released forecasting feature. Futures price
 futures total returns. International robustness is not reconstructed.
 
 Run the stages sequentially in PowerShell. Use new snapshot/output directories
-for a new data vintage; retain the existing Oxford archive described above.
+for a new data vintage, and keep the Oxford archive described above.
 
 ```powershell
 uv sync --frozen --extra prediction --extra reconstruction
@@ -485,7 +485,7 @@ foreach ($stage in @('classical', 'gru_univar', 'gru_multivar', 'evaluate')) {
 }
 ```
 
-When FRED is unavailable, the same requested yield series can be retained
+When FRED is unavailable, the same requested yield series can be taken
 from the licensed WRDS `frb_all.rates_daily` table, with Brent spot prices
 downloaded directly from EIA. Use a new macro snapshot and a new combined
 source directory:
@@ -497,12 +497,12 @@ uv run --frozen --extra prediction-rocm --extra reconstruction --extra wrds pyth
 
 Pass the combined directory as `--data-dir` to every reconstruction stage.
 Skip these download commands when those immutable directories already exist.
-This retains WRDS DGS3/DAAA and EIA RBRTE as the counterparts of FRED
+This keeps WRDS DGS3/DAAA and EIA RBRTE as the counterparts of FRED
 DGS3/DAAA/DCOILBRENTEU, with their actual provider identities and units in
 the manifest. Raw responses, the WRDS query, and the upstream macro manifest
-are copied and hashed. WRDS observations remain private and local.
-The current FRED vintage cannot be compared during its outage; this is a
-fresh source vintage, with the study's economic series definitions unchanged.
+are copied and hashed. WRDS observations stay private and local.
+The current FRED vintage cannot be compared during its outage. This is a
+fresh source vintage with the same economic series definitions.
 
 Classical fits run on CPU. Both neural stages require `cuda:0` through CUDA or ROCm and never fall
 back to CPU. Evaluation reuses verified forecasts and does not retrain.
@@ -510,7 +510,7 @@ Each stage rejects existing output directories. Saved results include the
 full strategy grid, forecasts, tuning, checkpoints, source/code hashes,
 forecast comparisons, five decline windows and rounded published references.
 Cache reuse verifies model inputs, settings, files and forecasting code. The
-execution wrapper's original hash is retained separately when a reader-only
+execution wrapper's original hash is recorded separately when a reader-only
 compatibility change permits reuse; calculation and valuation code is recorded
 with the evaluation.
 
@@ -527,7 +527,7 @@ reset-before, while its executed Keras/TensorFlow settings are unpublished.
 ### Revised matched study after the methodology audit
 
 `fecon paper-revised` corrects the practical limitations of the
-historical reconstruction while retaining its original files and outputs.
+historical reconstruction and leaves its original files and outputs in place.
 The saved October 21 revision used identical 22-observation histories,
 beginning October 3, 2000. Current runs again use the last 22 trading
 observations, following the requested rollback of the calendar-day experiment.
@@ -580,7 +580,7 @@ rejects changed inputs or calculation code, existing outputs, mixed protocols,
 different target dates or different GRU fold dates. Ordinary GPU requirements
 apply; classical fits and accounting are CPU-native and stages run sequentially.
 See `outputs/revised-study-20261021/protocol.json` for the executed revision.
-The archived reconstruction configurations retain their previous behavior.
+The archived reconstruction configurations still run the original reconstruction.
 
 The saved 22-observation revision covers every one of the 2,517 market days in 2011–2020.
 At 10 bps, stock/cash Sharpe is 0.843 for EWMA, 0.827 for the one-input GRU
@@ -649,7 +649,7 @@ The archived later-year pilot used the original substitute, one log-BV GRU
 and EWMA, 2021 calibration and
 2022–2025 evaluation on verified WRDS/CRSP ETF total returns. The full
 volatility history is estimated consistently; Oxford labels are not spliced
-onto later proxy labels. The existing 32/32 architecture has no new width
+onto later proxy labels. The 32/32 architecture has no new width
 search; pre-2021 folds select stopping epochs capped at 12, using seeds
 11/22/33. It used 30-calendar-day histories, t+2 forecasts, 10% annual equity
 risk, cash interest, entry/exit costs and the six fixed fee scenarios. Current
@@ -658,9 +658,9 @@ with 22 because the substitute fails the stricter quality requirement.
 The three Sharpe comparisons share one Holm adjustment. These are historical
 research results: exact publication times and the ability to obtain these
 measurements before trading remain unverified. The richer GRU is not included
-because the retained external-input snapshot ends in 2020.
+because its external-input snapshot ends in 2020.
 
-The completed pilot retains all 1,003 market days in 2022–2025. At 10 bps,
+The completed pilot covers all 1,003 market days in 2022–2025. At 10 bps,
 EWMA/GRU cash Sharpe is 0.335/0.340, versus about 0.433 for their static
 controls. Before fees the timing figures are 0.358/0.420. Maximum drawdown
 is 20.59%/21.27%, versus 23.17%/23.18% for the static controls. None of the
@@ -677,8 +677,8 @@ in the very calm years 2017–2018. Two extra stages learn **log BV** instead, s
 forecasts are always positive. Each keeps its raw counterpart's profiles,
 seeds, fold dates and epoch rule, selects on log-scale pre-2010 MSE, and
 restores the mean level with a training-only smearing factor. The fix was
-added after the raw results were seen; it is labelled post hoc, and the raw
-runs stay unchanged and reported.
+added after the raw results were seen. It is labelled post hoc, and the raw
+runs are still reported.
 `evaluate_fixed` scores all seven models paper-style in a separate directory.
 
 ```powershell
@@ -694,7 +694,7 @@ forecasts with no refitting, on verified WRDS/CRSP SPY, TLT, GLD and DBC total
 returns with French daily cash income. Reuse requires every selected forecast
 stage to record matching, valid SHA-256 hashes for its source manifest,
 Oxford archive and reconstruction config, in addition to verified forecast
-bytes. The realistic run retains those input identities in its provenance.
+bytes. The realistic run records those input identities in its provenance.
 A forecast issued at close t trades at close t+1 and earns the t+2 return;
 fees are 10 bps per ETF dollar traded
 (0 and 25 bps are sensitivities). Each year's 90th-percentile stress cutoff uses
@@ -709,7 +709,7 @@ and TLT and GLD minus cash in negative-SPY months (HAC), with one Holm
 adjustment. Secondary models, DBC, subperiods, declines and bootstrap
 intervals are descriptive.
 
-The primary Holm adjustment retains all six prespecified tests when an
+The primary Holm adjustment keeps all six prespecified tests when an
 individual test is unavailable: it uses p=1 internally for that test and
 keeps its reported p-value and adjusted p-value unavailable, with no
 rejection. Sharpe HAC inference uses centered calculations and marks
@@ -742,12 +742,12 @@ the preceding period; it is retained. Missing signals postpone a trade to the
 next eligible close, and periods without signals retain existing holdings.
 All daily returns remain present and holdings drift between trades. The
 2010 static-control calibration, annual stress cutoffs, monthly static
-rebalancing, fees and cash income remain unchanged. `decisions.csv` marks
+rebalancing, fees and cash income are the same as in the daily runs. `decisions.csv` marks
 selected signals with `scheduled`; `run.json` records the effective schedule.
 
 These are retrospective trading-frequency comparisons, not month-ahead
 volatility forecasts. Weekly/monthly test results are descriptive and have
-no primary significance family. The existing daily primary tests are retained.
+no primary significance family. The daily primary tests are still reported.
 `--skip-bootstrap` omits the optional descriptive bootstrap intervals and
 records that omission; the default command still produces them. All schedule
 comparisons run sequentially on CPU without refitting or importing PyTorch.
@@ -772,7 +772,7 @@ Figure 7 uses the paper's 90th-percentile, 30%-cap scenario.
 
 Both checks were added after `figure6_paper_check.png` was seen. They are
 labelled post hoc, add nothing to any primary test, and leave the original runs
-unchanged beside them.
+as they were.
 
 **Swiss and German bonds in local currency.** The paper's printed volatilities
 and correlations for these two bonds match CHF/EUR returns, not USD-converted
@@ -789,8 +789,8 @@ uv run fecon paper-figures --local-bonds --run-dir outputs/paper-reconstruction-
 proxy that helped all five models in the paper-style rebuild, but the frozen
 realistic test held only TLT, GLD and DBC. `configs/paper-realistic-ief.toml` copies
 `configs/paper-realistic.toml` and adds IEF as a descriptive secondary asset. Its WRDS
-snapshot reproduces the existing SPY, TLT, GLD and DBC returns exactly, and
-every existing portfolio and test in the new run matches the frozen run.
+snapshot reproduces the earlier SPY, TLT, GLD and DBC returns exactly, and
+every portfolio and test shared with the frozen run matches it.
 
 ```powershell
 uv run --extra wrds fecon --config configs/paper-realistic-ief.toml download --source wrds --verify-monthly --data-dir data/protection-long-ief-wrds-20261021

@@ -6,7 +6,7 @@ The study uses the fixed instruments and dates in `configs/study.toml`. These ar
 
 Yahoo Finance's `Adj Close`, retrieved through yfinance with `auto_adjust=False`, supplies the adjusted price series. This is a provider snapshot, not unmodified exchange data. Distributions and splits are reflected in its adjustments; do not add dividends again. Provider corrections may change a later download.
 
-Download includes seven calendar days before the requested start. The last pre-sample price must match the immediately preceding trading date in French's retained calendar, so the first return cannot silently span multiple sessions. yfinance's end date is exclusive; the CLI requests the day after the configured inclusive end. [yfinance download documentation](https://ranaroussi.github.io/yfinance/reference/api/yfinance.download.html).
+Download includes seven calendar days before the requested start. The last pre-sample price must match the immediately preceding trading date in French's saved calendar, so the first return cannot silently span multiple sessions. yfinance's end date is exclusive; the CLI requests the day after the configured inclusive end. [yfinance download documentation](https://ranaroussi.github.io/yfinance/reference/api/yfinance.download.html).
 
 The French daily factor ZIP supplies `Mkt-RF` and `RF`. Its percent returns are divided by 100 exactly once. RF is already a daily return, not an annual yield needing division by 252. Mkt-RF is already excess return. [French factor definitions](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/Data_Library/f-f_factors.html).
 
@@ -52,7 +52,7 @@ Correlation and sample covariance use matched daily simple returns. Annualized c
 
 ## Reproduction
 
-`download` writes a new snapshot only after validation. Its manifest retains source URLs, UTC retrieval time, settings, provider-library versions, observation bounds, and SHA-256 file hashes. Downloaded prices are retained locally; French's source ZIP is retained alongside the converted factors.
+`download` writes a new snapshot only after validation. Its manifest records source URLs, UTC retrieval time, settings, provider-library versions, observation bounds, and SHA-256 file hashes. Downloaded prices stay local, and French's source ZIP is saved next to the converted factors.
 
 `analyze` checks settings and hashes before reading the saved sample. It makes no finance-provider requests. It writes CSVs, PNGs, a Markdown summary, and `run.json` with the consumed snapshot hashes. New downloads may differ; an unchanged saved snapshot is the reproducible unit. Numerical CSVs and run metadata should repeat exactly within the locked environment; PNG metadata and floating-point results across other platforms are not promised byte-identical.
 
@@ -154,7 +154,7 @@ compounds daily returns and rejects absolute differences over 0.0001, one
 basis point, from CRSP's monthly series. It also rejects missing fund-months
 and duplicate monthly observations. Queries, parameters, original extracts,
 source definitions, retrieval times, SHA-256 hashes, and coverage summaries
-are retained privately. Direct returns feed the protection engine; normalized
+are kept privately. Direct returns feed the protection engine; normalized
 indices are only a compatibility representation for earlier commands.
 
 CIZ compounds daily returns with dividends reinvested on ex-dates, unlike the

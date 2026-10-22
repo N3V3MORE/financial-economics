@@ -23,6 +23,6 @@ Accept your collaborator invitation before cloning the repository or pushing cha
 
 6. Open a pull request on GitHub. Explain what changed, why, and how you checked it. Ask another contributor to review it before merging.
 
-Change the study universe or sample explicitly in `configs/study.toml`, and document the reason. Fetch a new snapshot for changed settings instead of editing retained data. Keep provider data and generated outputs out of Git; share the commands and interpretation needed to reproduce them.
+Change the study universe or sample in `configs/study.toml` and document the reason. Fetch a new snapshot for changed settings instead of editing saved data. Keep provider data and generated outputs out of Git, and share the commands and interpretation needed to reproduce them.
 
 Do not commit passwords, API keys, or data you do not have permission to share with the collaborators.

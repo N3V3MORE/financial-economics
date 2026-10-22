@@ -1,15 +1,15 @@
 # Final study: does volatility timing with "safe" assets protect stock investors?
 
-This page states the project's final research goal and what the evidence
-shows. It ties the original ETF study to the paper we adapted:
+The project's final research goal, and what the evidence shows. It links the
+original ETF study to the paper we adapted:
 Kaczmarek, Będowska-Sójka, Grobelny and Perez (2022), “False Safe Haven
 Assets: Evidence From the Target Volatility Strategy Based on Recurrent
 Neural Network” ([paper](https://doi.org/10.1016/j.ribaf.2021.101610)).
 
-The original numerical results below remain the historical reconstruction.
-The later methodology audit is addressed by the matched revision in
-`fecon paper-revised`; its changes are cross-referenced below.
-It is a new exploratory calculation on previously inspected history.
+Sections 1–3 report the original reconstruction and realistic test. A later
+methodology audit led to the matched revision (`fecon paper-revised`), a new
+exploratory calculation on history that had already been inspected. Its results
+follow under "Changes after cross-checking the paper".
 
 ## The research goal
 
@@ -75,18 +75,17 @@ portfolio risk.
 
 ## What we found
 
-**These results are verified.** On October 21, 2026 every stage was rerun
+**Verification.** On October 21, 2026 every stage was rerun
 from the saved data snapshots on the final code (`outputs/rerun-20261021`).
 That code includes the corrected inference: centered Sharpe tests, a
 six-test Holm family that keeps unavailable tests, and input checks on saved
 forecasts. All five GRUs were retrained from scratch with cuDNN. **No headline
 figure and no Holm decision changed.** The largest Sharpe change in the
-realistic test was 0.00006; one primary p-value moved from 0.9781 to 0.9783.
-GRU forecasts differ slightly from the earlier native-kernel runs, which are
-kept unchanged. A separate rebuild from fresh Yahoo/WRDS/EIA inputs on the AMD
-machine was stopped on October 21 and is not used here. Its historical status
-path is `outputs/paper-wrds-eia-rocm-20261021/status.json`; that directory is
-absent on this machine, so the stopped run cannot be inspected locally here.
+realistic test was 0.00006, and one primary p-value moved from 0.9781 to 0.9783.
+GRU forecasts differ slightly from the earlier native-kernel runs. Both sets are
+saved. A rebuild from fresh Yahoo/WRDS/EIA inputs on an AMD machine
+was stopped on October 21 and is not used here. Its status file,
+`outputs/paper-wrds-eia-rocm-20261021/status.json`, is on that machine only.
 
 ### 1. The rebuild approximates several reported metrics
 
@@ -200,8 +199,8 @@ realistic test delays trades on saved one-session forecasts. The extension
 assigned annual cutoffs by issue-date blocks starting at the preceding
 year-end close, while the realistic test assigned them by return year.
 The extension starts in cash; the realistic test can use an earlier signal
-on its first evaluation day. These boundary differences are retained in
-the reported histories. New extension runs share the realistic module's
+on its first evaluation day. The reported histories include these boundary
+differences. New extension runs share the realistic module's
 earned-return-year cutoff rule; the matched revision also standardizes
 the initial cash day for strategies, static controls and benchmark:
 
@@ -273,11 +272,11 @@ and its setup is rougher.
 
 ## Changes after cross-checking the paper
 
-The separate matched revision is recorded in
-`outputs/revised-study-20261021/protocol.json`. Original caches, configurations
-and results are retained. The revision uses the same Oxford BV definition and
-verified ETF total returns; it does not silently splice another volatility
-measure onto the archive.
+The matched revision is recorded in
+`outputs/revised-study-20261021/protocol.json`, alongside the original caches,
+configurations and results. It uses the same Oxford BV definition and verified
+ETF total returns, and it does not splice another volatility measure onto the
+archive.
 
 | Issue | Treatment in the revised calculation |
 |---|---|
@@ -291,15 +290,15 @@ measure onto the archive.
 | Future-informed stress thresholds | Past-only annual cutoffs, shared with the realistic module and assigned by earned-return year |
 | Different initial trading conventions | Every portfolio starts in cash on the first evaluation day |
 | Uncharged final sale or benchmark costs | Final liquidation uses actual drifted holdings; the buy-and-hold comparator also pays entry and exit costs |
-| One assumed execution price | Fixed 0/1/2/5/10/25-bps scenarios, with 10 bps retained as the main scenario |
+| One assumed execution price | Fixed 0/1/2/5/10/25-bps scenarios, with 10 bps as the main scenario |
 | Changes in down-month classification with costs | Falling months are defined by gross underlying stock returns |
 | Multiple inspected variants | One Holm family for 27 paired portfolio comparisons; all results labelled exploratory |
 
-Holding the stock target fixed when adding TLT, GLD or DBC remains deliberate:
+Holding the stock target fixed when adding TLT, GLD or DBC is deliberate:
 it isolates the contribution of replacing cash. The 10% budget therefore
 describes the equity allocation, not a guaranteed total-portfolio volatility.
 Realized volatility and its ratio to that budget are reported for every path.
-Static stock/cash controls retain each model's mean calibration-year target.
+Static stock/cash controls hold each model's mean calibration-year target.
 
 The frozen run records source/configuration/code hashes and rejects changed
 inputs, mixed stage identities, overwritten outputs and unequal GRU folds.
@@ -310,7 +309,7 @@ from the fixed-holdings check above.
 
 ### Results of the matched revision
 
-The completed run retains all 2,517 market days in 2011–2020. Both GRUs share
+The completed run covers all 2,517 market days in 2011–2020. Both GRUs share
 5,074 dated input windows, identical pre-2010 selection folds and the same
 annual refit dates. Every model forecasts t+2 directly or recursively;
 missing signals retain holdings rather than remove return days. Results
@@ -363,12 +362,12 @@ Saved tables, forecasts, decisions and model checkpoints are under
 matched their recorded hashes and the calculation code matched the frozen
 protocol. That revision passed all 369 tests, including actual GPU training.
 The October 22 calendar changes require new runs and do not replace these results.
-These are revised exploratory results on previously examined history; the
-original results below remain a separate experiment.
+These are revised exploratory results on previously examined history. The
+original results below are a separate experiment.
 
 ### Archived Oxford-like estimates and calendar-month pilot, October 22
 
-The Oxford archive stays unchanged. A separate approximation uses public
+A separate approximation uses public
 SPY intraday volatility measures, with coefficients fitted on 2000–2009 and
 method selection on 2010–2016. A daily SPX range model, selected on the same
 earlier dates, supplies explicitly flagged estimates when the intraday source
@@ -406,11 +405,11 @@ annual conversion remains sqrt(252), and the target session still ends t+2.
 
 The separate pilot in `outputs/proxy-study-20261022` trains the one-input
 GRU on the estimated history, with five annual refits from 2021 through 2025.
-One existing 32/32 profile and three seeds are fixed; pre-2021 validation
+One previously selected 32/32 profile (no new width search) and three seeds are fixed; pre-2021 validation
 selects 10 epochs within a maximum of 12. Calendar year 2021 calibrates the
 stock/cash controls, and investment performance is scored on actual verified
 ETF total returns for all 1,003 market days in 2022–2025. The richer GRU is
-excluded because its retained external-input snapshot ends in 2020.
+excluded because its external-input snapshot ends in 2020.
 
 | Stock/cash strategy, 2022–2025 | Annual return, 10 bps | Annual volatility, 10 bps | Sharpe, 10 bps | Maximum drawdown, 10 bps |
 |---|---:|---:|---:|---:|
@@ -447,9 +446,9 @@ or prove that the measurement was available before a historical trade.
 
 The active revised study and proxy study now use the last **22 trading
 observations**. The calendar-window helper and its tests have been removed.
-The original Oxford archive and saved experiments remain unchanged. The
-2022–2025 pilot above retains its historical 30-calendar-day configuration;
-it has not been rerun with 22 while the substitute fails the new quality rule.
+Saved experiments keep their recorded settings. The 2022–2025 pilot
+above used 30 calendar days and has not been rerun with 22 sessions while the
+substitute fails the new quality rule.
 
 The new approximation adds public Risk Lab IVV and VOO measurements to SPY.
 Each follows the S&P 500 but remains an ETF substitute for the index.

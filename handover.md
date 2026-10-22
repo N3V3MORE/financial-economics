@@ -9,10 +9,11 @@ work below, including the Risk Lab findings. The package is grouped into
 `datasets`, `settings`, `models`, `portfolio`, `evaluation`, `studies` and
 `reporting`; the former flat modules are gone, and staged studies run as `fecon`
 subcommands with their original options (`fecon paper-revised`,
-`fecon risklab-study`, `fecon paper-reconstruction`, …). Calculations are
-unchanged. Saved classical and GRU reconstruction stages remain reusable; saved
-matched-revision, proxy and Risk Lab runs need a fresh run because their
-whole-package code hash changed. See [Project structure](docs/structure.md).
+`fecon risklab-study`, `fecon paper-reconstruction`, …). Calculations did not
+change. Saved classical and GRU reconstruction stages can be reused. Saved
+matched-revision and proxy runs need a fresh run before reuse, because their
+whole-package code hash changed; the two final Risk Lab runs have been rerun
+(next paragraph). See [Project structure](docs/structure.md).
 A full rerun on the AMD machine after the regrouping reproduced both final runs
 (`revised-risklab-20261022`, `risklab-2022-2025-20261022`) byte for byte: every
 forecast, table and all 81 GRU checkpoints; only timestamps and code hashes in
@@ -35,8 +36,8 @@ trial](#october-22-gpu-data-access-and-the-risk-lab-trial).
 
 The methodology audit now has a separate matched implementation:
 `fecon paper-revised`, with frozen settings in
-`outputs/revised-study-20261021/protocol.json`. It retains the original
-reconstruction and labels the revised historical comparisons exploratory.
+`outputs/revised-study-20261021/protocol.json`. The original reconstruction
+sits beside it, and the revised historical comparisons are labelled exploratory.
 See the cross-reference table in `docs/final-study.md` and the runnable
 commands in `README.md`.
 
@@ -52,9 +53,9 @@ The earlier October 22 experiment added an explicitly estimated volatility histo
 `outputs/volatility-proxy-complete-20261022` and a separate later-year pilot
 in `outputs/proxy-study-20261022`. Final overlap error is 6.7% on volatility
 levels, 13.2% on raw BV; the missing 2018 crash week has 32.4% error under
-the daily-range fallback. That archived pilot used 30-calendar-day histories;
-its outputs stay unchanged, and it has not been rerun with 22. The October 21
-numbers below retain their original 22-observation setup.
+the daily-range fallback. That archived pilot used 30-calendar-day histories.
+Its outputs were not modified, and it has not been rerun with 22. The October 21
+numbers below come from their original 22-observation setup.
 
 The later-year pilot completed all 1,003 trading days in 2022–2025. At 10 bps,
 EWMA/one-input GRU cash Sharpe is 0.335/0.340, versus about 0.433 for their
@@ -193,7 +194,7 @@ WRDS data is licensed. Raw data and outputs stay local and are ignored by Git.
 
 ## Findings
 
-**October 21 matched revision.** The completed revised study retains all 2,517 market
+**October 21 matched revision.** The completed revised study covers all 2,517 market
 days in 2011–2020. At 10 bps, EWMA/one-input GRU/richer GRU stock/cash Sharpe
 is 0.843/0.827/0.841, versus 0.861/0.885/0.892 without fees. Both GRUs have
 lower measured volatility forecast MSE than EWMA, but neither forecast
@@ -211,7 +212,7 @@ GPU time). The run includes the corrected inference (centered Sharpe tests,
 six-test Holm family, forecast input checks) and GRUs retrained from scratch
 with cuDNN. No headline figure and no Holm decision changed. Stages without
 GRUs matched to rounding; the largest realistic-test Sharpe change was
-0.00006. The original runs are kept unchanged beside the rerun.
+0.00006. The original runs are kept beside the rerun.
 
 **Statistically supported:**
 - 11 of 13 ETFs lagged cash in falling months, 2015–2025 (Holm-adjusted).
@@ -372,8 +373,8 @@ the richer GRU's macro inputs end in 2020, so it was not extended.
   target and assigned cutoffs by annual issue-date blocks; the realistic
   test delays saved one-session forecasts and assigned cutoffs by return
   year. The extension starts in cash, while an earlier signal can invest
-  the realistic portfolio on its first evaluation day. These histories
-  are retained as distinct setups. New extension runs share the earned-return-year
+  the realistic portfolio on its first evaluation day. The two setups
+  are reported separately. New extension runs share the earned-return-year
   cutoff rule. All revised models target t+2, and every comparator starts in cash.
 - **ARFIMA bound.** ARFIMA's memory parameter hit its upper bound on 38% of days.
 - **History already seen.** Forecasts are chronological out-of-sample
@@ -425,7 +426,7 @@ the richer GRU's macro inputs end in 2020, so it was not extended.
   All 5,253 WRDS DGS3 observations matched the official Fed export exactly.
   The 4,197 overlapping AAA observations matched too; later WRDS AAA values
   lacked independent current-FRED comparison. Source identities and the
-  fresh vintage were retained in the manifests. These four dated directories
+  fresh vintage are recorded in the manifests. These four dated directories
   are present on the AMD machine and absent on the NVIDIA machine.
 - **AMD training:** Radeon 8060S on Windows runs PyTorch 2.11.0 + ROCm 7.14.1.
   Native HIP GRU probes passed forward/backward, Adam updates, exact same-seed
@@ -444,24 +445,23 @@ the richer GRU's macro inputs end in 2020, so it was not extended.
   also record NVIDIA cuDNN and AMD MIOpen availability, enabled flag and
   version separately from observed training-forward dispatch; inference
   dispatch remains unobserved.
-  Archived run metadata stays unchanged. Exact reviewed metadata-only code
-  hash transitions preserve retained raw/log forecast reuse; arbitrary model
-  changes still fail the cache guard. The MIOpen change to
+  Archived run metadata is never rewritten. A short list of reviewed,
+  metadata-only code hash changes lets saved raw/log forecasts be reused, and
+  any other model change still fails the cache guard. The MIOpen change to
   `gru_forecasting.py` was first reviewed as metadata-only for those caches,
   which were trained with NVIDIA cuDNN. Turning TF32 off then changed NVIDIA
   training math, so GRU stages cached before it need a fresh run.
   That AMD environment included the locked `prediction-rocm`, `reconstruction`
   and `wrds` extras; use `prediction-rocm` in AMD training commands. The
   NVIDIA machine uses the `prediction` extra.
-- **Commands to rerun each stage:** README sections “Reconstruct the paper's
-  U.S. experiment” and “Fixed GRUs and the realistic trading test”.
+- **Commands to rerun each stage:** `docs/commands.md` sections “Reconstruct the
+  paper's U.S. experiment” and “Fixed GRUs and the realistic trading test”.
 - **Stopped fresh-input rebuild (AMD machine):** `outputs/paper-wrds-eia-rocm-20261021/status.json`
-  was the recorded status path; `logs/run.stdout.log` and
-  `logs/run.stderr.log` were retained on that machine. Those paths are absent
-  on this machine and cannot be checked locally here. The process tree was
+  and `logs/run.stdout.log` and `logs/run.stderr.log` are kept on the AMD
+  machine. The process tree was
   terminated during the first GRU stage because no
   meaningful results-preserving speedup had been validated. No stages were
-  completed. Downloaded inputs and logs were retained there. Final output was
+  completed. Downloaded inputs and logs are kept there. Final output was
   planned
   at `outputs/paper-realistic-wrds-eia-rocm-20261021`.
 - **Historical tests after the inference, provenance, Windows login, AMD and source fixes:**
