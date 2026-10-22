@@ -1,6 +1,6 @@
 """Relocation preserves old imports and rejects unreviewed cache identities."""
 
-from importlib import import_module
+from importlib import import_module, reload
 import pickle
 import runpy
 import warnings
@@ -85,3 +85,13 @@ def test_original_class_pickle_namespace_is_preserved():
     assert Study.__module__ == "financial_economics.config"
     assert b"financial_economics.config" in encoded
     assert pickle.loads(encoded) == value
+
+
+def test_reload_preserves_original_pickle_and_runpy_behavior():
+    module = reload(import_module("financial_economics.config"))
+    assert module.Study.__module__ == "financial_economics.config"
+    assert module.load_study.__module__ == "financial_economics.config"
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        namespace = runpy.run_module("financial_economics.config", run_name="__main__")
+    assert "load_study" in namespace
