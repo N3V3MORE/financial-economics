@@ -145,7 +145,7 @@ command is in [Commands and study reference](commands.md).
 | `data/` | Local ignored source snapshots, retained in their existing paths and formats |
 | `outputs/` | Local ignored results, checkpoints, figures and run records, retained in their existing paths and formats |
 | `tests/` | Synthetic calculation, validation and command checks |
-| `scripts/` | Independent protection verification, supplement refresh and GPU comparison tools |
+| `scripts/` | Independent protection verification, supplement refresh, GPU comparison and one-file results packing tools |
 | `supplement/` | Supplemental workbook and cash illustration |
 | `docs/` | Research interpretation, methods, phase notes, command reference and this module map; `docs/archive/` keeps the restructure plan, verification record and cleanup log |
 | `pyproject.toml`, `uv.lock` | Package entrypoints, dependencies, extras and locked environment |

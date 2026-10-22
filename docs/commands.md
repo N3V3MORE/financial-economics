@@ -807,6 +807,14 @@ uv run fecon page
 
 Open `outputs/page/index.html` in a browser. It is a single file with no outside links, so you can also send it to someone. Each chart sits next to a table of the exact numbers, and hovering over a growth chart shows the values for that week. The page reads only the saved outputs. It stops if they came from different snapshots or settings, or if Phases 3 and 4 used different test periods or SPY + cash splits.
 
+## Pack a whole results folder into one file
+
+```sh
+uv run python scripts/bundle_outputs.py outputs/final-run-20261022 --output outputs/final-run-20261022.html
+```
+
+This writes one self-contained HTML page holding every file in the folder: tables, figures, summaries, logs, run records and GPU checkpoints. A full run of about 320 MB packs into roughly 90 MB. Open a file on the page to see it: tables show their first 300 rows, figures and text show in full. Each file also downloads from the page byte for byte, with its SHA-256 listed beside it. The page starts with the run's stage results and hash checks when the folder has a `completion.json`. It never overwrites an existing file. Like `outputs/`, it contains licensed WRDS-derived returns, so keep it local.
+
 ## Find your way around
 
 ```text
