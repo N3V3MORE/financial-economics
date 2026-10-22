@@ -62,8 +62,9 @@ WRDS data is licensed. Raw data and outputs stay local and are ignored by Git.
   mix holding the model's mean **2010** stock target, reset monthly. It is
   not matched to 2011–2020 exposure. In practice timing held more stock
   than its mix (ARFIMA 75% against 56%; one-input GRU 79% against 59%) with
-  lower volatility and beta, so its smaller crash losses do not come from
-  holding less stock. This exposure check was added afterwards and is descriptive.
+  similar volatility and lower beta, so its smaller crash losses do not come
+  from holding less stock. This exposure check was added afterwards and is
+  descriptive; see the main result under Findings.
 - **The paper's volatility scaling.** Monthly volatility is 22 × daily, as
   printed in the paper; textbook scaling uses √22. The 10% target is
   therefore about 7.2% a year. A conventional 10%-a-year target is reported
@@ -126,8 +127,19 @@ GRUs matched to rounding; the largest realistic-test Sharpe change was
 - 11 of 13 ETFs lagged cash in falling months, 2015–2025 (Holm-adjusted).
 - ARFIMA and the GRUs forecast far better than GARCH and GJR.
 
+**Main result (descriptive, no uncertainty estimates):**
+- Timing held more stock on average than its fixed mix (ARFIMA 75% against
+  56%) with similar volatility, lower beta and smaller severe losses. It
+  stayed invested in calm periods and cut stock when forecast risk rose:
+  effective risk allocation in this sample. This is not evidence that it
+  predicted whether stocks would rise or fall, or that the advantage is
+  statistically reliable or will persist.
+- The assumed trading costs erased the observed before-fee advantage
+  (ARFIMA Sharpe +0.09 before fees, −0.04 at 10 bps). Fees are scenarios,
+  and the before-fee advantage was not itself tested for significance.
+
 **Consistent but not significant:**
-- Timing cut the worst fall for every model (about −11% to −16%, against −15% to −23% for the static mix).
+- Timing cut the worst fall (maximum drawdown) for every model (about −11% to −16%, against −15% to −23% for the static mix); in the common COVID window ARFIMA lost 9.7% against 19.6%.
 - Timing roughly halved the COVID loss, but lost more in the slow 2015–16 fall.
 - After 10 bps fees, ARFIMA and one-input GRU timing had Sharpe estimates of 0.76–0.80 against 0.80 for the static mixes; their differences were not significant. This does not establish equivalence. The other models had estimates of 0.71–0.75. Before fees, ARFIMA had 0.89 against 0.80; at 25 bps it had 0.57.
 - In falling months, TLT beat cash by +1.7 to +3.6 points per period up to 2021, then lost 4.3 points in 2022–2025.

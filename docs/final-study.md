@@ -132,10 +132,14 @@ Realistic test, 2011–2020, 0.1% fees, cash earning interest:
 | One-input GRU timing | 8.1% | 0.80 | −14.5% | −10.2% | −11.8% |
 | Fixed mix, 2010-calibrated stock target (59%) | 8.4% | 0.80 | −20.5% | −20.5% | −7.7% |
 
-**The fixed mix uses the 2010 average stock share.** Each fixed mix holds
-its model's mean stock target over calibration year 2010, reset monthly. It
-was set before 2011 and is not matched to 2011–2020 exposure. Because 2010
-was volatile, timing in fact held *more* stock afterwards, yet with less risk:
+Worst fall is each portfolio's maximum drawdown over 2011–2020; COVID fall
+is the common February 19 – March 23, 2020 window.
+
+**Main result: timing held more stock, with similar or lower risk.** Each
+fixed mix holds its model's mean stock target over calibration year 2010,
+reset monthly. It was set before 2011 and is not matched to 2011–2020
+exposure. Because 2010 was volatile, timing in fact held *more* stock
+afterwards:
 
 | 2011–2020, 0.1% fees | Average stock share | Volatility | Beta to SPY |
 |---|---:|---:|---:|
@@ -144,17 +148,28 @@ was volatile, timing in fact held *more* stock afterwards, yet with less risk:
 | One-input GRU timing | 79% | 9.6% | 0.48 |
 | One-input GRU fixed mix | 59% | 9.9% | 0.58 |
 
-So timing's smaller crash losses did not come from holding less stock on
-average; it cut stock when forecast risk rose. Every model shows the same
-pattern. This exposure check was added after the results were seen and is
-descriptive.
+The explanation "it lost less because it was generally less invested" does
+not fit: timing held substantially more stock on average, with similar
+volatility, lower beta and smaller severe losses. Average stock share
+counts calm and turbulent days equally, while risk comes mostly from days
+with large market moves. Holding more stock in calm periods and less when
+forecast risk rose produces exactly this pattern. Every model shows it.
+
+This is evidence of effective risk allocation in this sample. It is not
+evidence that the forecasts predicted whether stocks would rise or fall
+(they forecast volatility, not direction), and these figures carry no
+uncertainty estimates, so they do not show the advantage is statistically
+reliable or will persist. The exposure check was added after the results
+were seen and is descriptive.
 
 - **No established Sharpe improvement.** Timing minus the fixed mix is
   −0.04 (ARFIMA) and −0.005 (GRU); neither difference was significant. This
   does not establish equal performance.
-- **Fees change the historical comparison.** Timing trades about 116 times
-  its own value over ten years. ARFIMA's Sharpe was 0.89 against 0.80 before
-  fees, 0.76 against 0.80 at 0.1%, and 0.57 against 0.80 at 0.25%.
+- **The assumed trading costs erased the observed advantage.** Timing trades
+  about 116 times its own value over ten years. ARFIMA's Sharpe was 0.89
+  against 0.80 before fees, 0.76 against 0.80 at 0.1%, and 0.57 against 0.80
+  at 0.25%. The fees are stated scenarios, not measured costs, and the
+  before-fee advantage was not itself tested for significance.
 - **Better forecasts did not rescue it.** The fixed GRUs forecast best but
   traded even more (about 137 times their value); after 0.1% fees their Sharpe
   was 0.75, below their fixed mixes' 0.80.
@@ -237,8 +252,10 @@ and its setup is rougher.
 **In these retrospective tests, volatility timing reduced the worst
 observed falls but did not establish a Sharpe improvement over the
 2010-calibrated static mixes after 0.1% fees.** The nonsignificant tests
-do not establish equivalence, and the controls are not calibrated to match
-evaluation exposure or risk. Defensive-asset effects varied by model and
+do not establish equivalence. Timing held more stock on average than its
+fixed mix (75% against 56% for ARFIMA) with similar volatility, lower beta
+and smaller severe losses: effective risk allocation in this sample, whose
+before-fee advantage the assumed trading costs erased. Defensive-asset effects varied by model and
 period:
 the primary TLT and GLD tests did not establish improvement beyond cash,
 and the fixed-holdings Treasury result reversed in 2022–2025. These
