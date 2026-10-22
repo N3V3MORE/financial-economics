@@ -1,5 +1,7 @@
 # ETF protection and volatility timing
 
+By Sushmit Deb, Jake Ryan and Rahini Gaikwad.
+
 Can a stock investor protect against market falls better than by simply holding
 less stock? This project tests that question on U.S. ETF data. It starts with an
 eight-ETF diversification study, asks which ETFs beat cash in falling months, and
@@ -141,3 +143,11 @@ command. [handover.md](handover.md) is the dated project log.
 Downloaded data and results stay local in the ignored `data/` and `outputs/`
 directories. Licensed WRDS observations must not be uploaded or redistributed.
 See [CONTRIBUTING.md](CONTRIBUTING.md) to work on the code.
+
+## Authors and license
+
+Sushmit Deb, Jake Ryan and Rahini Gaikwad.
+
+The code and documentation are released under the [MIT License](LICENSE). The
+license covers this repository only. Data from WRDS, Risk Lab, Oxford-Man and other
+providers is not included and stays under each provider's own terms.
