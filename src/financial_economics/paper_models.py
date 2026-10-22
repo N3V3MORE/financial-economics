@@ -1,5 +1,5 @@
 """Compatibility entry point; implementation: financial_economics.models.classical."""
 
-from ._compat import install_alias as _install_alias
+from ._compat import expose_module as _expose_module
 
-_implementation = _install_alias(__name__, "financial_economics.models.classical")
+_expose_module(__name__, "financial_economics.models.classical", "paper_models.py", globals())

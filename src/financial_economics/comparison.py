@@ -1,5 +1,5 @@
 """Compatibility entry point; implementation: financial_economics.portfolio.controls."""
 
-from ._compat import install_alias as _install_alias
+from ._compat import expose_module as _expose_module
 
-_implementation = _install_alias(__name__, "financial_economics.portfolio.controls")
+_expose_module(__name__, "financial_economics.portfolio.controls", "comparison.py", globals())

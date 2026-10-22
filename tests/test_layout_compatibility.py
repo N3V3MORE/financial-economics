@@ -3,6 +3,9 @@
 from importlib import import_module, reload
 import pickle
 import runpy
+import subprocess
+import sys
+from pathlib import Path
 import warnings
 
 import pytest
@@ -95,3 +98,25 @@ def test_reload_preserves_original_pickle_and_runpy_behavior():
         warnings.simplefilter("ignore", RuntimeWarning)
         namespace = runpy.run_module("financial_economics.config", run_name="__main__")
     assert "load_study" in namespace
+
+
+@pytest.mark.parametrize("run_name,alter_sys", [("__main__", False), (None, False), ("custom", True)])
+def test_fresh_runpy_preserves_namespace_and_callers_main(run_name, alter_sys):
+    source = Path(__file__).resolve().parents[1] / "src"
+    code = """
+import pickle, runpy, sys
+sys.path.insert(0, sys.argv[1])
+def caller_function():
+    return 1
+original_main = sys.modules['__main__']
+pickle.dumps(caller_function)
+run_name = None if sys.argv[2] == 'None' else sys.argv[2]
+namespace = runpy.run_module('financial_economics.config', run_name=run_name,
+                             alter_sys=sys.argv[3] == 'True')
+assert 'Study' in namespace and 'load_study' in namespace
+assert sys.modules['__main__'] is original_main
+pickle.dumps(caller_function)
+"""
+    result = subprocess.run([sys.executable, "-I", "-c", code, str(source), str(run_name), str(alter_sys)],
+                            capture_output=True, text=True, check=False)
+    assert result.returncode == 0, result.stderr

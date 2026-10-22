@@ -62,3 +62,17 @@ def install_alias(original, canonical):
     _restore_symbol_names(implementation, original, canonical)
     sys.modules[original] = implementation
     return implementation
+
+
+def expose_module(original, canonical, filename, namespace):
+    """Alias real imports; execute runpy/-m code in the caller's own namespace."""
+    if getattr(namespace.get("__spec__"), "_initializing", False):
+        install_alias(original, canonical)
+        return
+    # runpy may use __main__, a custom name, or the original name, with or
+    # without alter_sys. None of these should replace the caller's modules.
+    from ._layout import module_source
+
+    source = module_source(filename)
+    namespace["__file__"] = str(source)
+    exec(compile(source.read_bytes(), str(source), "exec"), namespace)

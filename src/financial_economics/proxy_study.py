@@ -1,8 +1,5 @@
 """Compatibility entry point; implementation: financial_economics.studies.proxy."""
 
-from ._compat import install_alias as _install_alias
+from ._compat import expose_module as _expose_module
 
-_implementation = _install_alias(__name__, "financial_economics.studies.proxy")
-
-if __name__ == "__main__":
-    raise SystemExit(_implementation.main())
+_expose_module(__name__, "financial_economics.studies.proxy", "proxy_study.py", globals())
