@@ -2,7 +2,8 @@
 
 The study's question: **can an investor protect against stock-market falls
 better than by simply holding less stock?** The strategy, from Kaczmarek et
-al. (2022), forecasts tomorrow's market volatility each day and holds
+al. (2022), forecasts market volatility each day for the session two trading
+days ahead, the one its trade earns after a one-day execution delay, and holds
 `10% ÷ forecast volatility` in stocks (at most 100%), the rest in cash. On
 "storm" days, when the forecast exceeds the past-only 90th percentile, up to
 20% can move from cash into one defensive ETF. Every timing portfolio is
@@ -79,7 +80,7 @@ Results, 2011–2020, 2,447 days with both targets observed:
 | Volatility MSE (not robust) | One-input GRU | One-input GRU | GRU beats GARCH and GJR (intraday) |
 
 The ranking flips with the loss: variance MSE favours ARFIMA, volatility
-MSE the GRU. On the close-to-close target GARCH and GJR rank first and second
+MSE the GRU. On the close-to-close target GJR and GARCH rank first and second
 by variance MSE, so their poor intraday showing was partly a target mismatch.
 The defensible claim is the narrow one: **the one-input GRU has the lowest
 QLIKE on both targets**; no model is distinguishable by variance MSE.
@@ -146,8 +147,11 @@ gap blocks the next 22 sessions; the portfolio then holds its last position.
 
 ![Missing-date sensitivity](figures/risklab/11_missing_date_sensitivity.png)
 
-On days where both rules issue a signal the stock share is identical, so the
-difference comes entirely from positions frozen for weeks. Under the strict
+Two things change between the rules. Under the strict rule positions stay
+frozen for weeks while no fresh signal is issued, and for the GRU the bridged
+histories also change its training samples, and so its forecasts. The archived
+comparison files are not available here, so this page does not measure how much
+of the difference each cause explains. Under the strict
 rule timing beats the fixed mix (EWMA 0.53, GRU 0.57 against 0.43); with
 bridged histories it trails (0.35 against 0.43). **The sign of timing's
 2022–2025 Sharpe advantage is therefore not a finding.** What survives both

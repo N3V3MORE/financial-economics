@@ -263,12 +263,17 @@ descriptions of the examined periods, not permanent properties of either asset.
 
 **Keep this separate from the timing strategy.** These rows are fixed
 holdings in months when SPY fell, not the paper's forecast-driven strategy.
-The volatility archive ends in February 2022, so the full strategy is not
-tested after 2020 (2021 in the extension). We can say TLT's relative
-performance in falling-stock months reversed; we cannot say the paper's
-complete strategy failed in 2022–2025. The early prediction study
-(squared daily returns, 2017–2025) is the only timing evidence after 2021,
-and its setup is rougher.
+The Oxford-Man archive ends in February 2022, so the Oxford-based strategy is
+not tested after 2020 (2021 in the extension). Later timing evidence comes from
+two other studies. The Risk Lab 2022–2025 study runs the full strategy on Risk
+Lab volatility ([findings](findings-risklab.md)): timing had a smaller worst
+fall than its fixed mix, long Treasuries were the worst storm-day asset, no
+portfolio test was significant, and the sign of timing's Sharpe advantage
+depends on how missing volatility dates are handled. The early prediction
+study (squared daily returns, 2017–2025) also covers these years, with a
+rougher setup. We can say TLT's relative performance in falling-stock months
+reversed; neither study shows that the paper's complete strategy reliably
+failed or succeeded in 2022–2025.
 
 ## Changes after cross-checking the paper
 

@@ -8,7 +8,8 @@ eight-ETF diversification study, asks which ETFs beat cash in falling months, an
 ends with a rebuild and extension of the target-volatility strategy in Kaczmarek
 et al. (2022, [doi](https://doi.org/10.1016/j.ribaf.2021.101610)).
 
-That strategy forecasts tomorrow's market volatility each day and holds
+That strategy forecasts market volatility each day for the session two trading
+days ahead, the one its trade earns after a one-day execution delay, and holds
 `10% ÷ forecast volatility` in SPY (at most 100%), with the rest in cash. On
 "storm" days, when the forecast exceeds its past-only 90th percentile, up to 20%
 moves from cash into one defensive ETF: long Treasuries (TLT), gold (GLD) or

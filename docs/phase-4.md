@@ -30,7 +30,7 @@ where \(V_{t-1}\) is the mix's value before day \(t\), starting at $1, \(w_{i,t}
 
 The windows are the five Phase 3 SPY falls, from the SPY peak to the trough, plus the whole evaluation period. The window must start and end on trading days. Contributions show where gains and losses came from. They don't show what a different mix would have earned, because removing a fund would change the other weights too.
 
-The report also gives the correlation between daily SPY and TLT returns in each year since 2010. A negative value means the bond fund tended to rise on days stocks fell. `--bond-fund` picks another study fund.
+The report also gives the correlation between daily SPY and TLT returns in each year since 2010. A negative value means daily bond and stock returns tended to move in opposite directions relative to their averages; on its own it does not show that the bond fund rose on the days stocks fell. `--bond-fund` picks another study fund.
 
 ## Run it
 
