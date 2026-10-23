@@ -151,3 +151,11 @@ def test_hac_holm_and_joint_bootstrap_match_independent_reference():
         np.testing.assert_allclose(intervals.iloc[position][["ci_low", "ci_high"]].to_numpy(dtype=float),
                                    np.quantile(draws, [.025, .975]))
         assert intervals.valid_draws.iloc[position] == 100
+
+
+def test_settings_require_the_main_fee_scenario():
+    study = Study("prediction test", "2013-01-01", "2018-12-31", "SPY",
+                  {"SPY": "Stocks", "TLT": "Treasuries"})
+    PredictionSettings(costs_bps=(0, 10), windows=("2017:2018",)).validate(study)
+    with pytest.raises(ValueError, match="main 10 bps scenario"):
+        PredictionSettings(costs_bps=(0, 5), windows=("2017:2018",)).validate(study)

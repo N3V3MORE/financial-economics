@@ -504,12 +504,23 @@ the richer GRU's macro inputs end in 2020, so it was not extended.
   as an extension of the paper, not a replication; the working branches merged
   into `main`; `volatility-project-checkpoint` deleted (tip `eceb1cf`,
   held only the GPU timing benchmark).
-- **Open next steps:** fix five low-severity
-  issues from the NVIDIA code review (a bare `KeyError` in `predict` when the
-  defensive asset is missing, a hard-coded "eight years" in the attribution
-  report, the missing 2007–09 row in the 2022–2025 table of `final-study.md`,
-  `uv sync --frozen` rather than `--locked` in CI, and little validation in the
-  realistic and reconstruction settings loaders); check the Google Doc draft
-  against the current results; ask the BU library about full TAQ; optionally
-  test 2026 once CRSP returns cover it.
+- **Done October 22–23:** a final full NVIDIA run (`outputs/final-run-20261022`
+  on that machine) passed every stage on the first attempt and matched the
+  earlier full run byte for byte (758 of 759 files, GRU checkpoints included).
+  `scripts/bundle_outputs.py` packs it, with short notes, into one HTML file.
+  Fixed from the code reviews: the missing-asset `KeyError` in `predict`, the
+  hard-coded "eight years", the missing 2007–09 row, CI now uses
+  `uv sync --locked`, `scipy` is a declared dependency, the protection report's
+  interval level and benchmark labels follow the settings, and prediction
+  settings must include the 10 bps scenario the primary tests use. The cash
+  workbook's 2025 total, labels and period notes were corrected, and several
+  overstated doc sentences softened.
+- **Open next steps:** the realistic and reconstruction settings loaders still
+  accept unknown keys and do not range-check values such as `resamples` or
+  `alpha` (the committed configs are valid); the protection configs set
+  `hac_lags` in both `[study]` and `[protection]` (both 6; left as is because
+  `verify_protection.py` checks the config hashes of saved runs); the final
+  run's Phase 4 summary and summary page predate the corrected correlation
+  wording; check the Google Doc draft against the current results; ask the BU
+  library about full TAQ; optionally test 2026 once CRSP returns cover it.
 - **Write-up draft:** [Google Doc](https://docs.google.com/document/d/1aUVYdh1XzAlTyHhGPN4SLtOsYPSjuieeSwIQuM8PsnE/edit?usp=sharing).

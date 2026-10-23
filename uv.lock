@@ -283,6 +283,7 @@ dependencies = [
     { name = "matplotlib" },
     { name = "numpy" },
     { name = "pandas" },
+    { name = "scipy" },
     { name = "statsmodels" },
     { name = "yfinance" },
 ]
@@ -328,6 +329,7 @@ requires-dist = [
     { name = "rocm-sdk-core", marker = "(platform_machine == 'AMD64' and sys_platform == 'win32' and extra == 'prediction-rocm') or (platform_machine == 'x86_64' and sys_platform == 'win32' and extra == 'prediction-rocm')", specifier = "==7.14.1", index = "https://repo.amd.com/rocm/whl-multi-arch/" },
     { name = "rocm-sdk-device-gfx1151", marker = "(platform_machine == 'AMD64' and sys_platform == 'win32' and extra == 'prediction-rocm') or (platform_machine == 'x86_64' and sys_platform == 'win32' and extra == 'prediction-rocm')", specifier = "==7.14.1", index = "https://repo.amd.com/rocm/whl-multi-arch/" },
     { name = "rocm-sdk-libraries", marker = "(platform_machine == 'AMD64' and sys_platform == 'win32' and extra == 'prediction-rocm') or (platform_machine == 'x86_64' and sys_platform == 'win32' and extra == 'prediction-rocm')", specifier = "==7.14.1", index = "https://repo.amd.com/rocm/whl-multi-arch/" },
+    { name = "scipy", specifier = ">=1.14,<2" },
     { name = "statsmodels", specifier = ">=0.14.4,<0.16" },
     { name = "torch", marker = "extra == 'prediction'", specifier = "==2.11.0", index = "https://download.pytorch.org/whl/cu130", conflict = { package = "financial-economics", extra = "prediction" } },
     { name = "torch", extras = ["device-gfx1151"], marker = "(platform_machine == 'AMD64' and sys_platform == 'win32' and extra == 'prediction-rocm') or (platform_machine == 'x86_64' and sys_platform == 'win32' and extra == 'prediction-rocm')", url = "https://repo.amd.com/rocm/whl-multi-arch/torch-2.11.0%2Brocm7.14.1-cp312-cp312-win_amd64.whl" },

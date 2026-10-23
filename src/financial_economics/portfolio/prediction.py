@@ -10,6 +10,7 @@ from financial_economics.portfolio.execution import dynamic_costed_path
 from financial_economics.evaluation.prediction import infer_prediction
 from financial_economics.datasets.returns import compound_months
 from financial_economics.portfolio.declines import compare_episodes, drawdown_episodes
+from financial_economics.settings.prediction import MAIN_COST_BPS
 
 
 @dataclass(frozen=True)
@@ -169,7 +170,7 @@ def run_prediction(data, study, settings, forecasts, defensive_asset="TLT"):
                 portfolio=name, scenario=scenario, cost_bps=cost, cash_income=cash_income))
         paths = pd.DataFrame(paths)
         months = compound_months(paths, daily.index, settings.evaluation_start, study.end)
-        if cash_income and cost == 10:
+        if cash_income and cost == MAIN_COST_BPS:
             main_paths, main_months = paths, months
         for window in windows:
             first, last = window.split(":")

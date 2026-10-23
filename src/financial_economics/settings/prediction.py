@@ -9,6 +9,9 @@ import numpy as np
 import pandas as pd
 
 
+MAIN_COST_BPS = 10  # the primary tests and episode comparisons use this fee scenario
+
+
 @dataclass(frozen=True)
 class PredictionSettings:
     training_end: str = "2014-12-31"
@@ -66,6 +69,8 @@ class PredictionSettings:
                 raise ValueError(f"Invalid {name}.")
         if any(value < 0 for value in self.costs_bps) or 0 not in self.costs_bps:
             raise ValueError("Costs must be nonnegative and include zero costs.")
+        if MAIN_COST_BPS not in self.costs_bps:
+            raise ValueError(f"Costs must include the main {MAIN_COST_BPS:g} bps scenario used by the primary tests.")
         for name, minimum in (("hidden_sizes", 1), ("seeds", 0), ("block_lengths", 1)):
             values = getattr(self, name)
             if (not values or len(set(values)) != len(values)

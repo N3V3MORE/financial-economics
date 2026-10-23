@@ -15,6 +15,9 @@ import pandas as pd
 from financial_economics.provenance import file_digest, git_state, package_code_digests, utc_now
 
 
+PRIMARY_BLOCK_MONTHS = 6  # prespecified mean block length of the plotted intervals
+
+
 def _save(fig, output, name):
     fig.savefig(output / name, dpi=170, bbox_inches="tight", facecolor="white")
     plt.close(fig)
@@ -24,6 +27,7 @@ def _figures(output, study, settings, source):
     """Read the saved figure tables, so plotted values have an exact inspectable source."""
     period = f"{study.start[:4]}–{study.end[:4]}"
     note = f"{period} • {source} • French daily RF compounded monthly"
+    benchmark = study.benchmark
     plt.rcParams.update({"font.size": 11, "axes.spines.top": False, "axes.spines.right": False,
                          "axes.labelcolor": "#222222", "text.color": "#222222"})
     protection = pd.read_csv(output / "figure_protection.csv")
@@ -37,11 +41,12 @@ def _figures(output, study, settings, source):
     ax.set_yticks(positions, labels)
     ax.invert_yaxis()
     ax.xaxis.set_major_formatter(PercentFormatter(1))
-    ax.set_xlabel("Average fund return minus cash in negative-SPY months")
+    ax.set_xlabel(f"Average fund return minus cash in negative-{benchmark} months")
     ax.set_title("Which funds helped relative to cash?", loc="left", fontsize=16, pad=18)
     ax.grid(axis="x", color="#e6e6e6")
-    fig.text(.02, .02, note + "\n" + ("Bars: pointwise 95% bootstrap intervals, mean block 6 months; Holm tests are in primary_tests.csv."
-             if settings.primary_inference else "Longer sample is descriptive; it is not part of the 13-test primary family."), fontsize=9)
+    fig.text(.02, .02, note + "\n" + (f"Bars: pointwise {1 - settings.alpha:.0%} bootstrap intervals, mean block "
+                                      f"{PRIMARY_BLOCK_MONTHS} months; Holm tests are in primary_tests.csv."
+             if settings.primary_inference else "Descriptive sample; it is not part of the primary test family."), fontsize=9)
     fig.tight_layout(rect=(0, .09, 1, 1))
     _save(fig, output, "protection.png")
 
@@ -55,7 +60,7 @@ def _figures(output, study, settings, source):
         ax.scatter(subset.cagr_difference, positions-.12, color="#31688e", marker="o", s=42, label="CAGR")
         ax.scatter(subset.volatility_difference, positions+.12, color="#a66f00", marker="s", s=36, label="Volatility")
         ax.set_yticks(positions, funds)
-        ax.set_title(f"{allocation:.0%} addition / {1-allocation:.0%} SPY")
+        ax.set_title(f"{allocation:.0%} addition / {1-allocation:.0%} {benchmark}")
         ax.set_xlabel("Change (percentage points)")
         ax.xaxis.set_major_formatter(PercentFormatter(1, symbol=""))
         ax.grid(color="#eeeeee")
@@ -63,7 +68,7 @@ def _figures(output, study, settings, source):
         ax.margins(x=.12, y=.06)
     axes[0, 0].invert_yaxis()
     axes[0, 0].legend(loc="lower right")
-    fig.suptitle("Growth and risk relative to the same-SPY-weight cash portfolio", x=.03, ha="left", fontsize=16)
+    fig.suptitle(f"Growth and risk relative to the same-{benchmark}-weight cash portfolio", x=.03, ha="left", fontsize=16)
     cost = tradeoff.cost_bps.iloc[0]
     fig.text(.03, .02, note + f"\n{cost:g} bps per ETF dollar bought/sold; entry and monthly rebalancing included; no exit or taxes."
              "\nPositive CAGR difference means more growth; positive volatility difference means more variability.", fontsize=9)
@@ -88,9 +93,9 @@ def _figures(output, study, settings, source):
         bar.ax.yaxis.set_major_formatter(PercentFormatter(1, symbol=""))
         bar.set_label("Fund return minus cash (pp)")
     else:
-        ax.text(.5, .5, "No SPY drawdowns reached 10%", transform=ax.transAxes, ha="center")
-    ax.set_title("Funds versus cash during SPY drawdowns of at least 10%", loc="left", fontsize=15, pad=16)
-    ax.set_xlabel("SPY peak month; each window ends at its SPY trough")
+        ax.text(.5, .5, f"No {benchmark} drawdowns reached 10%", transform=ax.transAxes, ha="center")
+    ax.set_title(f"Funds versus cash during {benchmark} drawdowns of at least 10%", loc="left", fontsize=15, pad=16)
+    ax.set_xlabel(f"{benchmark} peak month; each window ends at its {benchmark} trough")
     fig.text(.02, .015, note + "\nBuy-and-hold fund return minus cash over each fixed peak-to-trough window; not a timing strategy or a monthly mean.", fontsize=9)
     fig.tight_layout(rect=(0, .075, 1, 1))
     _save(fig, output, "declines.png")
@@ -106,9 +111,9 @@ def write_protection(result, study, settings, manifest, directory, config_path):
     conditions = tables["fund_conditions"]
     figures = conditions.loc[conditions.window.eq(full) & conditions.condition.eq("negative_spy")].copy()
     if settings.primary_inference:
-        ci = tables["bootstrap_intervals"].query("mean_block_months == 6")
+        ci = tables["bootstrap_intervals"].query("mean_block_months == @PRIMARY_BLOCK_MONTHS")
         if ci.empty:
-            raise ValueError("The primary figure requires the prespecified six-month bootstrap.")
+            raise ValueError(f"The primary figure requires the prespecified {PRIMARY_BLOCK_MONTHS}-month bootstrap.")
         figures = figures.merge(ci[["fund", "ci_low", "ci_high"]], on="fund", validate="one_to_one")
     tables["figure_protection"] = figures
     cost = 10 if 10 in settings.costs_bps else settings.costs_bps[0]
