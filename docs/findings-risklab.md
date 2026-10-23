@@ -21,11 +21,15 @@ hash-verified runs by [`scripts/make_findings_figures.py`](../scripts/make_findi
 
 ## The answer in one paragraph
 
-Timing roughly halved the worst falls (COVID: −10% to −16% across the six
-models against −21% to −27% for their fixed mixes and −34% for SPY) while holding more stock on average.
+Timing roughly halved the worst fall in 2011–2020, mostly through one crash
+(COVID: −10% to −16% across the six models against −21% to −27% for their fixed
+mixes and −34% for SPY). It held more stock on average but less market exposure
+(EWMA beta 0.63 against 0.78), and its worst fall stayed smaller against an
+after-the-fact SPY/cash mix with the same volatility (−15.7% against −24.4%).
 It did not reliably earn more per unit of risk: no portfolio test is
-significant after adjustment, in 2011–2020 or 2022–2025, and trading costs
-erode most models' before-fee edge. The GRUs forecast volatility best under
+significant after adjustment, in 2011–2020 or 2022–2025, though the tests have
+little power. Costs shrink the before-fee edge: at 0.10% four of six models
+still lead their fixed mix, at 0.25% only EWMA. The GRUs forecast volatility best under
 QLIKE, significantly so against EWMA and GARCH, but that did not turn into
 reliably better portfolios. Long Treasuries were the worst storm-day asset in
 2022–2025, when bonds fell with stocks. These conclusions hold with Oxford-Man
@@ -91,7 +95,9 @@ QLIKE on both targets**; no model is distinguishable by variance MSE.
 
 EWMA timing sits at 100% stocks in calm markets and falls to 15–40% in the
 2011, 2015–16, 2018 and 2020 sell-offs. On average it held more stock than its
-fixed mix (EWMA 89% against 78%; GARCH 77% against 60%).
+fixed mix (EWMA 89% against 78%; GARCH 77% against 60%), but less market
+exposure, because it held least stock when moves were largest (EWMA beta 0.63
+against 0.78).
 
 ## 4. Smaller crashes, not higher risk-adjusted returns
 
@@ -118,7 +124,8 @@ slow 2015–16 fall (EWMA −13.9% against −10.2%).
 ![Sharpe against trading costs](figures/risklab/06_sharpe_vs_fees.png)
 
 Before fees every timing strategy beats its fixed mix (Sharpe 0.86–0.88
-against 0.80). Costs erode that: at 0.25% per dollar traded only EWMA, which
+against 0.80). Costs shrink that edge: at 0.10% per dollar traded four of six
+models still lead (GARCH and GJR fall behind), and at 0.25% only EWMA, which
 trades least, stays ahead (0.82 against 0.79). GARCH and GJR fall to 0.63.
 
 ## 5. Did the safe assets help? (2022–2025)
@@ -166,7 +173,11 @@ so both sat entirely in cash through January 2022, while SPY fell 5.9% and the
 fixed mix 5.3%. That month accounts for most of the strict-rule advantage. At
 0.10% fees, scoring from February 1, 2022 gives Sharpe 0.52 (EWMA) and 0.57
 (GRU) against 0.53 for the fixed mix, and worst falls of −14.9% and −13.5%
-against about −20%. The smaller worst fall survives; the EWMA Sharpe lead does not.
+against about −20%. The EWMA Sharpe lead does not survive. The smaller worst
+fall survives only against the 2021 fixed mix, which held more risk (about 89% stock).
+Against an after-the-fact SPY/cash mix with the same volatility (about 69% SPY),
+scored from February 1 the gap nearly disappears: −14.9% (EWMA) and −13.5% (GRU)
+against −15.3%, with Sharpe 0.52 and 0.57 against 0.53.
 
 ## 7. Significance
 

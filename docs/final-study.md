@@ -41,6 +41,24 @@ therefore not new. Our addition is the realistic-trading test: a one-day
 delay, stated fee scenarios, interest on cash, past-only stress cutoffs and a
 fixed mix chosen before evaluation.
 
+Volatility timing itself has a large literature, and our results sit inside it
+rather than extending it. Fleming, Kirby and Ostdiek (2001, *Journal of Finance*)
+showed that volatility forecasts have economic value for allocation. Moreira and
+Muir (2017, *Journal of Finance*) found that scaling exposure down when
+volatility is high raised Sharpe ratios for many factors. Later work is more
+skeptical. Cederburg, O'Doherty, Wang and Yan (2020, *Journal of Financial
+Economics*) and Liu, Tang and Zhou (2019, *Journal of Portfolio Management*)
+found that the gains largely disappear in real-time, out-of-sample
+implementations, and Barroso and Detzel (2021, *Journal of Financial Economics*)
+showed that trading costs remove much of what remains. Harvey et al. (2018,
+*Journal of Portfolio Management*) reported the pattern we also see for the
+U.S. market: volatility targeting mainly shrinks the left tail, with a Sharpe
+ratio close to buy-and-hold. Our findings agree: smaller crash losses, no
+reliable Sharpe gain, and an edge that costs erode. On forecasting, the standard
+benchmark for realized volatility is Corsi's (2009, *Journal of Financial
+Econometrics*) HAR model, which this project does not include. So this is an
+independent replication and stress test of Kaczmarek et al., not a new result.
+
 ## What we did
 
 | Step | Data | Rules | Where |

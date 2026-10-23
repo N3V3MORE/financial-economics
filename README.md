@@ -19,6 +19,11 @@ always holds the timing portfolio's average stock share in a calibration year
 after the forecast and pay fees. The forecasting models are EWMA, ARFIMA, GARCH,
 GJR-GARCH and two GRU neural networks.
 
+This is an independent replication and stress test, not a new result. The
+findings match the volatility-timing literature (for example Moreira and Muir
+2017, Harvey et al. 2018, Cederburg et al. 2020), summarised under "Related work"
+in the [final study](docs/final-study.md).
+
 ## What we found
 
 Holding less stock was hard to beat. The eight-ETF mix was calmer than SPY, but
@@ -28,14 +33,20 @@ In 2015–2025, none of 13 candidate ETFs showed a reliably positive average
 contribution against cash in months when SPY fell, and eleven had negative
 effects that survived Holm adjustment.
 
-Volatility timing roughly halved the worst falls while holding more stock on
-average than its fixed mix (EWMA 89% against 78%). In COVID, timing portfolios
-lost 10% to 16% across six models, against 21% to 27% for their fixed mixes and
-34% for SPY. Timing protects against sharp crashes, not slow declines: in the slow
-2015–16 fall EWMA timing lost more than its fixed mix (−13.9% against −10.2%). It
-did not reliably earn more per unit of risk. No portfolio test is significant
-after multiple-testing adjustment, in 2011–2020 or 2022–2025, and trading costs
-erode most models' before-fee edge.
+Volatility timing roughly halved the worst fall in 2011–2020, mostly through one
+crash. In COVID, timing portfolios lost 10% to 16% across six models, against 21%
+to 27% for their fixed mixes and 34% for SPY. Timing held more stock on average
+than its fixed mix (EWMA 89% against 78%) but less market exposure (beta 0.63
+against 0.78), because it cut stock when risk rose. Against an after-the-fact
+SPY/cash mix with the same volatility (70% SPY), EWMA timing's worst fall was
+still smaller (−15.7% against −24.4%). The protection was not consistent: in the
+slow 2015–16 fall EWMA timing lost more than its fixed mix (−13.9% against
+−10.2%), and drawdown differences were never formally tested. Timing did not
+reliably earn more per unit of risk. No portfolio test is significant after
+multiple-testing adjustment, in 2011–2020 or 2022–2025, though the tests have
+little power (standard errors of 0.14–0.19 against Sharpe differences of
+0.02–0.05). Costs matter: at 0.10% per dollar traded four of six models still
+lead their fixed mix on Sharpe, and at 0.25% only EWMA does.
 
 ![Growth of $1 and drawdowns, 2011–2020](docs/figures/risklab/05_growth_and_drawdowns.png)
 
@@ -52,9 +63,12 @@ traded. Worst fall is maximum drawdown.
 | GRU (richer inputs) | 0.829 / 0.796 | −15.4% / −27.1% |
 | SPY | 0.797 | −33.7% |
 
-On the paper's original Oxford-Man volatility data the same realistic test left
-timing at or below its fixed mix (Sharpe 0.76 against 0.80 for ARFIMA, 0.80
-against 0.80 for the one-input GRU).
+On the paper's original Oxford-Man volatility data, the results depend on the
+setup. The paper-style realistic test (the paper's 22× volatility conversion and
+one-session forecasts) left timing at or below its fixed mix (Sharpe 0.76 against
+0.80 for ARFIMA, 0.80 against 0.80 for the one-input GRU). The matched test, with
+the same conventions as the Risk Lab study above, put timing above its fixed mix
+(0.831 against 0.795 for ARFIMA, 0.827 against 0.796 for the one-input GRU).
 
 The one-input GRU had the lowest QLIKE forecast loss (a loss that stays valid
 when measured variance is noisy), significantly lower than EWMA and GARCH, but
