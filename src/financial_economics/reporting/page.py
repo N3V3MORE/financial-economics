@@ -341,7 +341,8 @@ gain and loss in each fall.</p>
 {''.join(_bar_chart(falls[window], f'{window} · mix {100 * falls[window].sum():+.1f} points', 8, 100, '+.1f', highlight) for window in deepest)}
 </div>
 {_table(['Fund', *windows], fund_rows)}
-<p>A negative correlation means the bond fund tended to rise on days stocks fell. The dark bars mark years when
+<p>A negative correlation means daily bond and stock returns tended to move in opposite directions relative
+to their averages; on its own it does not show that the bond fund rose on the days stocks fell. The dark bars mark years when
 it was positive: {', '.join(year for year, value in correlation.items() if value > 0) or 'none'}.</p>
 <div class="pair">
 {_bar_chart(correlation, f'SPY/{bond} daily correlation by year', .8, 1, '+.2f', {year for year, value in correlation.items() if value > 0})}

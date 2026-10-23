@@ -147,7 +147,9 @@ def _write_summary(result: ExplainResult, settings: dict, output: Path) -> None:
               "## Did the bond fund keep cushioning stocks?", "",
               f"| Year | {benchmark}/{settings['bond_fund']} daily correlation |", "|---|---:|"]
     lines += [f"| {year} | {value:+.2f} |" for year, value in result.correlation.items()]
-    lines += ["", "A negative correlation means the bond fund tended to rise on days stocks fell.", "",
+    lines += ["", "A negative correlation means daily bond and stock returns tended to move in opposite "
+                  "directions relative to their averages; on its own it does not show that the bond fund "
+                  "rose on the days stocks fell.", "",
               "## Limits", "",
               "The rebuilt histories reuse the same days, and the funds and dates had already been "
               "examined, so this is not new evidence. Worst declines and recoveries depend on the order "
