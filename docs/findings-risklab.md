@@ -159,6 +159,15 @@ rules: a smaller worst fall than the fixed mix (strict −14.9% against −22.1%
 bridged −19.0% against −22.5%), TLT as the worst storm-day asset, the GRU
 roughly equal to EWMA, and no significant test.
 
+**A data gap gave strict-rule timing a head start.** Risk Lab has no value for
+December 27, 2021, so under the strict rule no forecast is issued until January
+27, 2022, and the first signal earns January 31. Timing portfolios start in cash,
+so both sat entirely in cash through January 2022, while SPY fell 5.9% and the
+fixed mix 5.3%. That month accounts for most of the strict-rule advantage. At
+0.10% fees, scoring from February 1, 2022 gives Sharpe 0.52 (EWMA) and 0.57
+(GRU) against 0.53 for the fixed mix, and worst falls of −14.9% and −13.5%
+against about −20%. The smaller worst fall survives; the EWMA Sharpe lead does not.
+
 ## 7. Significance
 
 ![p-values for all portfolio tests](figures/risklab/10_significance.png)

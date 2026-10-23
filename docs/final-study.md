@@ -269,7 +269,9 @@ two other studies. The Risk Lab 2022–2025 study runs the full strategy on Risk
 Lab volatility ([findings](findings-risklab.md)): timing had a smaller worst
 fall than its fixed mix, long Treasuries were the worst storm-day asset, no
 portfolio test was significant, and the sign of timing's Sharpe advantage
-depends on how missing volatility dates are handled. The early prediction
+depends on how missing volatility dates are handled. Under the strict rule a
+data gap left timing in cash through January 2022, when SPY fell 5.9%; that
+month explains most of its Sharpe lead. The early prediction
 study (squared daily returns, 2017–2025) also covers these years, with a
 rougher setup. We can say TLT's relative performance in falling-stock months
 reversed; neither study shows that the paper's complete strategy reliably

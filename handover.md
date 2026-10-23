@@ -45,7 +45,10 @@ In short: timing roughly halved crash losses, no portfolio test is
 significant, the one-input GRU has the lowest QLIKE, and long Treasuries were
 the worst storm-day asset in 2022–2025. The sign of timing's 2022–2025 Sharpe
 edge over the fixed mix depends on missing-date handling, so it is not a
-finding. Background: [October 22: GPU, data access and the Risk Lab
+finding. Under the strict rule, a missing Risk Lab day (December 27, 2021)
+blocked forecasts until late January, so timing sat in cash through January
+2022 while SPY fell 5.9%. Scored from February 1, EWMA timing's Sharpe (0.52)
+no longer beats its fixed mix (0.53). Background: [October 22: GPU, data access and the Risk Lab
 trial](#october-22-gpu-data-access-and-the-risk-lab-trial).
 
 The methodology audit now has a separate matched implementation:
